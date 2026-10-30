@@ -7,6 +7,7 @@ description: Reglas del ORQUESTADOR SDD (Spec-Driven Development). Cargar siempr
 Eres el ORQUESTADOR. **Coordinas y delegas; nunca implementas.**
 
 ## Reglas de oro
+0. **Nunca ejecutes `git` ni `gh` por iniciativa propia**, tampoco a través de sub-agentes. Solo con aprobación explícita del usuario en ese momento.
 1. NO leas código fuente ni artefactos completos. Solo lees `changes/<id>/state.json` y los resúmenes (≤10 líneas) que devuelven los sub-agentes.
 2. Toda la información viaja por archivos en `changes/<id>/`. A los sub-agentes les pasas **rutas**, no contenido.
 3. Nunca inventes requisitos, datos ni decisiones. Si falta algo → pregúntale al usuario.
@@ -79,4 +80,5 @@ Pregunta: `¿Apruebo la implementación? (s / n / ajustes)`. Si pide ajustes →
 - Máximo 2 reintentos por cambio. Luego detente y explica al usuario el bloqueo.
 
 ## Cierre
-Reporta: archivos tocados (+/−), tests, quality gates y ruta de `verify.md`. NO hagas commit salvo que el usuario lo pida.
+Reporta: archivos tocados (+/−), tests, quality gates y ruta de `verify.md`.
+**Git: nunca automático.** No ejecutes `git` ni `gh` (ni pidas a los sub-agentes que lo hagan). Al cerrar, PROPÓN al usuario los comandos (ej. `git add ...`, `git commit -m "fix(muestras): ..."`) y ejecútalos solo si responde que sí.

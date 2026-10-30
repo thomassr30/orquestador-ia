@@ -12,7 +12,7 @@
  *   node install.js --no-mcp             no registra servidores MCP
  *   node install.js --no-deps            no instala pdfjs-dist / mammoth
  *   node install.js --auto-edits         Claude Code acepta ediciones de archivos sin preguntar (modo acceptEdits)
- *   node install.js --no-permissions     no agrega permisos preaprobados en Claude Code
+ *   node install.js --no-permissions     no agrega permisos preaprobados en Claude Code (git/gh siempre piden aprobación)
  *   node install.js --force              sobrescribe skills/agentes con el mismo nombre que no son del orquestador
  *   node install.js --uninstall          desinstala todo lo instalado
  */
@@ -273,12 +273,11 @@ function registerMcp(tkey, t) {
 }
 
 // ---------- permisos preaprobados (Claude Code) ----------
-// Solo comandos de lectura, tests, lint, build y los scripts del orquestador. Nada que borre, publique o despliegue.
+// Solo tests, lint, build y los scripts del orquestador. Nada de git, nada que borre, publique o despliegue.
 function permissionRules() {
   const bin = `${SDD_HOME_FWD}/bin`;
   return [
     ...['new-change.js', 'sdd-state.js', 'sdd-status.js', 'to-md.js'].map(f => `Bash(node "${bin}/${f}":*)`),
-    'Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git branch:*)',
     'Bash(npm test:*)', 'Bash(npm run test:*)', 'Bash(npm run lint:*)', 'Bash(npm run build:*)', 'Bash(npm run typecheck:*)', 'Bash(npm audit:*)',
     'Bash(npx vitest:*)', 'Bash(npx jest:*)', 'Bash(npx playwright test:*)', 'Bash(npx tsc --noEmit:*)', 'Bash(npx eslint:*)', 'Bash(npx stylelint:*)',
     'Bash(ng test:*)', 'Bash(ng lint:*)', 'Bash(ng build:*)', 'Bash(npx ng test:*)', 'Bash(npx ng lint:*)', 'Bash(npx ng build:*)',
@@ -287,33 +286,65 @@ function permissionRules() {
     'Bash(semgrep scan:*)', 'Bash(docker ps:*)'
   ];
 }
+// Git y GitHub SIEMPRE requieren aprobación del usuario (en Claude Code "ask" tiene prioridad sobre "allow" y sobre acceptEdits)
+const GIT_ASK_CLAUDE = ['Bash(git:*)', 'Bash(gh:*)'];
+const GIT_ASK_OPENCODE = ['git *', 'gh *'];
+
 function configureClaudePermissions(file) {
-  if (opt('no-permissions') && !opt('auto-edits')) return;
   let json;
   try { json = readJson(file); } catch { notes.push(`Claude Code: ${file} no es JSON válido; permisos no configurados.`); return; }
-  json.permissions = json.permissions || {};
-  const added = [];
-  if (!opt('no-permissions')) {
-    const allow = new Set(json.permissions.allow || []);
-    for (const r of permissionRules()) if (!allow.has(r)) { allow.add(r); added.push(r); }
-    json.permissions.allow = [...allow];
-  }
-  let mode = null;
-  if (opt('auto-edits') && json.permissions.defaultMode !== 'acceptEdits') { mode = json.permissions.defaultMode || 'default'; json.permissions.defaultMode = 'acceptEdits'; }
-  if (!added.length && mode === null) return;
+  const P = json.permissions = json.permissions || {};
+  const prevP = manifest.permissions || {};
+  // quitar lo agregado por instalaciones anteriores (se vuelve a agregar lo vigente)
+  const oldAllow = new Set(prevP.added || []); const oldAsk = new Set(prevP.addedAsk || []);
+  P.allow = (P.allow || []).filter(r => !oldAllow.has(r));
+  P.ask = (P.ask || []).filter(r => !oldAsk.has(r));
+  const added = []; const addedAsk = [];
+  if (!opt('no-permissions')) for (const r of permissionRules()) if (!P.allow.includes(r)) { P.allow.push(r); added.push(r); }
+  for (const r of GIT_ASK_CLAUDE) if (!P.ask.includes(r)) { P.ask.push(r); addedAsk.push(r); }
+  if (!P.allow.length) delete P.allow;
+  if (!P.ask.length) delete P.ask;
+  let previousMode = prevP.previousMode ?? null;
+  if (opt('auto-edits') && P.defaultMode !== 'acceptEdits') { previousMode = P.defaultMode || 'default'; P.defaultMode = 'acceptEdits'; }
   backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n');
-  manifest.permissions = { file, added: [...new Set([...((manifest.permissions || {}).added || []), ...added])], previousMode: mode ?? (manifest.permissions || {}).previousMode ?? null };
-  log(`  ✓ ${added.length} permisos preaprobados${opt('auto-edits') ? ' + ediciones automáticas (acceptEdits)' : ''} → ${file}`);
+  manifest.permissions = { file, added, addedAsk, previousMode };
+  log(`  ✓ ${added.length} permisos preaprobados · git/gh siempre con tu aprobación${P.defaultMode === 'acceptEdits' ? ' · ediciones automáticas' : ''} → ${file}`);
 }
 function removeClaudePermissions(p) {
   if (!p || !fs.existsSync(p.file)) return;
   let json; try { json = readJson(p.file); } catch { return; }
-  if (!json.permissions) return;
-  const rm = new Set(p.added || []);
-  if (json.permissions.allow) json.permissions.allow = json.permissions.allow.filter(r => !rm.has(r));
-  if (p.previousMode !== null && p.previousMode !== undefined && json.permissions.defaultMode === 'acceptEdits') {
-    if (p.previousMode === 'default') delete json.permissions.defaultMode; else json.permissions.defaultMode = p.previousMode;
+  const P = json.permissions; if (!P) return;
+  const rmA = new Set(p.added || []); const rmK = new Set(p.addedAsk || []);
+  if (P.allow) { P.allow = P.allow.filter(r => !rmA.has(r)); if (!P.allow.length) delete P.allow; }
+  if (P.ask) { P.ask = P.ask.filter(r => !rmK.has(r)); if (!P.ask.length) delete P.ask; }
+  if (p.previousMode !== null && p.previousMode !== undefined && P.defaultMode === 'acceptEdits') {
+    if (p.previousMode === 'default') delete P.defaultMode; else P.defaultMode = p.previousMode;
   }
+  writeFile(p.file, JSON.stringify(json, null, 2) + '\n');
+}
+function configureOpencodeGit(file) {
+  let json;
+  try { json = readJson(file); } catch { notes.push(`OpenCode: ${file} no es JSON puro; agrega manualmente permission.bash {"git *":"ask","gh *":"ask"}.`); return; }
+  json.permission = json.permission || {};
+  let bash = json.permission.bash;
+  if (typeof bash === 'string') bash = { '*': bash };
+  bash = bash || {};
+  const added = [];
+  for (const k of GIT_ASK_OPENCODE) if (bash[k] !== 'ask') { bash[k] = 'ask'; added.push(k); }
+  json.permission.bash = bash;
+  if (added.length) { backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n'); }
+  const prev = (manifest.opencodePerm || {}).added || [];
+  manifest.opencodePerm = { file, added: [...new Set([...prev, ...added])] };
+  log(`  ✓ git/gh siempre con tu aprobación → ${file}`);
+}
+function removeOpencodeGit(p) {
+  if (!p || !fs.existsSync(p.file)) return;
+  let json; try { json = readJson(p.file); } catch { return; }
+  const bash = json.permission && json.permission.bash;
+  if (!bash || typeof bash !== 'object') return;
+  for (const k of p.added || []) delete bash[k];
+  if (!Object.keys(bash).length) delete json.permission.bash;
+  if (json.permission && !Object.keys(json.permission).length) delete json.permission;
   writeFile(p.file, JSON.stringify(json, null, 2) + '\n');
 }
 
@@ -330,6 +361,7 @@ function uninstall() {
   log('Desinstalando Orquestador SDD...');
   removePrevious(prev, false);
   removeClaudePermissions(prev.permissions);
+  removeOpencodeGit(prev.opencodePerm);
   rmrf(SDD_HOME);
   log('✓ Skills, agentes, comandos y reglas globales eliminados.');
   if ((prev.mcp || []).length) log(`Los servidores MCP registrados se mantienen (pueden usarlos otras herramientas): ${[...new Set(prev.mcp.map(m => m.name))].join(', ')}`);
@@ -366,6 +398,7 @@ function install() {
   const foreign = p => fs.existsSync(p) && !owned.has(p) && !FORCE;
   manifest.mcp = [...(prev?.mcp || [])];
   if (prev?.permissions) manifest.permissions = prev.permissions;
+  if (prev?.opencodePerm) manifest.opencodePerm = prev.opencodePerm;
   removePrevious(prev, true); // reinstalación limpia (las reglas se reemplazan en su lugar)
 
   // 1. runtime: scripts + dependencias
@@ -427,6 +460,7 @@ function install() {
       notes.push(`Cursor: pega el contenido de core/rules/global.md en Cursor → Settings → Rules → User Rules.`);
     }
     if (t.settings) configureClaudePermissions(t.settings);
+    if (k === 'opencode') configureOpencodeGit(t.mcp.file);
     if (!opt('no-mcp')) registerMcp(k, t);
   }
 

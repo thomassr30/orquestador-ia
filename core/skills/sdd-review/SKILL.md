@@ -9,6 +9,6 @@ Alcance: $ARGUMENTS
 
 1. Carga la skill `sdd-orchestrator`.
 2. Crea el cambio: `node "{{SDD_HOME}}/bin/new-change.js" --type review "<alcance>"`
-3. Escribe el alcance en `changes/<id>/input.md`. Para diffs, guarda la lista de archivos: `git diff --name-only <base>` (no el diff completo).
+3. Escribe el alcance en `changes/<id>/input.md`. Para revisar un diff/rama necesitas `git diff --name-only <base>`: **pide aprobación al usuario** antes de ejecutarlo (o pídele la lista de archivos).
 4. Delega `explore` (solo stack.json + archivos del alcance) y luego `review` en `sdd-reviewer`.
 5. Muestra al usuario el resumen y la ruta de `review.md`. NO corrijas nada. Ofrece: "¿Corrijo los hallazgos críticos con /sdd-fix?".

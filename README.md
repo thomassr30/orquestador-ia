@@ -71,6 +71,7 @@ revisa los cambios antes de subir                 → [SDD] Flujo: review
 
 - Para una respuesta sin flujo, di **"directo"** o **"sin sdd"**.
 - La IA siempre se detiene a pedir tu aprobación antes de modificar código.
+- **Git y GitHub nunca son automáticos:** ningún `git` ni `gh` (commit, push, PR…) se ejecuta sin tu aprobación. Al terminar, la IA te propone los comandos y espera tu "sí".
 
 Los comandos siguen disponibles si quieres forzar un flujo:
 

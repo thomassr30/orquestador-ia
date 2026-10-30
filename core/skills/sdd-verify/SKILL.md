@@ -19,7 +19,7 @@ ENTRADA: `spec.md`, `design.md`, `tasks.md`, `test-plan.md`, `stack.json`. SALID
 - [ ] 0 vulnerabilidades altas/críticas nuevas
 - [ ] 0 violaciones graves de accesibilidad (si hubo UI)
 - [ ] Cada REQ de spec.md trazado a ≥1 test que pasa
-- [ ] El diff no toca archivos fuera de tasks.md (justificar si lo hace)
+- [ ] Los archivos modificados están dentro de tasks.md (compáralo con lo reportado por los implementers; no ejecutes git)
 
 ```markdown
 # Verificación — APROBADO | RECHAZADO
