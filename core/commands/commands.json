@@ -88,5 +88,10 @@
     "name": "sdd-improve",
     "description": "Mejora continua del orquestador (con evidencia y aprobación)",
     "skill": "sdd-improve"
+  },
+  {
+    "name": "sdd-ux",
+    "description": "Diseño y experiencia: criticar, auditar, pulir, textos, adaptar, simplificar",
+    "skill": "sdd-ux"
   }
 ]

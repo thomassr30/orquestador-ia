@@ -14,8 +14,8 @@ for (let i = 0; i < args.length; i++) {
   else words.push(args[i]);
 }
 const FLOWS = {
-  feature: ['ingest', 'explore', 'analysis', 'propose', 'spec', 'design', 'test-plan', 'tasks', 'gate', 'test-write', 'apply', 'verify', 'qa'],
-  fix: ['ingest', 'explore', 'test-plan', 'tasks', 'gate', 'test-write', 'apply', 'verify', 'qa'],
+  feature: ['ingest', 'explore', 'analysis', 'propose', 'spec', 'design', 'test-plan', 'tasks', 'gate', 'test-write', 'apply', 'verify', 'ui-review', 'qa'],
+  fix: ['ingest', 'explore', 'test-plan', 'tasks', 'gate', 'test-write', 'apply', 'verify', 'ui-review', 'qa'],
   analysis: ['ingest', 'explore', 'analysis'],
   qa: ['qa'],
   deps: ['explore', 'deps-audit', 'gate', 'apply', 'verify'],

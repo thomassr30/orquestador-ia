@@ -3,8 +3,8 @@
 Orquestador de agentes para desarrollo guiado por especificaciones (SDD). Se instala **una vez** y queda disponible en **todos tus proyectos** y en **6 herramientas de IA**: Claude Code, OpenCode, Gemini CLI, Codex CLI, Cursor y VS Code Copilot.
 
 - **1 orquestador**: coordina el trabajo y no programa.
-- **21 sub-agentes**, de 20 a 30 líneas cada uno.
-- **96 skills** con el conocimiento detallado.
+- **22 sub-agentes**, de 20 a 30 líneas cada uno.
+- **104 skills** con el conocimiento detallado.
 - **10 comandos** para consultar, desarrollar, corregir, testear, refactorizar, revisar y documentar. Se cargan solo cuando se necesitan.
 
 ---
@@ -99,6 +99,7 @@ Los comandos siguen disponibles si quieres forzar un flujo:
 | **Retomar** un cambio a medias | `/sdd-continue [id]` | — |
 | Ver el **estado** de los cambios | `/sdd-status [--all]` | — (script, sin tokens) |
 | **QA funcional / UAT** (casos de aceptación, bugs, veredicto) | `/sdd-qa <qué probar>` | ❌ |
+| **Diseño** de una pantalla: criticar, auditar, pulir, textos, adaptar, simplificar, más audaz/sobrio | `/sdd-ux <pedido>` o pedirlo normal | Revisiones no; mejoras sí (con GATE) |
 | **Trabajar un ticket** (Jira, Azure Boards, GitHub, GitLab, Linear) | `/sdd-ticket LAB-123` o mencionar la clave | ✅ tras tu aprobación |
 | **Prototipo** visual antes de implementar | `/sdd-prototype <pantalla o flujo>` | ❌ (solo `changes/<id>/prototipo/`) |
 | **Dependencias**: auditar y actualizar por lotes | `/sdd-deps [objetivo]` | ✅ lotes aprobados |
@@ -138,6 +139,7 @@ TÚ → ORQUESTADOR (skill sdd-orchestrator: solo lee state.json y resúmenes)
         ├─ sdd-test-writer       → tests (TDD)
         ├─ sdd-backend-implementer / sdd-frontend-implementer / sdd-db-implementer / sdd-mobile-implementer
         ├─ sdd-verifier          → verify.md (quality gates)
+        ├─ sdd-ui-reviewer       → design-review.md (crítica + auditoría de UI)
         ├─ sdd-qa-functional     → qa-report.md (aceptación, bugs, veredicto)
         ├─ sdd-reviewer          → review.md (/sdd-review)
         ├─ sdd-doc-writer        → docs/*.md (/sdd-doc)
@@ -151,7 +153,7 @@ TÚ → ORQUESTADOR (skill sdd-orchestrator: solo lee state.json y resúmenes)
 - **Ahorro de tokens:** el orquestador no lee código. Los sub-agentes nacen con contexto limpio. Se comunican por archivos, no por chat. Las skills `stack-*` se cargan según `stack.json`. El estado y la ingesta de PDF/DOCX se manejan con scripts que no usan IA.
 - **Stack:** `stack-go`, `stack-nodejs`, `stack-nestjs`, `stack-adonisjs`, `stack-angular`, `stack-react`, `stack-nextjs`, `stack-html-css`, `stack-tailwind`, `stack-scss`, `stack-postgres`, `stack-sqlserver`.
 - **Mobile:** `stack-react-native`, `stack-expo`, `rn-animations`, `stack-ios`, `stack-swiftui`, `ios-hardware`, `stack-android`, `stack-compose`, `android-hardware`, `mobile-design`, `test-mobile`.
-- **Diseño:** `design-quality` (web y mobile, anti diseño genérico).
+- **Diseño (web y mobile):** `design-quality` (núcleo: contexto, modos, reglas por área, anti-patrones), `design-context`, `design-shape`, `design-critique`, `design-audit`, `design-polish`, `design-harden`, `ux-writing`, `sdd-ux`.
 - **DevOps (una skill por plataforma):** `devops-cicd` (principios y mapa), `ci-github-actions`, `ci-gitlab`, `ci-azure-pipelines`, `ci-jenkins`, `ci-bitbucket`, `container-docker`, `deploy-kubernetes`, `deploy-openshift`, `deploy-helm`, `deploy-kustomize`, `iac-terraform`, `config-consul`, `config-vault`, `ops-observability`, `post-deploy-check`.
 - **Análisis funcional:** `analysis-requirements`, `analysis-modeling`, `analysis-estimation`.
 - **QA funcional:** `qa-acceptance`, `qa-web`, `qa-mobile`.
@@ -239,3 +241,7 @@ Sube la versión en `package.json` y anota el cambio en `CHANGELOG.md`.
 - Al crear `~/.config/opencode/AGENTS.md`, OpenCode deja de usar `~/.claude/CLAUDE.md` como respaldo.
 - En Codex, si tienes `~/.codex/AGENTS.override.md`, ese archivo tiene prioridad: copia ahí el bloque `sdd-orquestador`.
 - La compatibilidad con sub-agentes y skills depende de la versión de cada herramienta. Mantenlas actualizadas.
+
+## Créditos
+
+Las skills de diseño están inspiradas en [Impeccable](https://github.com/pbakaus/impeccable) de Paul Bakaus (Apache 2.0). Adaptación propia en español; ver `NOTICE`.

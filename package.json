@@ -1,6 +1,6 @@
 {
   "name": "orquestador-sdd",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Orquestador de agentes SDD global y multi-IA (Claude Code, OpenCode, Gemini CLI, Codex, Cursor, VS Code Copilot)",
   "private": true,
   "scripts": {

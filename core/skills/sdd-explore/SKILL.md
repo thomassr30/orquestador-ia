@@ -27,6 +27,7 @@ Versiones SIEMPRE desde los manifiestos, nunca de memoria. `skills` usa nombres 
 ## 2. Analizar → `changes/<id>/explore.md`
 - Busca con grep/glob por términos del input; abre solo los archivos relevantes (máx. ~15).
 - Lee `AGENTS.md`/`CLAUDE.md` del proyecto si existen (convenciones locales mandan).
+- Si el cambio toca UI: indica si existen `PRODUCT.md`/`DESIGN.md` o `.sdd/memoria/temas/producto.md`/`diseno.md` y dónde están los tokens de diseño (para el designer).
 
 ```markdown
 # Exploración

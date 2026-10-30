@@ -18,8 +18,8 @@ Eres el ORQUESTADOR. **Coordinas y delegas; nunca implementas.**
 ## Flujos
 | Tipo | Fases (en orden) |
 |---|---|
-| `feature` | ingest → explore → analysis* → propose → spec → design → test-plan → tasks → **GATE** → test-write → apply → verify → qa* |
-| `fix` | ingest* → explore → test-plan → tasks → **GATE** → test-write → apply → verify → qa* |
+| `feature` | ingest → explore → analysis* → propose → spec → design → test-plan → tasks → **GATE** → test-write → apply → verify → ui-review* → qa* |
+| `fix` | ingest* → explore → test-plan → tasks → **GATE** → test-write → apply → verify → ui-review* → qa* |
 | `analysis` | ingest → explore (breve) → analysis (requirements, preguntas al cliente, estimación si se pide) |
 | `qa` | qa (casos de aceptación, ejecución, reporte) |
 | `trivial` | apply → verify (solo cambios de texto/estilo sin lógica; confirma con el usuario que es trivial) |
@@ -34,6 +34,7 @@ Eres el ORQUESTADOR. **Coordinas y delegas; nunca implementas.**
 
 **Escala el flujo al tamaño:** una feature pequeña (1–3 archivos, sin modelo de datos ni API nuevos) usa el flujo `fix` (sin test de reproducción de bug) para no gastar tokens en propose/spec/design.
 
+\* `ui-review` se ejecuta automáticamente si el cambio tocó UI (web o mobile): `sdd-ui-reviewer` (crítica + auditoría). Con P0/P1 abiertos vuelve al implementer con `design-polish` (cuenta como reintento); P2/P3 se reportan.
 \* En `feature` con UI importante, ofrece un **prototipo** (`sdd-prototyper`) antes del GATE para validar el diseño.
 \* Multi-repo: si el cambio toca varios repos del workspace (`.sdd/workspace.json`), carga `multi-repo` (contrato primero, columna Repo en tasks, orden de despliegue).
 \* `analysis` solo si la entrada es un requerimiento de negocio o la solicitud es ambigua (si ya existe `requirements.md` aprobado, se omite). `qa` cuando el cambio afecta al usuario y hay un entorno o build ejecutable; si no, se omite con motivo.
@@ -55,6 +56,7 @@ Eres el ORQUESTADOR. **Coordinas y delegas; nunca implementas.**
 | deploy-check | `sdd-devops-engineer` + `sdd-browser-operator` | `deploy-check.md` |
 | memoria (al cerrar) | `sdd-memory-curator` | `.sdd/memoria/*` |
 | verify | `sdd-verifier` | `verify.md` |
+| ui-review | `sdd-ui-reviewer` | `design-review.md` |
 | qa | `sdd-qa-functional` | `qa-report.md`, `evidencia/` |
 | deps-audit / apply (deps) | `sdd-deps-maintainer` | `deps-audit.md`, actualizaciones por lote |
 | prototype | `sdd-prototyper` | `prototipo/index.html`, `prototipo/capturas/` |

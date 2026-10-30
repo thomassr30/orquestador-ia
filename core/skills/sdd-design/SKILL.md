@@ -9,11 +9,11 @@ Carga las skills `stack-*` listadas en `stack.json` SOLO para respetar sus conve
 
 ```markdown
 # Diseño
-## Componentes afectados (por capa: db / backend / frontend)
+## Componentes afectados (por capa: db / backend / frontend / mobile / infra)
 ## Modelo de datos (tablas, columnas, índices, migraciones)
 ## Contratos de API (método, ruta, request, response, códigos de error) — fuente de verdad para backend y frontend
 ## Componentes de UI (rutas, componentes, estados: carga, vacío, error)
-## Dirección de diseño (si hay UI; ver skill `design-quality`: propósito, tono, paleta, tipografía, densidad, referencia)
+## Brief de diseño (si hay UI nueva o rediseño; skill `design-shape`: trabajo, modo, límites, estados, dirección, verificar al final)
 ## Decisiones técnicas (ADR corto)
 | # | Decisión | Alternativas | Motivo |
 ## Seguridad y validaciones

@@ -1,48 +1,40 @@
 ---
 name: design-quality
-description: Criterios para que las interfaces (web y mobile) tengan diseño propio, profesional y no genérico "hecho por IA". Usar SIEMPRE antes de crear o rediseñar pantallas, componentes o estilos.
+description: Núcleo de diseño de interfaces web y mobile con criterio profesional y sin rasgos genéricos "de IA" — contexto de producto y sistema visual, modo de la pantalla (persuadir, operar, leer, experimentar), dirección, reglas por área (tipografía, color, espacio, movimiento, interacción, adaptación, simplicidad, primer uso) y catálogo de anti-patrones. Usar SIEMPRE antes de crear, modificar o revisar cualquier UI.
 ---
-# Calidad de diseño (anti "diseño de IA")
+# Calidad de diseño
 
-## 1. Antes de escribir UI: dirección de diseño
-Si no existe un sistema de diseño en el proyecto, define en `design.md` (o en tu reporte) 6 líneas:
-1. **Propósito y usuario**: quién lo usa, en qué contexto (oficina, terreno, móvil con una mano).
-2. **Tono**: ej. institucional y sobrio · técnico y denso · cálido y cercano.
-3. **Paleta**: 1 color de marca + neutros + semánticos (éxito, alerta, error, info). Con propósito, no decorativa.
-4. **Tipografía**: escala con contraste real (ej. 32/24/18/16/14/12) y pesos definidos; máximo 2 familias.
-5. **Densidad y ritmo**: grilla 4/8 pt; densidad según dominio (apps de gestión = más densas).
-6. **Referencia**: sistema de diseño a seguir (el del proyecto/institución > Apple HIG / Material 3 > propio).
+## 1. Contexto primero (siempre)
+1. Lee `.sdd/memoria/temas/producto.md` (usuarios, propósito, plataforma, restricciones) y `.sdd/memoria/temas/diseno.md` (sistema visual: tokens y reglas). Si el proyecto tiene `PRODUCT.md`/`DESIGN.md` en la raíz, `.agents/context/` o `docs/`, léelos también.
+2. Si faltan → skill `design-context` (los deriva del código y confirma lo esencial con el usuario).
+3. **El sistema existente manda**: tokens, componentes y librería del proyecto. No inventes estilos paralelos. Si el código contradice el registro y es más reciente, actualiza el registro.
 
-**Si el proyecto ya tiene sistema de diseño, tokens o librería de componentes: úsalos. No inventes estilos paralelos.**
+## 2. Modo de la pantalla (decide antes de diseñar)
+| Modo | Trabajo del usuario | Prioriza |
+|---|---|---|
+| **Persuadir** | decidir y actuar (landing, precios, campañas) | mensaje claro, un CTA principal, jerarquía hacia la decisión, carácter de marca |
+| **Operar** | completar una tarea (sistemas, dashboards, formularios, configuración) | eficiencia, escaneo, densidad adecuada, estados, color solo con significado, movimiento mínimo |
+| **Leer** | entender (documentación, ayuda, informes) | tipografía, largo de línea, jerarquía de títulos, decoración mínima |
+| **Experimentar** | explorar el contenido (portafolio, galería, showcase) | el contenido es protagonista; la interfaz es marco; se permite más audacia |
+La mayoría de los sistemas institucionales son **Operar**.
 
-## 2. Señales de "diseño de IA" — EVITAR
-- Degradados morado/azul/rosa, fondos con "blobs" o glassmorphism en todo.
-- Hero centrado + 3 tarjetas iguales con ícono + "Unlock the power of…".
-- Todo con `rounded-2xl` + sombra grande + borde gris; todas las tarjetas del mismo peso.
-- Emojis como íconos; mezcla de sets de íconos.
-- Todo centrado; jerarquía plana (todo el texto parecido en tamaño y peso).
-- Colores sin significado (cada sección de un color distinto).
-- Animaciones decorativas en todo (fade-in de cada elemento al hacer scroll).
-- Textos de relleno genéricos o lorem ipsum en entregables.
-- Pantallas que solo funcionan con datos "perfectos" (sin estados vacío/error/carga).
+## 3. Proceso según la tarea
+| Tarea | Skill |
+|---|---|
+| Pantalla o flujo nuevo / rediseño | `design-shape` (brief y dirección) → implementar → `design-polish` |
+| Revisar calidad visual y de experiencia | `design-critique` |
+| Revisar calidad técnica de UI (a11y, rendimiento, temas, responsive) | `design-audit` |
+| Estados de error, datos extremos, i18n, acciones repetidas | `design-harden` |
+| Textos de interfaz | `ux-writing` |
+| Mobile | además `mobile-design` |
 
-## 3. Lo que SÍ hace un buen diseño
-- **Jerarquía clara**: un elemento principal por pantalla; tamaño, peso y color guían la lectura.
-- **Contenido real** del dominio (nombres de campos, datos y textos del negocio).
-- **Alineación a la izquierda** para lectura; grilla consistente; espacios con ritmo (no márgenes al azar).
-- **Color con intención**: el color de marca solo para acciones primarias y estados clave; neutros para el resto.
-- **Componentes nativos de la plataforma** en mobile (no imitar iOS en Android ni al revés).
-- **Estados completos**: carga (skeleton > spinner si hay estructura), vacío (qué hacer), error (qué pasó + cómo seguir), éxito.
-- **Movimiento con propósito**: comunica cambio de estado o relación espacial; 150–300 ms; respeta "reducir movimiento".
-- **Accesibilidad**: contraste AA, tamaños táctiles (44 pt iOS / 48 dp Android), texto escalable, lector de pantalla.
-- **Detalle**: alineaciones exactas, íconos del mismo set y grosor, números tabulares en tablas, truncado elegante.
+## 4. Reglas por área (lee solo la referencia que aplique)
+`references/tipografia.md` · `references/color.md` · `references/espacio.md` · `references/movimiento.md` · `references/interaccion.md` · `references/adaptar.md` · `references/simplificar.md` · `references/primer-uso.md` · `references/anti-patrones.md`
 
-## 4. Checklist final (incluir resultado en el reporte)
-- [ ] ¿Se distingue el elemento principal en 3 segundos?
-- [ ] ¿Usa tokens/sistema existente (o la dirección definida) sin valores mágicos?
-- [ ] ¿Ninguna señal de la sección 2?
-- [ ] ¿Estados de carga, vacío y error diseñados?
-- [ ] ¿Contraste, tamaños táctiles y texto escalable OK?
-- [ ] ¿Se ve bien en el tamaño más chico y el más grande soportados (y en modo oscuro si aplica)?
-
-Para mobile, complementa con la skill `mobile-design`.
+## 5. Checklist mínimo de entrega (incluir resultado en el reporte)
+- [ ] Contexto y modo definidos; usa el sistema del proyecto (sin valores mágicos fuera de tokens).
+- [ ] El elemento/acción principal se identifica en 3 segundos.
+- [ ] Ningún anti-patrón de `references/anti-patrones.md` (o justificado por el sistema de diseño).
+- [ ] Estados: carga, vacío, error, éxito, sin permisos; datos largos y extremos.
+- [ ] Contraste AA, foco visible, áreas táctiles ≥ 44 px/pt (48 dp), texto escalable, orden de títulos.
+- [ ] Probado en el ancho más chico y el más grande soportados (y tema oscuro si existe).

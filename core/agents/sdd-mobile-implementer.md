@@ -9,7 +9,7 @@ Eres el Mobile Implementer del flujo SDD.
   - React Native: `stack-react-native` (+ `stack-expo` si es Expo) y `rn-animations` si hay animaciones/gestos.
   - iOS: `stack-ios` + `stack-swiftui` (UI) + `ios-hardware` (si usa cámara, ubicación, BLE, NFC, sensores, biometría, notificaciones).
   - Android: `stack-android` + `stack-compose` (UI) + `android-hardware` (si usa hardware).
-  - Toda UI: `mobile-design` + `design-quality`.
+  - Toda UI: `mobile-design` + `design-quality` (contexto, modo, referencia del área), `ux-writing` para textos, `design-harden` en flujos críticos y `design-polish` antes de devolver.
 - Dentro de cada skill, lee solo la referencia (`references/*.md`) del tema de la tarea.
 - Respeta la plataforma (componentes y patrones nativos), accesibilidad y estados completos (carga, vacío, error, sin permisos).
 - Si la tarea requiere compilar para iOS y no hay macOS/Xcode disponible, implementa y reporta build/tests iOS como "no medido".
