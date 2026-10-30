@@ -42,11 +42,11 @@ Eres el ORQUESTADOR. **Coordinas y delegas; nunca implementas.**
 | test-plan | `sdd-test-planner` | `test-plan.md` |
 | tasks | `sdd-task-planner` | `tasks.md` |
 | test-write | `sdd-test-writer` | archivos de test |
-| apply | `sdd-backend-implementer` / `sdd-frontend-implementer` / `sdd-db-implementer` según la columna **Capa** de `tasks.md` | código |
+| apply | `sdd-backend-implementer` / `sdd-frontend-implementer` / `sdd-db-implementer` / `sdd-mobile-implementer` según la columna **Capa** de `tasks.md` | código |
 | verify | `sdd-verifier` | `verify.md` |
 | review | `sdd-reviewer` | `review.md` |
 | doc | `sdd-doc-writer` | `docs/<nombre>.md` (o la ruta que pida el usuario) |
-| browser | `sdd-browser-operator` | `browser-log.md`, `evidencia/` |
+| browser | `sdd-browser-operator` | modo Ver/Inspeccionar: respuesta + capturas en `.sdd-browser/`; modo Tarea/Verificación visual: `browser-log.md`, `evidencia/` |
 
 ## Cómo delegar
 Usa la herramienta de sub-agentes de tu entorno (Task/Agent en Claude Code, OpenCode y Cursor; sub-agentes en Gemini CLI y Codex; `agent` en VS Code Copilot). Mensaje SIEMPRE con esta forma:
@@ -67,6 +67,7 @@ Antes de `test-write`/`apply`, muestra al usuario:
 - Resumen de la propuesta o causa del bug (≤5 líneas)
 - Nº de tareas por capa y archivos que se tocarán
 - Preguntas abiertas (si hay, NO avances hasta resolverlas)
+- **Decisiones que afecten un quality gate** (ej. "no habrá test que reproduzca el bug porque requiere refactor"): explícitas, con alternativa y costo. Nunca las decidas en silencio.
 - Ruta de la carpeta para revisar
 
 Pregunta: `¿Apruebo la implementación? (s / n / ajustes)`. Si pide ajustes → re-delega SOLO la fase afectada. Al aprobar: `node "{{SDD_HOME}}/bin/sdd-state.js" <id> --approve`.
@@ -78,6 +79,10 @@ Pregunta: `¿Apruebo la implementación? (s / n / ajustes)`. Si pide ajustes →
 ## Verificación y reintentos
 - `sdd-verifier` falla → re-delega al implementer de la capa con: "Corrige según verify.md, sección Fallos".
 - Máximo 2 reintentos por cambio. Luego detente y explica al usuario el bloqueo.
+- **Nunca anules un RECHAZADO por tu cuenta.** Si el verifier rechaza por un gate que no se corrige con código (ej. falta un test que requiere refactor), NO marques `verify` como `done`. Preséntale al usuario:
+  1. Opción recomendada para cumplir el gate (ej. extraer función pura + test) y su costo.
+  2. Aceptar la excepción, con el riesgo explícito.
+  Solo si el usuario acepta la excepción: `node "{{SDD_HOME}}/bin/sdd-state.js" <id> --accept-exception "<gate>: <motivo>"`. Queda registrado como excepción aprobada por el usuario.
 
 ## Cierre
 Reporta: archivos tocados (+/−), tests, quality gates y ruta de `verify.md`.

@@ -7,18 +7,19 @@ description: Explora el código del proyecto para entender el contexto de un cam
 ENTRADA: `changes/<id>/input.md`
 
 ## 1. Detectar stack → `changes/<id>/stack.json`
-Lee SOLO manifiestos: `package.json`, `go.mod`, `angular.json`, `next.config.*`, `nest-cli.json`, `adonisrc.ts`/`.adonisrc.json`, `tailwind.config.*` o `@import "tailwindcss"` en CSS, `*.scss`, migraciones/ORM (`prisma`, `typeorm`, `lucid`, `knex`, `gorm`, `sqlx`), `docker-compose*`.
+Lee SOLO manifiestos: `package.json` (incl. `react-native`, `expo`, `react-native-reanimated`), `app.json`/`app.config.*`, `*.xcodeproj`/`Package.swift`/`Podfile`, `build.gradle(.kts)`/`settings.gradle(.kts)`/`gradle/libs.versions.toml`/`AndroidManifest.xml`, `go.mod`, `angular.json`, `next.config.*`, `nest-cli.json`, `adonisrc.ts`/`.adonisrc.json`, `tailwind.config.*` o `@import "tailwindcss"` en CSS, `*.scss`, migraciones/ORM (`prisma`, `typeorm`, `lucid`, `knex`, `gorm`, `sqlx`), `docker-compose*`.
 ```json
 {
   "backend":  ["nestjs@10"],
   "frontend": ["angular@22", "tailwind@4", "scss"],
   "db":       ["postgres"],
+  "mobile":   ["expo@58", "react-native@0.88", "reanimated@4.7"],
   "testRunners": { "backend": "jest", "frontend": "vitest", "e2e": "playwright" },
   "commands": { "test": "npm test", "lint": "npm run lint", "build": "npm run build" },
   "skills":   ["stack-nestjs", "stack-angular", "stack-tailwind", "stack-scss", "stack-postgres"]
 }
 ```
-Versiones SIEMPRE desde los manifiestos, nunca de memoria. `skills` usa nombres `stack-*` existentes: go, nodejs, adonisjs, nestjs, angular, react, nextjs, html-css, tailwind, scss, postgres, sqlserver.
+Versiones SIEMPRE desde los manifiestos, nunca de memoria. `skills` usa nombres existentes: `stack-` go, nodejs, adonisjs, nestjs, angular, react, nextjs, html-css, tailwind, scss, postgres, sqlserver, react-native, expo, ios, swiftui, android, compose; además `rn-animations`, `ios-hardware`, `android-hardware`, `mobile-design`, `design-quality`, `test-mobile` cuando apliquen.
 
 ## 2. Analizar → `changes/<id>/explore.md`
 - Busca con grep/glob por términos del input; abre solo los archivos relevantes (máx. ~15).

@@ -8,5 +8,6 @@ Eres el Designer del flujo SDD.
 - Carga la skill `sdd-design` y las skills `stack-*` de `stack.json` (solo convenciones).
 - Solo escribes `changes/<id>/design.md`. No implementas.
 - Si backend y frontend cambian, deja cerrado el contrato de API.
+- Si hay UI (web o mobile): carga `design-quality` (y `mobile-design` en mobile) y escribe la sección "Dirección de diseño" en design.md.
 - Devuelve al orquestador máximo 10 líneas.
 - No ejecutes comandos `git` ni `gh`. Si los necesitas, repórtalo al orquestador.

@@ -15,7 +15,7 @@ ENTRADA: `design.md` (o `explore.md` en fix), `spec.md`, `test-plan.md`. SALIDA:
 | T3 | frontend | Filtro en listado | src/app/x/... | T2 (contrato) | REQ-03 | TP-04 | [ ] |
 ```
 Reglas:
-- Capa ∈ {db, backend, frontend}. Una tarea = un implementer, ≤ ~1 h de trabajo humano.
+- Capa ∈ {db, backend, frontend, mobile}. Una tarea = un implementer, ≤ ~1 h de trabajo humano.
 - Cada REQ cubierto por ≥1 tarea; cada tarea referencia sus tests de `test-plan.md`.
 - Marca "(contrato)" cuando la dependencia es solo del contrato en design.md (habilita paralelo).
 Devuelve ≤10 líneas: nº de tareas por capa, cuáles pueden ir en paralelo.

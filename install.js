@@ -123,7 +123,12 @@ function backup(f) {
   const b = `${f}.bak-sdd`;
   if (!fs.existsSync(b)) fs.copyFileSync(f, b);
 }
-function render(text) { return text.split('{{SDD_HOME}}').join(SDD_HOME_FWD); }
+function render(text) {
+  let out = text.split('{{SDD_HOME}}').join(SDD_HOME_FWD);
+  // Frontmatter YAML seguro: entrecomilla descripciones con ": " (evita skills inválidas)
+  out = out.replace(/^(---\r?\n[\s\S]*?^description: )(?!["'])(.*: .*)$/m, (_, pre, v) => pre + JSON.stringify(v));
+  return out;
+}
 function copyDir(src, dst) {
   mkdirp(dst);
   for (const e of fs.readdirSync(src, { withFileTypes: true })) {
@@ -477,6 +482,8 @@ function install() {
 // ---------- actualización automática tras git pull ----------
 function setupGitHooks() {
   if (DRY || !fs.existsSync(path.join(ROOT, '.git')) || !fs.existsSync(path.join(ROOT, '.githooks'))) return;
+  // En macOS/Linux git ignora hooks sin permiso de ejecución (p. ej. si se hizo commit desde Windows)
+  if (!IS_WIN) for (const h of fs.readdirSync(path.join(ROOT, '.githooks'))) { try { fs.chmodSync(path.join(ROOT, '.githooks', h), 0o755); } catch { /* sin permisos */ } }
   const cur = run('git', ['-C', ROOT, 'config', '--get', 'core.hooksPath'], { encoding: 'utf8' });
   if (String(cur.stdout || '').trim() === '.githooks') return;
   const r = run('git', ['-C', ROOT, 'config', 'core.hooksPath', '.githooks'], { stdio: 'ignore' });

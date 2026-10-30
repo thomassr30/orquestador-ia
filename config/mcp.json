@@ -1,5 +1,27 @@
 {
   "_comentario": "Servidores MCP que install.js registra en cada herramienta (si no existen ya). Pon enabled:false para omitir uno.",
-  "playwright": { "enabled": true, "command": "npx", "args": ["-y", "@playwright/mcp@latest"] },
-  "context7":   { "enabled": true, "command": "npx", "args": ["-y", "@upstash/context7-mcp"] }
+  "playwright": {
+    "enabled": true,
+    "command": "npx",
+    "args": [
+      "-y",
+      "@playwright/mcp@latest"
+    ]
+  },
+  "context7": {
+    "enabled": true,
+    "command": "npx",
+    "args": [
+      "-y",
+      "@upstash/context7-mcp"
+    ]
+  },
+  "chrome-devtools": {
+    "enabled": true,
+    "command": "npx",
+    "args": [
+      "-y",
+      "chrome-devtools-mcp@latest"
+    ]
+  }
 }

@@ -3,13 +3,22 @@
 Orquestador de agentes para desarrollo guiado por especificaciones (SDD). Se instala **una vez** y queda disponible en **todos tus proyectos** y en **6 herramientas de IA**: Claude Code, OpenCode, Gemini CLI, Codex CLI, Cursor y VS Code Copilot.
 
 - **1 orquestador**: coordina el trabajo y no programa.
-- **14 sub-agentes**, de 20 a 30 líneas cada uno.
-- **44 skills** con el conocimiento detallado.
+- **15 sub-agentes**, de 20 a 30 líneas cada uno.
+- **56 skills** con el conocimiento detallado.
 - **10 comandos** para consultar, desarrollar, corregir, testear, refactorizar, revisar y documentar. Se cargan solo cuando se necesitan.
 
 ---
 
-## 1. Requisitos (Windows)
+## 1. Requisitos
+
+Funciona en **Windows, macOS y Linux** (Node.js 18 o superior). Las rutas `~` equivalen a `C:\Users\<tú>` en Windows y a `/Users/<tú>` o `/home/<tú>` en macOS/Linux.
+
+| Sistema | Instalar | Actualizar |
+|---|---|---|
+| Windows (PowerShell) | `node install.js` | `git pull` o `npm run update` |
+| macOS / Linux (Terminal) | `node install.js` | `git pull` o `npm run update` |
+
+### Requisitos por herramienta
 
 | Herramienta | Para qué | Comprobar |
 |---|---|---|
@@ -67,6 +76,7 @@ Antes de modificar un archivo de configuración tuyo, el instalador guarda una c
 agrega exportación a Excel en el listado          → [SDD] Flujo: new
 en /muestras al guardar no aparece la alerta      → [SDD] Flujo: fix
 revisa los cambios antes de subir                 → [SDD] Flujo: review
+muéstrame cómo se ve /muestras en móvil           → [SDD] Flujo: browser (abre el navegador y captura)
 ```
 
 - Para una respuesta sin flujo, di **"directo"** o **"sin sdd"**.
@@ -84,7 +94,7 @@ Los comandos siguen disponibles si quieres forzar un flujo:
 | **Refactorizar** sin cambiar el comportamiento | `/sdd-refactor <objetivo>` | ✅ tras tu aprobación |
 | **Revisar** código, una rama o los cambios sin commit | `/sdd-review [alcance]` | ❌ (entrega `review.md`) |
 | **Documentar** (arquitectura, API, modelo de datos) | `/sdd-doc <tema>` | Solo documentos en `docs/` |
-| Tarea en el **navegador** con evidencia | `/sdd-browser <tarea>` | ❌ |
+| **Navegador**: ver, inspeccionar (consola/red), verificar visualmente o hacer tareas web | `/sdd-browser <qué>` | ❌ |
 | **Retomar** un cambio a medias | `/sdd-continue [id]` | — |
 | Ver el **estado** de los cambios | `/sdd-status [--all]` | — (script, sin tokens) |
 
@@ -117,7 +127,7 @@ TÚ → ORQUESTADOR (skill sdd-orchestrator: solo lee state.json y resúmenes)
         ├─ sdd-task-planner      → tasks.md (por capa, dependencias)
         ├─ ⏸ TU APROBACIÓN
         ├─ sdd-test-writer       → tests (TDD)
-        ├─ sdd-backend-implementer / sdd-frontend-implementer / sdd-db-implementer
+        ├─ sdd-backend-implementer / sdd-frontend-implementer / sdd-db-implementer / sdd-mobile-implementer
         ├─ sdd-verifier          → verify.md (quality gates)
         ├─ sdd-reviewer          → review.md (/sdd-review)
         ├─ sdd-doc-writer        → docs/*.md (/sdd-doc)
@@ -126,6 +136,8 @@ TÚ → ORQUESTADOR (skill sdd-orchestrator: solo lee state.json y resúmenes)
 
 - **Ahorro de tokens:** el orquestador no lee código. Los sub-agentes nacen con contexto limpio. Se comunican por archivos, no por chat. Las skills `stack-*` se cargan según `stack.json`. El estado y la ingesta de PDF/DOCX se manejan con scripts que no usan IA.
 - **Stack:** `stack-go`, `stack-nodejs`, `stack-nestjs`, `stack-adonisjs`, `stack-angular`, `stack-react`, `stack-nextjs`, `stack-html-css`, `stack-tailwind`, `stack-scss`, `stack-postgres`, `stack-sqlserver`.
+- **Mobile:** `stack-react-native`, `stack-expo`, `rn-animations`, `stack-ios`, `stack-swiftui`, `ios-hardware`, `stack-android`, `stack-compose`, `android-hardware`, `mobile-design`, `test-mobile`.
+- **Diseño:** `design-quality` (web y mobile, anti diseño genérico).
 - **Revisión y documentación:** `code-review`, `tech-docs`.
 - **Testing:** `test-strategy`, `test-unit`, `test-integration`, `test-db` (Testcontainers), `test-api-contract`, `test-e2e` (Playwright), `test-visual`, `test-a11y` (axe), `test-performance` (k6 / Lighthouse), `test-security`.
 - **Sin sub-agentes:** si una IA no puede lanzar sub-agentes, el orquestador ejecuta las fases en secuencia cargando cada skill (modo secuencial).

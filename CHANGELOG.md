@@ -1,5 +1,27 @@
 # Cambios
 
+## 1.6.0
+- **Control del navegador mejorado**: modos Ver, Inspeccionar (consola/red/rendimiento), Verificación visual (UI propia en 4 tamaños + estados + diseño) y Tarea. "Ver" no crea carpeta `changes/`.
+- Nuevo MCP `chrome-devtools` (consola, red, trazas de rendimiento) junto a Playwright.
+- Detección automática: "muéstrame / abre / cómo se ve…" activa el navegador sin comandos.
+- El frontend implementer y el verifier hacen verificación visual cuando la app corre en local.
+- Skill `browser-automation` con referencias: herramientas, verificación visual, sesiones/login.
+
+## 1.5.0
+- **Mobile**: skills `stack-react-native`, `stack-expo`, `rn-animations` (Animated, Reanimated 4/3, Gesture Handler), `stack-ios`, `stack-swiftui`, `ios-hardware`, `stack-android`, `stack-compose`, `android-hardware`, `mobile-design`, `test-mobile`. Cada una con `references/` por tema (se cargan solo si la tarea lo requiere).
+- **Diseño**: nueva skill `design-quality` (anti diseño genérico "de IA") aplicada a web y mobile; el designer define la "Dirección de diseño".
+- Nuevo sub-agente `sdd-mobile-implementer` y capa `mobile` en tareas.
+- Explorer detecta proyectos RN/Expo, iOS y Android.
+
+## 1.4.2
+- El orquestador ya no puede anular un RECHAZADO del verifier: debe ofrecer al usuario cumplir el gate o aceptar la excepción. Nuevo `sdd-state.js --accept-exception` (queda registrado como aprobado por el usuario).
+- El GATE debe mostrar explícitamente decisiones que afecten quality gates (ej. no habrá test de reproducción).
+- Test planner: propone la mínima extracción para hacer testeable código que lee configuración al cargar; las pruebas manuales se listan aparte.
+- Verifier: intenta build, audit y cobertura antes de marcarlos "no medido" e indica el motivo.
+
+## 1.4.1
+- macOS/Linux: el instalador marca el hook de git como ejecutable (necesario si el repo se publicó desde Windows).
+
 ## 1.4.0
 - **Git y GitHub nunca de forma autónoma:** cualquier comando `git` o `gh` (commit, push, PR, etc.) requiere aprobación del usuario.
   - Claude Code: reglas `ask` para `Bash(git:*)` y `Bash(gh:*)` (tienen prioridad sobre permisos preaprobados y sobre `--auto-edits`).

@@ -3,6 +3,7 @@
 // Uso:
 //   node sdd-state.js <id> --phase <fase> --status <pending|running|done|failed|skipped> [--note "texto"]
 //   node sdd-state.js <id> --approve | --retry | --close | --show
+//   node sdd-state.js <id> --accept-exception "gate: motivo"   (solo con aprobación explícita del usuario)
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -25,9 +26,16 @@ if (phase) {
   s.log.push({ at: now, msg: `${phase}: ${status}${note ? ' — ' + note : ''}` });
 } else if (note) s.log.push({ at: now, msg: note });
 if (args.includes('--approve')) { s.approved = true; if ('gate' in s.phases) s.phases.gate = 'done'; s.log.push({ at: now, msg: 'Aprobado por el usuario' }); }
+const exc = get('--accept-exception');
+if (exc) {
+  s.exceptions = s.exceptions || [];
+  s.exceptions.push({ at: now, gate: exc.split(':')[0].trim(), reason: exc, approvedBy: 'usuario' });
+  if ('verify' in s.phases) s.phases.verify = 'done';
+  s.log.push({ at: now, msg: `Excepción aceptada por el usuario: ${exc}` });
+}
 if (args.includes('--retry')) { s.retries += 1; s.log.push({ at: now, msg: `Reintento ${s.retries}` }); }
 if (args.includes('--close')) { s.closed = true; s.log.push({ at: now, msg: 'Cambio cerrado' }); }
 s.updated = now;
 fs.writeFileSync(file, JSON.stringify(s, null, 2));
 const next = Object.entries(s.phases).find(([, v]) => v !== 'done' && v !== 'skipped');
-console.log(JSON.stringify({ id, next: next ? next[0] : null, approved: s.approved, retries: s.retries, closed: s.closed }));
+console.log(JSON.stringify({ id, next: next ? next[0] : null, approved: s.approved, retries: s.retries, closed: s.closed, exceptions: (s.exceptions || []).length }));
