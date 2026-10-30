@@ -100,7 +100,7 @@ const TARGETS = {
 const log = (...a) => console.log(...a);
 const warn = m => console.log(`  ⚠ ${m}`);
 const notes = [];
-const manifest = { version: VERSION, installedAt: new Date().toISOString(), targets: [], files: [], dirs: [], rules: [], mcp: [] };
+const manifest = { version: VERSION, source: ROOT, installedAt: new Date().toISOString(), targets: [], files: [], dirs: [], rules: [], mcp: [] };
 
 // Ejecuta un comando sin el aviso DEP0190: en Windows se pasa una sola línea al shell (necesario para .cmd)
 function run(cmd, args, opts = {}) {
@@ -123,8 +123,9 @@ function backup(f) {
   const b = `${f}.bak-sdd`;
   if (!fs.existsSync(b)) fs.copyFileSync(f, b);
 }
+const SDD_SOURCE_FWD = ROOT.replace(/\\/g, '/');
 function render(text) {
-  let out = text.split('{{SDD_HOME}}').join(SDD_HOME_FWD);
+  let out = text.split('{{SDD_HOME}}').join(SDD_HOME_FWD).split('{{SDD_SOURCE}}').join(SDD_SOURCE_FWD);
   // Frontmatter YAML seguro: entrecomilla descripciones con ": " (evita skills inválidas)
   out = out.replace(/^(---\r?\n[\s\S]*?^description: )(?!["'])(.*: .*)$/m, (_, pre, v) => pre + JSON.stringify(v));
   return out;
@@ -472,6 +473,9 @@ function install() {
   }
 
   if (!DRY) { mkdirp(SDD_HOME); fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2)); }
+  // registro de mejora continua (en el repo del orquestador; nunca se sobrescribe)
+  const reg = path.join(ROOT, 'mejora', 'registro.md');
+  if (!DRY && !fs.existsSync(reg)) { fs.mkdirSync(path.dirname(reg), { recursive: true }); fs.writeFileSync(reg, '# Registro de mejora continua\n\nFormato: estado · #n · fecha · tipo · severidad · componente · descripción · origen (→ resolución)\n\n'); }
   setupGitHooks();
 
   log(DRY ? '\n✅ Simulación completa (no se escribió nada).' : '\n✅ Instalación completa.');

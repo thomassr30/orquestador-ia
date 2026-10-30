@@ -68,5 +68,25 @@
     "name": "sdd-doc",
     "description": "Generar documentación técnica en español",
     "skill": "sdd-doc"
+  },
+  {
+    "name": "sdd-ticket",
+    "description": "Trabajar un ticket del gestor de tareas de principio a fin",
+    "skill": "sdd-ticket"
+  },
+  {
+    "name": "sdd-prototype",
+    "description": "Prototipo visual navegable antes de implementar",
+    "skill": "sdd-prototype"
+  },
+  {
+    "name": "sdd-deps",
+    "description": "Auditar y actualizar dependencias por lotes de riesgo",
+    "skill": "sdd-deps"
+  },
+  {
+    "name": "sdd-improve",
+    "description": "Mejora continua del orquestador (con evidencia y aprobación)",
+    "skill": "sdd-improve"
   }
 ]

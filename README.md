@@ -3,8 +3,8 @@
 Orquestador de agentes para desarrollo guiado por especificaciones (SDD). Se instala **una vez** y queda disponible en **todos tus proyectos** y en **6 herramientas de IA**: Claude Code, OpenCode, Gemini CLI, Codex CLI, Cursor y VS Code Copilot.
 
 - **1 orquestador**: coordina el trabajo y no programa.
-- **19 sub-agentes**, de 20 a 30 líneas cada uno.
-- **82 skills** con el conocimiento detallado.
+- **21 sub-agentes**, de 20 a 30 líneas cada uno.
+- **96 skills** con el conocimiento detallado.
 - **10 comandos** para consultar, desarrollar, corregir, testear, refactorizar, revisar y documentar. Se cargan solo cuando se necesitan.
 
 ---
@@ -99,6 +99,10 @@ Los comandos siguen disponibles si quieres forzar un flujo:
 | **Retomar** un cambio a medias | `/sdd-continue [id]` | — |
 | Ver el **estado** de los cambios | `/sdd-status [--all]` | — (script, sin tokens) |
 | **QA funcional / UAT** (casos de aceptación, bugs, veredicto) | `/sdd-qa <qué probar>` | ❌ |
+| **Trabajar un ticket** (Jira, Azure Boards, GitHub, GitLab, Linear) | `/sdd-ticket LAB-123` o mencionar la clave | ✅ tras tu aprobación |
+| **Prototipo** visual antes de implementar | `/sdd-prototype <pantalla o flujo>` | ❌ (solo `changes/<id>/prototipo/`) |
+| **Dependencias**: auditar y actualizar por lotes | `/sdd-deps [objetivo]` | ✅ lotes aprobados |
+| **Mejorar el orquestador** con evidencia | `/sdd-improve` | Solo con tu aprobación |
 | **Verificar un despliegue** (pods, logs, config, smoke) | `/sdd-deploy-check <servicio> <entorno>` | ❌ (rollback solo propuesto) |
 | **Memoria** del proyecto: ver, guardar contexto, compactar, olvidar | `/sdd-memory [acción]` | Solo `.sdd/memoria/` |
 
@@ -138,6 +142,8 @@ TÚ → ORQUESTADOR (skill sdd-orchestrator: solo lee state.json y resúmenes)
         ├─ sdd-reviewer          → review.md (/sdd-review)
         ├─ sdd-doc-writer        → docs/*.md (/sdd-doc)
         ├─ sdd-devops-engineer   → Dockerfile, pipelines, k8s, configuración, post-despliegue
+        ├─ sdd-deps-maintainer   → deps-audit.md, actualizaciones por lote
+        ├─ sdd-prototyper        → prototipo/ (HTML navegable + capturas)
         ├─ sdd-memory-curator    → .sdd/memoria (al cerrar cada cambio)
         └─ sdd-browser-operator  → evidencia/
 ```
@@ -150,6 +156,9 @@ TÚ → ORQUESTADOR (skill sdd-orchestrator: solo lee state.json y resúmenes)
 - **Análisis funcional:** `analysis-requirements`, `analysis-modeling`, `analysis-estimation`.
 - **QA funcional:** `qa-acceptance`, `qa-web`, `qa-mobile`.
 - **Memoria:** `sdd-memory`.
+- **Gestor de tareas:** `tracker-common`, `tracker-jira`, `tracker-azure-boards`, `tracker-github-issues`, `tracker-gitlab-issues`, `tracker-linear`; entrega: `release-notes`.
+- **Multi-repo:** `multi-repo` (+ `sdd-workspace.js`).
+- **Dependencias:** `deps-update`. **Prototipos:** `prototype`. **Mejora continua:** `sdd-improve`.
 - **Revisión y documentación:** `code-review`, `tech-docs`.
 - **Testing:** `test-strategy`, `test-unit`, `test-integration`, `test-db` (Testcontainers), `test-api-contract`, `test-e2e` (Playwright), `test-visual`, `test-a11y` (axe), `test-performance` (k6 / Lighthouse), `test-security`.
 - **Sin sub-agentes:** si una IA no puede lanzar sub-agentes, el orquestador ejecuta las fases en secuencia cargando cada skill (modo secuencial).
@@ -171,7 +180,13 @@ Cada proyecto guarda su memoria en `.sdd/memoria/` (recomendado versionarla en g
 - **Compactar la memoria**: `/sdd-memory compactar` → muestra qué fusiona/archiva y pide confirmación.
 - Nunca guarda secretos, valores de configuración ni datos personales.
 
-## 7. Personalizar
+## 7. Mejora continua
+
+- Al cerrar cada cambio, solo se registran incidentes reales (regla violada, corrección tuya sobre el comportamiento de un agente, gate fallido evitable, reintentos agotados, conocimiento faltante) en `mejora/registro.md` de este repo.
+- `/sdd-improve` propone cambios **solo con evidencia** (≥ 2 ocurrencias en cambios distintos o 1 de severidad alta), máximo 3, prefiriendo reforzar o editar lo existente antes que crear skills; también propone podar lo que sobra.
+- Nada se aplica sin tu aprobación; luego `node install.js` y tú haces el commit.
+
+## 7b. Personalizar
 
 | Quiero… | Edito | Luego |
 |---|---|---|

@@ -8,6 +8,9 @@ En proyectos de software (carpeta con `.git`, `package.json`, `go.mod`, `angular
 | reporta un error (no funciona, falla, se ve mal, arregla, corrige) | `sdd-fix` |
 | entrega un requerimiento de negocio o pide analizar, levantar historias, preparar preguntas al cliente o estimar | `sdd-analyze` |
 | pide probar funcionalmente, hacer QA o UAT | `sdd-qa` |
+| menciona un ticket (LAB-123, #45, AB#678) o pide trabajar una tarea del gestor | `sdd-ticket` |
+| pide ver cómo se vería algo, una maqueta o prototipo | `sdd-prototype` |
+| pide actualizar dependencias, corregir vulnerabilidades o subir versión de un framework | `sdd-deps` |
 | pide tests para código existente | `sdd-test` |
 | pide mejorar o reorganizar código sin cambiar su comportamiento | `sdd-refactor` |
 | pide revisar código, cambios o una rama | `sdd-review` |
@@ -16,6 +19,7 @@ En proyectos de software (carpeta con `.git`, `package.json`, `go.mod`, `angular
 | dice que desplegó, pide verificar un entorno o revisar un pod | `sdd-deploy-check` |
 | pide recordar, guardar contexto, compactar u olvidar algo del proyecto | `sdd-memory` |
 | pregunta qué hay pendiente o quiere seguir algo anterior | `sdd-status` / `sdd-continue` |
+| pide revisar o mejorar el propio orquestador (agentes, skills, reglas) | `sdd-improve` |
 
 Reglas:
 - **Memoria**: al iniciar cualquier flujo lee solo `.sdd/memoria/MEMORIA.md` (y `sesion.md` si existe); el resto de la memoria se lee únicamente cuando el índice indica que aplica. Antes de compactar la conversación, guarda el contexto con `sdd-memory` (guardar).
