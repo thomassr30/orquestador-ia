@@ -1,7 +1,6 @@
 ---
 name: sdd-doc
-description: Genera documentación técnica formal en español (arquitectura, API, modelo de datos, módulos, despliegue) a partir del código real. Usar cuando el usuario escriba /sdd-doc o $sdd-doc.
-disable-model-invocation: true
+description: Genera documentación técnica formal en español (arquitectura, API, modelo de datos, módulos) a partir del código. Usar cuando el usuario pida documentar el proyecto o parte de él, o escriba /sdd-doc.
 ---
 # /sdd-doc — Documentación técnica
 

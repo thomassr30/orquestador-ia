@@ -1,7 +1,6 @@
 ---
 name: sdd-refactor
-description: Refactoriza código sin cambiar su comportamiento, protegido por tests de caracterización antes y después. Usar cuando el usuario escriba /sdd-refactor o $sdd-refactor.
-disable-model-invocation: true
+description: Refactoriza código sin cambiar su comportamiento, protegido por tests de caracterización. Usar cuando el usuario pida mejorar, ordenar, separar, migrar o limpiar código sin cambiar lo que hace, o escriba /sdd-refactor.
 ---
 # /sdd-refactor — Refactorizar sin cambiar comportamiento
 

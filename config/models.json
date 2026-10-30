@@ -1,6 +1,6 @@
 {
-  "_comentario": "Modelo por nivel (tier) y herramienta. 'inherit' o vacío = usa el modelo de la sesión. 'effort' (solo claude) fija el nivel de esfuerzo de los sub-agentes; vacío = no lo fija. Edita y vuelve a ejecutar install.js.",
-  "claude":   { "fast": "sonnet",  "strong": "sonnet", "effort": "xhigh" },
+  "_comentario": "Modelo por nivel (tier) y herramienta. 'inherit' o vacío = usa el modelo de la sesión. Edita y vuelve a ejecutar install.js.",
+  "claude":   { "fast": "haiku",   "strong": "inherit" },
   "opencode": { "fast": "inherit", "strong": "inherit", "_ejemplo": "anthropic/claude-sonnet-5-5" },
   "gemini":   { "fast": "inherit", "strong": "inherit" },
   "codex":    { "fast": "inherit", "strong": "inherit" },

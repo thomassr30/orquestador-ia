@@ -1,7 +1,6 @@
 ---
 name: sdd-fix
-description: Corrige un bug con el flujo SDD corto (explorar, test que reproduce, aprobar, implementar, verificar). Usar cuando el usuario escriba /sdd-fix o $sdd-fix.
-disable-model-invocation: true
+description: Corrige bugs con el flujo SDD corto (explorar, test que reproduce, aprobar, implementar, verificar). Usar cuando el usuario reporte un error, algo que no funciona o se ve mal, pida arreglar o corregir algo, o escriba /sdd-fix.
 ---
 # /sdd-fix — Corrección de bug
 

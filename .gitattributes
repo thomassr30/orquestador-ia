@@ -1,0 +1,4 @@
+# Mantener LF en scripts y hooks (necesario para que el hook funcione en Git Bash de Windows)
+* text=auto eol=lf
+*.png binary
+*.jpg binary

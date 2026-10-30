@@ -1,7 +1,6 @@
 ---
 name: sdd-test
-description: Agrega tests a código existente sin cobertura (unit, integración, BD, e2e, accesibilidad) sin cambiar código productivo. Usar cuando el usuario escriba /sdd-test o $sdd-test.
-disable-model-invocation: true
+description: Agrega tests a código existente sin cambiar código productivo. Usar cuando el usuario pida tests, cobertura o pruebas para código que ya existe, o escriba /sdd-test.
 ---
 # /sdd-test — Agregar tests a código existente
 

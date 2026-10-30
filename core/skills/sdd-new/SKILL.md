@@ -1,7 +1,6 @@
 ---
 name: sdd-new
-description: Inicia un cambio nuevo (feature) con el flujo SDD completo a partir de un texto o de archivos adjuntos (PDF, DOCX, imágenes). Usar cuando el usuario escriba /sdd-new o $sdd-new.
-disable-model-invocation: true
+description: Desarrolla funcionalidades nuevas con el flujo SDD completo (especificar, diseñar, testear, implementar, verificar). Usar cuando el usuario pida agregar, crear, desarrollar o implementar algo en el proyecto, adjunte un requerimiento, o escriba /sdd-new.
 ---
 # /sdd-new — Cambio nuevo (feature)
 

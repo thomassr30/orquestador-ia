@@ -1,7 +1,6 @@
 ---
 name: sdd-continue
-description: Retoma un cambio SDD pendiente desde su última fase registrada. Usar cuando el usuario escriba /sdd-continue o $sdd-continue.
-disable-model-invocation: true
+description: Retoma un cambio SDD pendiente desde su última fase. Usar cuando el usuario quiera seguir o continuar un trabajo anterior, o escriba /sdd-continue.
 ---
 # /sdd-continue — Retomar un cambio
 

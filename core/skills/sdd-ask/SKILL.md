@@ -1,7 +1,6 @@
 ---
 name: sdd-ask
-description: Consulta de solo lectura sobre el código del proyecto (cómo funciona, dónde está, qué usa). No modifica nada. Usar cuando el usuario escriba /sdd-ask o $sdd-ask.
-disable-model-invocation: true
+description: Responde preguntas sobre el código del proyecto actual (dónde está algo, cómo funciona, qué usa) en solo lectura y con evidencia archivo:línea. Usar cuando el usuario pregunte por SU proyecto, o escriba /sdd-ask.
 ---
 # /sdd-ask — Consulta (solo lectura)
 

@@ -4,12 +4,15 @@
  * Herramientas: Claude Code, OpenCode, Gemini CLI, Codex CLI, Cursor, VS Code Copilot
  *
  * Uso:
- *   node install.js                      instala en las herramientas detectadas
+ *   node install.js                      instala en las herramientas detectadas (o las de la instalación anterior)
+ *   node install.js --detect             vuelve a detectar herramientas instaladas
  *   node install.js --targets=all        instala en todas
  *   node install.js --targets=claude,opencode
  *   node install.js --dry-run            muestra qué haría, sin escribir
  *   node install.js --no-mcp             no registra servidores MCP
  *   node install.js --no-deps            no instala pdfjs-dist / mammoth
+ *   node install.js --auto-edits         Claude Code acepta ediciones de archivos sin preguntar (modo acceptEdits)
+ *   node install.js --no-permissions     no agrega permisos preaprobados en Claude Code
  *   node install.js --force              sobrescribe skills/agentes con el mismo nombre que no son del orquestador
  *   node install.js --uninstall          desinstala todo lo instalado
  */
@@ -51,6 +54,7 @@ const TARGETS = {
     skills: path.join(HOME, '.claude', 'skills'),
     agents: path.join(HOME, '.claude', 'agents'), agentFmt: 'claude',
     rules: path.join(HOME, '.claude', 'CLAUDE.md'),
+    settings: path.join(HOME, '.claude', 'settings.json'),
     mcp: { kind: 'claude' }
   },
   opencode: {
@@ -147,15 +151,11 @@ function parseFrontmatter(text) {
   return { meta, body: m[2].trim() + '\n' };
 }
 
-function modelsConfig() {
-  try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'config', 'models.json'), 'utf8')); } catch { return {}; /* sin config */ }
-}
 function modelFor(target, tier) {
-  const m = (modelsConfig()[target] || {})[tier || 'strong'];
+  let cfg = {};
+  try { cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'config', 'models.json'), 'utf8')); } catch { /* sin config */ }
+  const m = (cfg[target] || {})[tier || 'strong'];
   return m && m !== 'inherit' ? m : null;
-}
-function effortFor(target) {
-  return (modelsConfig()[target] || {}).effort || null;
 }
 
 // ---------- generadores de agentes ----------
@@ -163,10 +163,8 @@ function renderAgent(fmt, target, a) {
   const { meta, body } = a; const model = modelFor(target, meta.tier);
   const b = render(body);
   switch (fmt) {
-    case 'claude': {
-      const effort = effortFor(target);
-      return `---\nname: ${meta.name}\ndescription: ${q(meta.description)}\nmodel: ${model || 'inherit'}\n${effort ? `effort: ${effort}\n` : ''}---\n${b}`;
-    }
+    case 'claude':
+      return `---\nname: ${meta.name}\ndescription: ${q(meta.description)}\nmodel: ${model || 'inherit'}\n---\n${b}`;
     case 'opencode':
       return `---\ndescription: ${q(meta.description)}\nmode: subagent\n${model ? `model: ${model}\n` : ''}---\n${b}`;
     case 'gemini':
@@ -274,6 +272,51 @@ function registerMcp(tkey, t) {
   if (changed) { backup(m.file); writeFile(m.file, JSON.stringify(json, null, 2) + '\n'); log(`  ✓ MCP en ${m.file}`); }
 }
 
+// ---------- permisos preaprobados (Claude Code) ----------
+// Solo comandos de lectura, tests, lint, build y los scripts del orquestador. Nada que borre, publique o despliegue.
+function permissionRules() {
+  const bin = `${SDD_HOME_FWD}/bin`;
+  return [
+    ...['new-change.js', 'sdd-state.js', 'sdd-status.js', 'to-md.js'].map(f => `Bash(node "${bin}/${f}":*)`),
+    'Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git branch:*)',
+    'Bash(npm test:*)', 'Bash(npm run test:*)', 'Bash(npm run lint:*)', 'Bash(npm run build:*)', 'Bash(npm run typecheck:*)', 'Bash(npm audit:*)',
+    'Bash(npx vitest:*)', 'Bash(npx jest:*)', 'Bash(npx playwright test:*)', 'Bash(npx tsc --noEmit:*)', 'Bash(npx eslint:*)', 'Bash(npx stylelint:*)',
+    'Bash(ng test:*)', 'Bash(ng lint:*)', 'Bash(ng build:*)', 'Bash(npx ng test:*)', 'Bash(npx ng lint:*)', 'Bash(npx ng build:*)',
+    'Bash(node ace test:*)',
+    'Bash(go test:*)', 'Bash(go vet:*)', 'Bash(go build:*)', 'Bash(golangci-lint run:*)', 'Bash(govulncheck:*)', 'Bash(gosec:*)',
+    'Bash(semgrep scan:*)', 'Bash(docker ps:*)'
+  ];
+}
+function configureClaudePermissions(file) {
+  if (opt('no-permissions') && !opt('auto-edits')) return;
+  let json;
+  try { json = readJson(file); } catch { notes.push(`Claude Code: ${file} no es JSON válido; permisos no configurados.`); return; }
+  json.permissions = json.permissions || {};
+  const added = [];
+  if (!opt('no-permissions')) {
+    const allow = new Set(json.permissions.allow || []);
+    for (const r of permissionRules()) if (!allow.has(r)) { allow.add(r); added.push(r); }
+    json.permissions.allow = [...allow];
+  }
+  let mode = null;
+  if (opt('auto-edits') && json.permissions.defaultMode !== 'acceptEdits') { mode = json.permissions.defaultMode || 'default'; json.permissions.defaultMode = 'acceptEdits'; }
+  if (!added.length && mode === null) return;
+  backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n');
+  manifest.permissions = { file, added: [...new Set([...((manifest.permissions || {}).added || []), ...added])], previousMode: mode ?? (manifest.permissions || {}).previousMode ?? null };
+  log(`  ✓ ${added.length} permisos preaprobados${opt('auto-edits') ? ' + ediciones automáticas (acceptEdits)' : ''} → ${file}`);
+}
+function removeClaudePermissions(p) {
+  if (!p || !fs.existsSync(p.file)) return;
+  let json; try { json = readJson(p.file); } catch { return; }
+  if (!json.permissions) return;
+  const rm = new Set(p.added || []);
+  if (json.permissions.allow) json.permissions.allow = json.permissions.allow.filter(r => !rm.has(r));
+  if (p.previousMode !== null && p.previousMode !== undefined && json.permissions.defaultMode === 'acceptEdits') {
+    if (p.previousMode === 'default') delete json.permissions.defaultMode; else json.permissions.defaultMode = p.previousMode;
+  }
+  writeFile(p.file, JSON.stringify(json, null, 2) + '\n');
+}
+
 // ---------- desinstalar ----------
 function removePrevious(prev, quiet) {
   if (!prev) return;
@@ -286,6 +329,7 @@ function uninstall() {
   if (!prev) { log('No hay instalación registrada (falta ~/.sdd-orquestador/manifest.json).'); return; }
   log('Desinstalando Orquestador SDD...');
   removePrevious(prev, false);
+  removeClaudePermissions(prev.permissions);
   rmrf(SDD_HOME);
   log('✓ Skills, agentes, comandos y reglas globales eliminados.');
   if ((prev.mcp || []).length) log(`Los servidores MCP registrados se mantienen (pueden usarlos otras herramientas): ${[...new Set(prev.mcp.map(m => m.name))].join(', ')}`);
@@ -295,6 +339,8 @@ function uninstall() {
 // ---------- instalar ----------
 function selectTargets() {
   const t = val('targets');
+  const prev = prevManifest();
+  if (!t && !opt('detect') && prev && (prev.targets || []).length) return prev.targets.filter(k => TARGETS[k]);
   if (t === 'all') return Object.keys(TARGETS);
   if (t) {
     const list = t.split(',').map(s => s.trim()).filter(Boolean);
@@ -311,13 +357,15 @@ function install() {
     log('No se detectó ninguna herramienta. Usa --targets=claude,opencode,... o --targets=all');
     process.exit(1);
   }
-  log(`Orquestador SDD v${VERSION}${DRY ? ' (simulación)' : ''}`);
+  const before = prevManifest();
+  log(`Orquestador SDD v${VERSION}${DRY ? ' (simulación)' : ''}${before && before.version !== VERSION ? ` (actualizando desde v${before.version})` : ''}`);
   log(`Destinos: ${targets.map(k => TARGETS[k].label).join(', ')}\n`);
 
   const prev = prevManifest();
   const owned = new Set([...(prev?.dirs || []), ...(prev?.files || [])]);
   const foreign = p => fs.existsSync(p) && !owned.has(p) && !FORCE;
   manifest.mcp = [...(prev?.mcp || [])];
+  if (prev?.permissions) manifest.permissions = prev.permissions;
   removePrevious(prev, true); // reinstalación limpia (las reglas se reemplazan en su lugar)
 
   // 1. runtime: scripts + dependencias
@@ -378,16 +426,27 @@ function install() {
     } else if (k === 'cursor') {
       notes.push(`Cursor: pega el contenido de core/rules/global.md en Cursor → Settings → Rules → User Rules.`);
     }
+    if (t.settings) configureClaudePermissions(t.settings);
     if (!opt('no-mcp')) registerMcp(k, t);
   }
 
   if (!DRY) { mkdirp(SDD_HOME); fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2)); }
+  setupGitHooks();
 
   log(DRY ? '\n✅ Simulación completa (no se escribió nada).' : '\n✅ Instalación completa.');
   if (notes.length) { log('\nNotas:'); notes.forEach(n => log(`- ${n}`)); }
   log('\nPrueba en cualquier proyecto:');
   log('  Claude Code / Cursor / Copilot / OpenCode / Gemini:  /sdd-status   /sdd-ask <pregunta>');
   log('  Codex:                                               $sdd-status   $sdd-ask <pregunta>');
+}
+
+// ---------- actualización automática tras git pull ----------
+function setupGitHooks() {
+  if (DRY || !fs.existsSync(path.join(ROOT, '.git')) || !fs.existsSync(path.join(ROOT, '.githooks'))) return;
+  const cur = run('git', ['-C', ROOT, 'config', '--get', 'core.hooksPath'], { encoding: 'utf8' });
+  if (String(cur.stdout || '').trim() === '.githooks') return;
+  const r = run('git', ['-C', ROOT, 'config', 'core.hooksPath', '.githooks'], { stdio: 'ignore' });
+  if (r.status === 0) log('\n• Git: actualización automática activada (cada "git pull" reinstala lo que cambie).');
 }
 
 if (opt('uninstall')) uninstall(); else install();

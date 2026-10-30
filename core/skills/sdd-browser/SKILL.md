@@ -1,7 +1,6 @@
 ---
 name: sdd-browser
-description: Ejecuta una tarea en el navegador (navegar, formularios, descargas, capturas) mediante el sub-agente browser-operator. Usar cuando el usuario escriba /sdd-browser o $sdd-browser.
-disable-model-invocation: true
+description: Ejecuta tareas en el navegador (navegar, formularios, descargas, capturas) con evidencia y confirmación antes de acciones irreversibles. Usar cuando el usuario pida hacer algo en una página web, o escriba /sdd-browser.
 ---
 # /sdd-browser — Tarea de navegador
 

@@ -1,7 +1,6 @@
 ---
 name: sdd-status
-description: Muestra el estado de los cambios SDD del proyecto actual. Usar cuando el usuario escriba /sdd-status o $sdd-status.
-disable-model-invocation: true
+description: Muestra el estado de los cambios SDD del proyecto con un script (sin gastar tokens). Usar cuando el usuario pregunte qué hay pendiente o en curso, o escriba /sdd-status.
 ---
 # /sdd-status
 

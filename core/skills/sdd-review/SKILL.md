@@ -1,7 +1,6 @@
 ---
 name: sdd-review
-description: Revisa código (archivos, carpeta, rama o cambios sin commit) y entrega un informe priorizado de calidad, seguridad, accesibilidad y convenciones. No modifica código. Usar cuando el usuario escriba /sdd-review o $sdd-review.
-disable-model-invocation: true
+description: Revisa código (archivos, carpeta, rama o cambios sin commit) y entrega un informe priorizado sin modificar código. Usar cuando el usuario pida revisar, auditar o evaluar código o cambios, o escriba /sdd-review.
 ---
 # /sdd-review — Revisión de código
 

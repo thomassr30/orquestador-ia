@@ -34,10 +34,12 @@ node install.js --targets=all                 # todas las IA, aunque no estén i
 node install.js --targets=claude,opencode     # solo algunas
 node install.js --dry-run                     # simula sin escribir nada
 node install.js --no-mcp                      # sin registrar Playwright / Context7
+node install.js --auto-edits                  # Claude Code acepta ediciones sin preguntar
+node install.js --no-permissions              # sin permisos preaprobados en Claude Code
 node install.js --uninstall                   # desinstala todo
 ```
 
-Para **actualizar** después de editar algo en `core/`, vuelve a ejecutar `node install.js`. La reinstalación es limpia y no duplica nada.
+Para **actualizar** después de editar algo en `core/`, vuelve a ejecutar `node install.js`. La reinstalación es limpia, no duplica nada y recuerda en qué herramientas instalaste (`--detect` para volver a detectarlas).
 
 > **Cursor:** pega el contenido de `core/rules/global.md` en *Settings → Rules → User Rules* (Cursor no guarda esas reglas en un archivo).
 
@@ -58,7 +60,19 @@ Antes de modificar un archivo de configuración tuyo, el instalador guarda una c
 
 ## 4. Uso diario
 
-Abre tu IA dentro de la carpeta de cualquier proyecto:
+**Modo automático:** abre tu IA en la carpeta del proyecto y escribe normal. El sistema detecta qué necesitas y usa los agentes:
+
+```
+¿dónde se valida el RUT?                         → [SDD] Flujo: ask
+agrega exportación a Excel en el listado          → [SDD] Flujo: new
+en /muestras al guardar no aparece la alerta      → [SDD] Flujo: fix
+revisa los cambios antes de subir                 → [SDD] Flujo: review
+```
+
+- Para una respuesta sin flujo, di **"directo"** o **"sin sdd"**.
+- La IA siempre se detiene a pedir tu aprobación antes de modificar código.
+
+Los comandos siguen disponibles si quieres forzar un flujo:
 
 | Necesito… | Comando | ¿Modifica código? |
 |---|---|---|
@@ -127,7 +141,42 @@ TÚ → ORQUESTADOR (skill sdd-orchestrator: solo lee state.json y resúmenes)
 
 **No edites** los archivos instalados en `~/.claude`, `~/.agents`, etc.: se regeneran desde `core/`. Versiona esta carpeta en Git.
 
-## 7. Notas
+## 7. GitHub y actualizaciones automáticas
+
+### Publicar (una vez)
+1. En GitHub crea un repositorio **privado** vacío, por ejemplo `orquestador-sdd` (sin README ni .gitignore).
+2. En PowerShell:
+```powershell
+cd C:\dev\orquestador-ia
+git init
+git add .
+git commit -m "Orquestador SDD v1.2.0"
+git branch -M main
+git remote add origin https://github.com/<tu-usuario>/orquestador-sdd.git
+git push -u origin main
+node install.js        # activa la actualización automática (hook de git)
+```
+
+### Actualizar
+```powershell
+cd C:\dev\orquestador-ia
+git pull               # el hook reinstala solo lo que corresponda
+# o bien, en un paso con validaciones:
+npm run update
+```
+
+### Otro equipo o compañero
+```powershell
+git clone https://github.com/<tu-usuario>/orquestador-sdd.git C:\dev\orquestador-ia
+cd C:\dev\orquestador-ia
+node install.js
+```
+
+### Flujo para hacer cambios
+Edita en `core/` → `node install.js` (prueba local) → `git commit` → `git push`. Los demás equipos lo reciben con `git pull`.
+Sube la versión en `package.json` y anota el cambio en `CHANGELOG.md`.
+
+## 8. Notas
 
 - OpenCode, Cursor y Copilot leen tanto `~/.claude/skills` como `~/.agents/skills`. Si instalas Claude junto con otras IA, pueden aparecer skills duplicadas; el contenido es idéntico.
 - Al crear `~/.config/opencode/AGENTS.md`, OpenCode deja de usar `~/.claude/CLAUDE.md` como respaldo.

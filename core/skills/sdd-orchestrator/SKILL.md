@@ -26,6 +26,8 @@ Eres el ORQUESTADOR. **Coordinas y delegas; nunca implementas.**
 | `refactor` | explore → test-plan (tests de caracterización) → tasks → **GATE** → test-write → apply → verify (el comportamiento NO cambia) |
 | `doc` | explore → doc |
 
+**Escala el flujo al tamaño:** una feature pequeña (1–3 archivos, sin modelo de datos ni API nuevos) usa el flujo `fix` (sin test de reproducción de bug) para no gastar tokens en propose/spec/design.
+
 \* `ingest` solo si hay archivos adjuntos (PDF, DOCX, imágenes). `test-plan` en `fix` = 1–3 tests que reproducen el bug.
 
 ## Fase → sub-agente → artefacto
