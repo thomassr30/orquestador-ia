@@ -4,7 +4,7 @@ description: Pasada final de calidad sobre UI cuya dirección ya es correcta —
 ---
 # Pulido final
 
-Carga `design-quality`. Conserva el propósito y la identidad visual: **no rediseñar**. Si existe `design-review.md`, empieza por sus P0/P1.
+Carga `design-quality`. Conserva el propósito y la identidad visual: **no rediseñar**. Si existe la revisión de diseño, empieza por sus P0/P1.
 
 ## Cuatro áreas
 1. **Función y estados**: defectos, carga, vacío, error, éxito, sin permisos; datos largos.

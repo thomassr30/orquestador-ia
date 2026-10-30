@@ -4,11 +4,11 @@ description: Redacta la propuesta de cambio (qué y por qué, alcance, fuera de 
 ---
 # Proponer
 
-ENTRADA: `input.md`, `explore.md`. SALIDA: `changes/<id>/proposal.md`
+ENTRADA: solicitud del usuario y hallazgos del explorer (en el mensaje). SALIDA: en tu respuesta (no crees archivo salvo que el usuario lo pida), con esta estructura:
 
 ```markdown
 # Propuesta: <título>
-## Problema / necesidad (citar input.md)
+## Problema / necesidad (citar la solicitud)
 ## Objetivo
 ## Alcance (incluye)
 ## Fuera de alcance
@@ -17,4 +17,4 @@ ENTRADA: `input.md`, `explore.md`. SALIDA: `changes/<id>/proposal.md`
 ## Impacto (módulos, datos, usuarios)
 ## Preguntas abiertas
 ```
-Reglas: no inventes requisitos; todo lo que no esté en input.md va a "Preguntas abiertas". Devuelve ≤10 líneas.
+Reglas: no inventes requisitos; todo lo que no esté en la solicitud va a "Preguntas abiertas". Explica lo necesario, sin relleno.

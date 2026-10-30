@@ -1,6 +1,6 @@
 ---
 name: stack-sqlserver
-description: Convenciones para diseño, migraciones, T-SQL y tests en SQL Server. Usar cuando stack.json incluya sqlserver o mssql.
+description: Convenciones para diseño, migraciones, T-SQL y tests en SQL Server. Usar cuando el stack detectado incluya sqlserver o mssql.
 ---
 # SQL Server
 

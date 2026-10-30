@@ -5,12 +5,8 @@ description: Agrega tests a código existente sin cambiar código productivo. Us
 # /sdd-test — Agregar tests a código existente
 
 Qué probar: $ARGUMENTS
-(Ej.: `servicio de muestras`, `src/app/muestras/muestra-form.component.ts`, `endpoint GET /muestras`.)
+(Si no ves la solicitud arriba, usa el mensaje del usuario y sus adjuntos.)
 
-1. Carga la skill `sdd-orchestrator`.
-2. Crea el cambio: `node "{{SDD_HOME}}/bin/new-change.js" --type test "<qué probar>"`
-3. Flujo `test`: explore → test-plan → GATE → test-write → verify.
-4. Reglas:
-   - Los tests documentan el comportamiento ACTUAL. Si un test revela un bug, NO lo corrijas: márcalo como `skip`/`todo` con el motivo y repórtalo (sugiere `/sdd-fix`).
-   - No se modifica código productivo. Si algo no es testeable sin cambiarlo, repórtalo como bloqueo y sugiere `/sdd-refactor`.
-5. En el GATE muestra: tipos de test, nº de casos y archivos a crear.
+1. Carga `sdd-orchestrator`, flujo `test`. Sin archivos de trabajo (solo los archivos de test).
+2. Explorer → test-planner → GATE (tipos de test, casos, archivos) → test-writers en paralelo por módulo → verifier.
+3. Los tests documentan el comportamiento actual: si revelan un bug, márcalo como pendiente (`skip`/`todo`) y repórtalo; no cambies código productivo.

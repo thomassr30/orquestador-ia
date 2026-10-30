@@ -1,6 +1,6 @@
 ---
 name: stack-react-native
-description: Convenciones para desarrollar apps con React Native CLI (Nueva Arquitectura, TypeScript, navegación, estado, rendimiento, módulos nativos). Usar cuando stack.json incluya react-native sin Expo, o como base común para Expo.
+description: Convenciones para desarrollar apps con React Native CLI (Nueva Arquitectura, TypeScript, navegación, estado, rendimiento, módulos nativos). Usar cuando el stack detectado incluya react-native sin Expo, o como base común para Expo.
 ---
 # React Native (CLI)
 
@@ -27,7 +27,7 @@ Animaciones → skill `rn-animations`. Diseño → `mobile-design` + `design-qua
 - **Errores**: Error Boundary en la raíz y por flujo crítico; reporte a la herramienta del proyecto (Sentry, etc.).
 - **Plataforma**: `Platform.select` o archivos `.ios.tsx` / `.android.tsx` cuando el comportamiento difiere de verdad.
 - **Accesibilidad**: `accessibilityRole`, `accessibilityLabel`, `accessibilityState`, `hitSlop` para áreas táctiles pequeñas; soporte a escalado de fuente (no fijar `allowFontScaling={false}` salvo justificación).
-- **Dependencias nativas**: antes de agregar una, verifica soporte de Nueva Arquitectura y mantenimiento; justifícala en design.md.
+- **Dependencias nativas**: antes de agregar una, verifica soporte de Nueva Arquitectura y mantenimiento; justifícala en el diseño del plan.
 
 ## Comandos habituales
 `npx react-native start` · `npx react-native run-android` · `npx react-native run-ios` · `npm test` · `npx tsc --noEmit` · `npm run lint`

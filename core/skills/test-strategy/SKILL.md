@@ -1,6 +1,6 @@
 ---
 name: test-strategy
-description: Decide qué tipos de test aplicar a un cambio y produce test-plan.md con trazabilidad REQ → test. Usar en el Test Planner y Test Writer del flujo SDD.
+description: Decide qué tipos de test aplicar a un cambio y produce el plan de pruebas con trazabilidad REQ → test. Usar en el Test Planner y Test Writer del flujo SDD.
 ---
 # Estrategia de testing
 
@@ -21,7 +21,7 @@ description: Decide qué tipos de test aplicar a un cambio y produce test-plan.m
 
 No agregues tipos que no aporten: menos tests bien elegidos > muchos tests frágiles.
 
-## Salida: `changes/<id>/test-plan.md`
+## Salida (en tu respuesta (no crees archivo salvo que el usuario lo pida))
 ```markdown
 # Plan de pruebas
 | TP | REQ | Tipo | Caso (Dado/Cuando/Entonces resumido) | Archivo | Estado |
@@ -30,10 +30,10 @@ No agregues tipos que no aporten: menos tests bien elegidos > muchos tests frág
 ## Datos de prueba / fixtures
 ## Fuera de alcance de pruebas (y por qué)
 ```
-Reglas: cada REQ con ≥1 TP; casos de borde y error incluidos; usa los runners de `stack.json`.
+Reglas: cada REQ con ≥1 TP; casos de borde y error incluidos; usa los runners del stack detectado.
 
 ## Código difícil de testear
 Si el código bajo prueba no es testeable tal cual (lee configuración/red/BD al cargar el módulo, efectos al importar, estado global):
 - Propón la **mínima extracción** que lo haga testeable (ej. función pura que recibe el objeto de configuración y devuelve el resultado o lanza el error) y marca esa tarea en el plan.
-- Si se decide NO extraer, regístralo en `test-plan.md` → "Excepciones propuestas" con motivo y riesgo, para que el orquestador lo lleve al GATE. Nunca lo omitas en silencio.
+- Si se decide NO extraer, regístralo en el plan de pruebas → "Excepciones propuestas" con motivo y riesgo, para que el orquestador lo lleve al GATE. Nunca lo omitas en silencio.
 - Pruebas manuales (TP de despliegue) se listan aparte como **verificación manual**, con responsable "usuario".

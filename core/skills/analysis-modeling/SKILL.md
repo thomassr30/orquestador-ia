@@ -4,7 +4,7 @@ description: Modelado funcional con diagramas Mermaid (procesos/flujos de negoci
 ---
 # Modelado funcional
 
-Diagramas en **Mermaid** (se ven en GitHub, GitLab, Azure DevOps y VS Code), dentro de `requirements.md` o en `changes/<id>/modelos.md`.
+Diagramas en **Mermaid** (se ven en GitHub, GitLab, Azure DevOps y VS Code), dentro de la respuesta (los diagramas se ven en el chat de las herramientas que renderizan Mermaid; si no, entrégalos como bloque de código). Archivo solo si el usuario lo pide.
 
 | Necesidad | Diagrama |
 |---|---|
@@ -18,7 +18,7 @@ Diagramas en **Mermaid** (se ven en GitHub, GitLab, Azure DevOps y VS Code), den
 - Un diagrama = una pregunta respondida; máximo ~15 nodos (si crece, dividir).
 - Nombres del dominio (los del glosario), no técnicos, en diagramas funcionales.
 - Cada transición de estado y cada decisión del flujo debe tener su regla de negocio (RN-xx) o criterio de aceptación asociado.
-- Marcar en el diagrama los puntos con dudas (`?`) y llevarlos a `preguntas-cliente.md`.
+- Marcar en el diagrama los puntos con dudas (`?`) y llevarlos a las preguntas para el cliente.
 
 ## Prototipo de baja fidelidad
 Cuando la pantalla es central para entender el requerimiento: lista de campos (nombre, tipo, obligatorio, validación), acciones y estados de la pantalla. El diseño visual se define después (skill `design-quality`).

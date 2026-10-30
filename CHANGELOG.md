@@ -1,5 +1,24 @@
 # Cambios
 
+## 1.13.0 — Compactación sin pérdida y aislada por proyecto
+- **Hook SessionStart de Claude Code** (`sdd-context.js`): al iniciar, reanudar, limpiar o **después de compactar**, inyecta automáticamente la memoria del proyecto actual (índice + sesión de trabajo + lista de temas), con tope de 9.000 caracteres.
+- **Compact Instructions** en las reglas globales: qué conservar al compactar (proyecto, objetivo, plan aprobado, decisiones, estado de tareas, errores y soluciones, pedidos del usuario, próximos pasos).
+- `sesion.md` con la ruta del proyecto en la primera línea, actualizado al aprobar el plan, al terminar tareas importantes y al cerrar.
+- **Aislamiento por proyecto**: la memoria se busca solo en la raíz git del proyecto; la del workspace multi-repo solo si ese workspace incluye el repo; nunca información de un proyecto en archivos globales ni en otro proyecto.
+- `install.js --no-hooks` para omitir el hook; la desinstalación conserva los hooks propios del usuario.
+
+## 1.12.0 — Memoria y contexto siempre activos
+- La memoria del proyecto vuelve a ser automática (no es un archivo de trabajo): se lee el índice y la sesión al empezar, se cargan solo los temas relevantes, `sesion.md` se actualiza al aprobar el plan, al terminar y antes de compactar, y lo durable se guarda al cerrar informándolo en el chat ("Recordé: …").
+- Optimización de contexto: no re-explorar ni re-leer lo que ya está en la conversación; a cada sub-agente solo lo necesario; el explorer parte de la memoria.
+- Compactar u olvidar memoria sigue requiriendo confirmación. Los archivos de trabajo (análisis, planes, reportes) siguen sin crearse.
+
+## 1.11.0 — Paralelo, todo en el chat y git de solo lectura
+- **Ejecución en paralelo**: el orquestador lanza a la vez los agentes sin dependencias y encadena automáticamente lo que depende (pipeline: construir y verificar por tarea apenas termina). Se mantienen todos los agentes.
+- **Nada guardado**: sin carpeta `changes/` ni archivos `.md`/`.json` intermedios; el contexto viaja en los mensajes entre agentes y todos los resultados se informan en el chat. Archivos solo cuando son el objetivo (código, tests, infra, documentación, prototipo) o si el usuario lo pide ("modo registro").
+- **Respuestas**: explican lo necesario (hallazgos, motivo, evidencia, riesgos, próximos pasos), ni telegráficas ni con relleno.
+- **Memoria y registro de mejora**: solo se escriben cuando el usuario lo pide.
+- **Git**: lectura libre (status, diff, log, show, blame, ramas…, `gh`/`glab` de consulta); escritura **bloqueada** (commit, push, pull, merge, rebase, reset, checkout, stash, tag, PR, issues…) mediante reglas `deny` en Claude Code y OpenCode, y regla global en todas las IA.
+
 ## 1.10.0 — Diseño profesional (inspirado en Impeccable)
 - `design-quality` reescrita: contexto de producto y sistema visual, **modos** (Persuadir, Operar, Leer, Experimentar), proceso por tarea y referencias por área (tipografía, color, espacio, movimiento, interacción, adaptar, simplificar, primer uso) + catálogo de anti-patrones ampliado.
 - Skills nuevas: `design-context` (producto.md y diseno.md en memoria), `design-shape` (brief y dirección evaluada antes de codificar), `design-critique` (usabilidad 0–4, P0–P3), `design-audit` (5 áreas, /20, detector de Impeccable opcional sin telemetría), `design-polish`, `design-harden`, `ux-writing`, `sdd-ux` (pedidos de diseño en lenguaje natural).

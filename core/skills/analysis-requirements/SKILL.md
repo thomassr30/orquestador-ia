@@ -4,7 +4,7 @@ description: Análisis funcional de requerimientos (elicitación, historias de u
 ---
 # Análisis de requerimientos
 
-ENTRADA: `changes/<id>/input.md` (+ `explore.md` y memoria si existen). SALIDA: `changes/<id>/requirements.md` y `changes/<id>/preguntas-cliente.md`.
+ENTRADA: requerimiento (y hallazgos del explorer/memoria) en el mensaje. SALIDA: análisis en tu respuesta (no crees archivos salvo pedido del usuario).
 
 ## Procedimiento
 1. **Entender el objetivo de negocio**: problema, quién lo tiene, cómo se mide el éxito. Si no está, es la primera pregunta.
@@ -17,9 +17,9 @@ ENTRADA: `changes/<id>/input.md` (+ `explore.md` y memoria si existen). SALIDA: 
 6. **Requisitos no funcionales** solo si aplican y medibles: rendimiento, seguridad, disponibilidad, accesibilidad, auditoría/trazabilidad, normativa de datos personales.
 7. **Glosario** de términos del dominio (evita ambigüedad entre cliente y equipo).
 8. **Priorización** MoSCoW (Must/Should/Could/Won't) cuando haya más de lo que cabe en una entrega.
-9. **Preguntas para el cliente**: todo lo ambiguo, contradictorio o faltante → `preguntas-cliente.md` (agrupadas por tema, con opción sugerida cuando ayude a decidir rápido). NUNCA rellenar con supuestos silenciosos; si hay que asumir, se marca `SUPUESTO-0N` y se lista.
+9. **Preguntas para el cliente**: todo lo ambiguo, contradictorio o faltante → sección "Preguntas para el cliente" (lista lista para copiar) (agrupadas por tema, con opción sugerida cuando ayude a decidir rápido). NUNCA rellenar con supuestos silenciosos; si hay que asumir, se marca `SUPUESTO-0N` y se lista.
 
-## Formato `requirements.md`
+## Estructura de la respuesta
 ```markdown
 # Requerimientos: <título>
 ## Objetivo de negocio y métrica de éxito
@@ -30,6 +30,6 @@ ENTRADA: `changes/<id>/input.md` (+ `explore.md` y memoria si existen). SALIDA: 
 ## Requisitos no funcionales — RNF-01…
 ## Supuestos — SUPUESTO-01… (requieren validación)
 ## Glosario
-## Trazabilidad: fuente (sección/página de input.md) → HU/RN
+## Trazabilidad: fuente (sección/página del documento original) → HU/RN
 ```
 Para diagramas de procesos, estados o datos usa `analysis-modeling`; para estimar, `analysis-estimation`.

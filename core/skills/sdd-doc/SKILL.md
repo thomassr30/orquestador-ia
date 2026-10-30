@@ -5,10 +5,8 @@ description: Genera documentación técnica formal en español (arquitectura, AP
 # /sdd-doc — Documentación técnica
 
 Qué documentar: $ARGUMENTS
-(Ej.: `arquitectura general`, `API de muestras`, `modelo de datos`, `módulo de autenticación`.)
+(Si no ves la solicitud arriba, usa el mensaje del usuario y sus adjuntos.)
 
-1. Carga la skill `sdd-orchestrator`.
-2. Si no está claro: pregunta tipo de documento, audiencia (técnica / gestión) y ruta de salida (por defecto `docs/`).
-3. Crea el cambio: `node "{{SDD_HOME}}/bin/new-change.js" --type doc "<tema>"`
-4. Delega `explore` (con foco en el tema) y luego `doc` en `sdd-doc-writer`.
-5. Muestra la ruta del documento y las "Preguntas abiertas / información no verificable" que haya dejado.
+1. Si no está claro: tipo de documento, audiencia y ruta de salida (por defecto `docs/`).
+2. Explorer → `sdd-doc-writer` (aquí sí se escribe el documento, porque es lo pedido).
+3. Informa ruta, secciones y lo pendiente de validar.

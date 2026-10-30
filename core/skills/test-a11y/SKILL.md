@@ -10,7 +10,7 @@ description: Tests de accesibilidad automáticos (axe-core) y checklist manual W
 - En tests de componentes: `jest-axe` / `vitest-axe` si están disponibles.
 - Gate: 0 violaciones `serious` o `critical`.
 
-## Checklist manual (reportar en verify.md)
+## Checklist manual (reportar en el informe de verificación)
 - Navegable solo con teclado (Tab, Shift+Tab, Enter, Esc); orden de foco lógico; foco visible.
 - Controles con nombre accesible (label, aria-label).
 - Mensajes dinámicos (alertas, errores) anunciados (`role="alert"`/`aria-live`).

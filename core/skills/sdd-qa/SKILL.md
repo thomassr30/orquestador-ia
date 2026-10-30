@@ -5,9 +5,9 @@ description: Ejecuta QA funcional y de aceptación de un cambio o funcionalidad 
 # /sdd-qa — QA funcional
 
 Qué probar: $ARGUMENTS
-(Si no ves la solicitud arriba, usa el mensaje del usuario.)
+(Si no ves la solicitud arriba, usa el mensaje del usuario y sus adjuntos.)
 
-1. Carga `sdd-orchestrator`. Usa el cambio relacionado si existe; si no: `node "{{SDD_HOME}}/bin/new-change.js" --type qa "<qué se prueba>"` y escribe en `input.md` el alcance y los criterios de aceptación disponibles (si no hay, pídelos o derívalos de la funcionalidad y confírmalos con el usuario).
-2. Confirma entorno (local/dev/QA), URL o build, y usuario de prueba. Producción solo lectura y con autorización explícita.
-3. Delega en `sdd-qa-functional`.
-4. Reporta: veredicto, matriz resumida, bugs por severidad y pendientes manuales. Para cada bug crítico/alto ofrece `/sdd-fix`.
+1. Carga `sdd-orchestrator`. Confirma entorno (local/dev/QA), URL o build y usuario de prueba; producción solo lectura con autorización explícita.
+2. Si no hay criterios de aceptación, derívalos de la funcionalidad y confírmalos con el usuario.
+3. Delega en `sdd-qa-functional` (web y mobile en paralelo si aplica).
+4. Informa en el chat: veredicto, casos y resultados, bugs con severidad y pasos, pendientes manuales. Para bugs críticos/altos ofrece corregirlos.

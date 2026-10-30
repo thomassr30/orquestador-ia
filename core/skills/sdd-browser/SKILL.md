@@ -5,24 +5,9 @@ description: "Controla el navegador para ver, inspeccionar o interactuar con pá
 # /sdd-browser — Control del navegador
 
 Solicitud: $ARGUMENTS
-(Si no ves la solicitud arriba, usa el mensaje del usuario.)
+(Si no ves la solicitud arriba, usa el mensaje del usuario y sus adjuntos.)
 
-Carga la skill `browser-automation` y elige el modo:
-
-| Modo | Cuándo | Carpeta `changes/` |
-|---|---|---|
-| **Ver** | "muéstrame", "abre", "cómo se ve", "qué dice la página X" | No |
-| **Inspeccionar** | errores en consola, peticiones fallidas, rendimiento, "por qué no carga" | No (sí si deriva en un fix) |
-| **Verificación visual** | revisar la UI propia en local tras un cambio (responsive, estados, diseño) | Sí, dentro del cambio en curso |
-| **Tarea** | varios pasos: formularios, descargas, flujos con evidencia | Sí |
-
-## Modo Ver / Inspeccionar (rápido)
-1. Si es un sitio con login, pide al usuario que inicie sesión en la ventana del navegador (nunca pidas contraseñas por chat).
-2. Delega en `sdd-browser-operator` (o hazlo tú si no hay sub-agentes) con: URL, qué mirar y formato de respuesta.
-3. Responde: lo observado (≤8 líneas) + captura(s) guardadas en `.sdd-browser/` del proyecto (o la carpeta temporal) + hallazgos de consola/red si aplica.
-
-## Modo Verificación visual / Tarea
-1. Carga `sdd-orchestrator`. Si no hay cambio en curso: `node "{{SDD_HOME}}/bin/new-change.js" --type browser "<título>"`.
-2. Escribe pasos y datos en `changes/<id>/browser-task.md` (pregunta lo que falte).
-3. Delega en `sdd-browser-operator`. Reporta resultado, pasos fallidos y la ruta de `evidencia/`.
-4. Si la app local no está corriendo, propón el comando para levantarla (ej. `npm run dev`) y espera confirmación antes de ejecutarlo.
+Carga `browser-automation` y elige el modo: **Ver** (cómo se ve / qué dice), **Inspeccionar** (consola, red, rendimiento), **Verificación visual** (UI propia en varios tamaños) o **Tarea** (pasos en una web).
+1. Si hay login, el usuario inicia sesión en la ventana del navegador (nunca contraseñas por chat).
+2. Delega en `sdd-browser-operator` (o hazlo tú si no hay sub-agentes). Si la app local no corre, propone el comando para levantarla y espera confirmación.
+3. Informa en el chat lo observado, hallazgos y capturas. No guardes evidencias en el proyecto salvo pedido.

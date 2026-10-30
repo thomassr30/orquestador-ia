@@ -4,7 +4,7 @@ description: Principios DevOps y mapa de skills por plataforma (CI/CD, contenedo
 ---
 # DevOps — principios y mapa
 
-## Carga solo la skill de la plataforma que usa el proyecto (ver `stack.json` → `infra`)
+## Carga solo la skill de la plataforma que usa el proyecto (ver el stack detectado → `infra`)
 | Área | Skills |
 |---|---|
 | CI/CD | `ci-github-actions` · `ci-gitlab` · `ci-azure-pipelines` · `ci-jenkins` · `ci-bitbucket` |

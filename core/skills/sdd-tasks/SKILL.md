@@ -4,7 +4,7 @@ description: Divide el cambio en tareas pequeñas por capa con dependencias y tr
 ---
 # Planificar tareas
 
-ENTRADA: `design.md` (o `explore.md` en fix), `spec.md`, `test-plan.md`. SALIDA: `changes/<id>/tasks.md`
+ENTRADA: diseño, requisitos y plan de tests (en el mensaje). SALIDA: en tu respuesta (no crees archivo salvo que el usuario lo pida):
 
 ```markdown
 # Tareas
@@ -17,6 +17,6 @@ ENTRADA: `design.md` (o `explore.md` en fix), `spec.md`, `test-plan.md`. SALIDA:
 Reglas:
 - *Columna Repo solo en cambios multi-repo (skill `multi-repo`).
 - Capa ∈ {db, backend, frontend, mobile, infra}. Una tarea = un implementer, ≤ ~1 h de trabajo humano.
-- Cada REQ cubierto por ≥1 tarea; cada tarea referencia sus tests de `test-plan.md`.
-- Marca "(contrato)" cuando la dependencia es solo del contrato en design.md (habilita paralelo).
-Devuelve ≤10 líneas: nº de tareas por capa, cuáles pueden ir en paralelo.
+- Cada REQ cubierto por ≥1 tarea; cada tarea referencia sus tests.
+- Marca "(contrato)" cuando la dependencia es solo del contrato en el diseño del plan (habilita paralelo).
+Indica explícitamente qué tareas pueden ir en paralelo (archivos disjuntos) y cuáles dependen de otras.

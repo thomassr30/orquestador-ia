@@ -4,7 +4,7 @@ description: Escribe la especificación con requisitos numerados y escenarios Da
 ---
 # Especificar
 
-ENTRADA: `proposal.md` (+ `requirements.md` si existe: cada HU/criterio de aceptación se traduce a REQ/escenarios con trazabilidad `HU-01 → REQ-01`; + `input.md` si necesitas citar). SALIDA: `changes/<id>/spec.md`
+ENTRADA: la propuesta (+ el análisis de requerimientos si existe: cada HU/criterio de aceptación se traduce a REQ/escenarios con trazabilidad `HU-01 → REQ-01`; + la solicitud si necesitas citar). SALIDA: en tu respuesta (no crees archivo salvo que el usuario lo pida)
 
 ```markdown
 # Especificación
@@ -18,4 +18,4 @@ ENTRADA: `proposal.md` (+ `requirements.md` si existe: cada HU/criterio de acept
 ## Reglas de negocio / validaciones
 ## Preguntas abiertas
 ```
-Reglas: cada requisito debe ser testeable; IDs `REQ-NN` estables (no renumerar). Devuelve ≤10 líneas: nº de requisitos, escenarios y preguntas.
+Reglas: cada requisito debe ser testeable; IDs `REQ-NN` estables (no renumerar). Entrega los requisitos completos en tu respuesta (sin crear archivos).

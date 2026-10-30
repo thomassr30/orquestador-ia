@@ -29,10 +29,10 @@ Si un MCP no está disponible, dilo y usa el otro; no intentes "simular" la nave
 1. Abre la URL; espera a que cargue (esperar por texto/elemento, no tiempos fijos).
 2. Lee la página con el **snapshot de accesibilidad** (más barato y preciso que capturas); usa **captura de pantalla** para ver diseño o como evidencia.
 3. Interactúa por referencias del snapshot (roles y nombres), no por coordenadas.
-4. Evidencia: capturas en `changes/<id>/evidencia/NN-paso.png` (modo tarea) o `.sdd-browser/` (modo ver); bitácora en `browser-log.md` (paso | acción | resultado | evidencia).
+4. Evidencia: muestra o describe las capturas en tu respuesta y detalla los pasos (acción → resultado). No guardes capturas ni bitácoras en el proyecto salvo que el usuario lo pida.
 5. Cierra pestañas que abriste al terminar.
 
 ## Flujos repetitivos → script (cero tokens después)
 Si la tarea se repetirá, genera `scripts/flujos/<nombre>.spec.ts` con `@playwright/test` (selectores `getByRole`/`getByLabel`, credenciales por variables de entorno, `storageState` para sesión). Indica: `npx playwright test scripts/flujos/<nombre>.spec.ts`.
 
-Devuelve ≤8 líneas: resultado, hallazgos, pasos fallidos y rutas de capturas/script.
+Entrega: resultado, hallazgos, pasos fallidos y capturas/script si los hubo, con lo necesario para entenderlo.

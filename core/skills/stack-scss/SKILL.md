@@ -1,6 +1,6 @@
 ---
 name: stack-scss
-description: Convenciones para estilos SCSS/Sass. Usar cuando stack.json incluya scss o sass.
+description: Convenciones para estilos SCSS/Sass. Usar cuando el stack detectado incluya scss o sass.
 ---
 # SCSS
 

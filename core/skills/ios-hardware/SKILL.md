@@ -18,7 +18,7 @@ Lee SOLO la referencia de la capacidad que necesitas:
 1. **Permisos en contexto**: solicitar cuando el usuario usa la función, con explicación previa propia; nunca al abrir la app.
 2. **Textos de uso** en `Info.plist` (`NSCameraUsageDescription`, `NSLocationWhenInUseUsageDescription`, `NSBluetoothAlwaysUsageDescription`, `NFCReaderUsageDescription`, `NSFaceIDUsageDescription`, `NSMotionUsageDescription`, `NSPhotoLibraryAddUsageDescription`…) específicos: qué se usa y para qué.
 3. **Todos los estados de autorización**: no determinado, denegado, restringido, limitado (fotos), aproximado (ubicación). Si está denegado: explicar y ofrecer `UIApplication.openSettingsURLString`.
-4. **Capabilities/entitlements** en el target (NFC, Background Modes, Push) — no los agregues sin indicarlo en design.md.
+4. **Capabilities/entitlements** en el target (NFC, Background Modes, Push) — no los agregues sin indicarlo en el diseño del plan.
 5. **Encapsula el framework** detrás de un protocolo (`protocol LectorCodigos`) para testear con fakes y no acoplar la UI.
 6. **Ciclo de vida**: iniciar/detener sesiones (cámara, sensores, escaneo BLE) según visibilidad de la vista y estado de la app; liberar recursos.
 7. **Privacidad**: mínimo de datos y precisión necesarios; declara en `PrivacyInfo.xcprivacy`; no enviar datos crudos de sensores/ubicación sin necesidad.

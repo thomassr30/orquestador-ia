@@ -22,5 +22,5 @@ Solicitud: $ARGUMENTS
 | "estado vacío", "primer uso", "onboarding" | `references/primer-uso.md` | Sí (GATE) |
 | "documenta el sistema de diseño" | `design-context` | Solo memoria |
 | "propón cómo debería ser" | `design-shape` (+ `prototype`) | No |
-3. Revisiones (crítica/auditoría): delega en `sdd-ui-reviewer` y entrega el informe con P0–P3.
-4. Cambios: crea un cambio `fix` (o `feature` si es grande) con el brief/hallazgos como entrada; GATE → implementer de la capa → `design-polish` → `design-audit` en la verificación.
+3. Revisiones (crítica/auditoría): delega en `sdd-ui-reviewer` y entrega en el chat el informe con P0–P3.
+4. Cambios: flujo `fix` (o `feature` si es grande) con el brief/hallazgos como entrada; GATE → implementer de la capa → `design-polish` → revisión de UI en paralelo con la verificación. Todo informado en el chat, sin archivos de trabajo.

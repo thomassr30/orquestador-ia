@@ -1,6 +1,6 @@
 ---
 name: stack-nestjs
-description: Convenciones para desarrollar y testear APIs en NestJS. Usar cuando stack.json incluya nestjs.
+description: Convenciones para desarrollar y testear APIs en NestJS. Usar cuando el stack detectado incluya nestjs.
 ---
 # NestJS
 

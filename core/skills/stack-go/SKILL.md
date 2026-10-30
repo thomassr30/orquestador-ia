@@ -1,6 +1,6 @@
 ---
 name: stack-go
-description: Convenciones para desarrollar y testear servicios en Go. Usar cuando stack.json incluya go.
+description: Convenciones para desarrollar y testear servicios en Go. Usar cuando el stack detectado incluya go.
 ---
 # Go
 

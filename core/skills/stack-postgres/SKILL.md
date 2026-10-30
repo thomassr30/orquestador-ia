@@ -1,6 +1,6 @@
 ---
 name: stack-postgres
-description: Convenciones para diseño, migraciones, queries y tests en PostgreSQL. Usar cuando stack.json incluya postgres.
+description: Convenciones para diseño, migraciones, queries y tests en PostgreSQL. Usar cuando el stack detectado incluya postgres.
 ---
 # PostgreSQL
 

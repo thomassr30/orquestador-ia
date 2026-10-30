@@ -1,6 +1,6 @@
 ---
 name: stack-android
-description: Desarrollo Android nativo en Kotlin con clean code, arquitectura recomendada (UI/dominio/datos), Hilt, corrutinas y Flow, Room/DataStore, red, seguridad, Gradle y requisitos de Google Play. Usar cuando stack.json incluya android/kotlin. Para UI cargar stack-compose; para hardware cargar android-hardware.
+description: Desarrollo Android nativo en Kotlin con clean code, arquitectura recomendada (UI/dominio/datos), Hilt, corrutinas y Flow, Room/DataStore, red, seguridad, Gradle y requisitos de Google Play. Usar cuando el stack detectado incluya android/kotlin. Para UI cargar stack-compose; para hardware cargar android-hardware.
 ---
 # Android nativo — Kotlin
 

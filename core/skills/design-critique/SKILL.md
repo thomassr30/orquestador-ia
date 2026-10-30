@@ -16,7 +16,7 @@ Carga `design-quality` (contexto, modo y anti-patrones). Revisa el código **y**
 ## Severidad
 **P0** bloquea la tarea o es inaccesible · **P1** importante antes de entregar · **P2** menor, siguiente pasada · **P3** pulido.
 
-## Salida → `changes/<id>/design-review.md` (sección Crítica) o reporte directo
+## Salida (en tu respuesta)
 ```markdown
 ## Crítica — <pantalla> — puntaje usabilidad: X/Y
 ### Conservar

@@ -4,7 +4,7 @@ description: Redacta textos de entrega sin ejecutar git — mensaje de commit (C
 ---
 # Commit, PR y notas de versión (solo borradores)
 
-**Nunca ejecuta git/gh/glab**: escribe los textos en `changes/<id>/entrega.md` y los muestra para que el usuario los use o apruebe su ejecución.
+**Nunca ejecuta git/gh/glab**: entrega los textos en el chat, listos para copiar; el usuario hace el commit y el PR.
 
 ## Mensaje de commit (Conventional Commits)
 `<tipo>(<ámbito>): <resumen en imperativo, ≤ 72 caracteres>` + cuerpo (qué y por qué) + pie (`Refs: LAB-123`, `BREAKING CHANGE: …`).

@@ -1,6 +1,6 @@
 ---
 name: stack-html-css
-description: Convenciones de HTML semántico, CSS y accesibilidad. Usar cuando stack.json incluya html o css, o al construir cualquier UI.
+description: Convenciones de HTML semántico, CSS y accesibilidad. Usar cuando el stack detectado incluya html o css, o al construir cualquier UI.
 ---
 # HTML y CSS
 

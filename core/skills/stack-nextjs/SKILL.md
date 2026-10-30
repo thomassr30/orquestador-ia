@@ -1,6 +1,6 @@
 ---
 name: stack-nextjs
-description: Convenciones para desarrollar y testear aplicaciones Next.js (App Router o Pages Router). Usar cuando stack.json incluya nextjs.
+description: Convenciones para desarrollar y testear aplicaciones Next.js (App Router o Pages Router). Usar cuando el stack detectado incluya nextjs.
 ---
 # Next.js
 

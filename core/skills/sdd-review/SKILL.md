@@ -5,10 +5,8 @@ description: Revisa código (archivos, carpeta, rama o cambios sin commit) y ent
 # /sdd-review — Revisión de código
 
 Alcance: $ARGUMENTS
-(Ejemplos: vacío = cambios sin commit; `rama feature/x` = diff contra la rama principal; `src/app/muestras` = carpeta.)
+(Vacío = cambios sin commit; `rama X` = diff contra la principal; una ruta = esa carpeta.)
 
-1. Carga la skill `sdd-orchestrator`.
-2. Crea el cambio: `node "{{SDD_HOME}}/bin/new-change.js" --type review "<alcance>"`
-3. Escribe el alcance en `changes/<id>/input.md`. Para revisar un diff/rama necesitas `git diff --name-only <base>`: **pide aprobación al usuario** antes de ejecutarlo (o pídele la lista de archivos).
-4. Delega `explore` (solo stack.json + archivos del alcance) y luego `review` en `sdd-reviewer`.
-5. Muestra al usuario el resumen y la ruta de `review.md`. NO corrijas nada. Ofrece: "¿Corrijo los hallazgos críticos con /sdd-fix?".
+1. Carga `sdd-orchestrator`. Obtén el alcance con git de solo lectura (`git status`, `git diff --stat`, `git diff <base>...<rama>`).
+2. Explorer (stack) → `sdd-reviewer` ∥ `sdd-ui-reviewer` (si hay UI).
+3. Informa en el chat: veredicto, hallazgos por severidad con evidencia y sugerencia, y lo que está bien. No corrijas nada; ofrece corregir los críticos.

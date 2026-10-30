@@ -4,7 +4,7 @@ description: "Testing de apps mobile por plataforma (React Native/Expo, iOS Swif
 ---
 # Testing mobile
 
-Usa SIEMPRE el runner y las librerías que ya tiene el proyecto. Si falta algo, propónlo en design.md antes de agregarlo.
+Usa SIEMPRE el runner y las librerías que ya tiene el proyecto. Si falta algo, propónlo en el diseño del plan antes de agregarlo.
 
 ## React Native / Expo
 | Tipo | Herramienta |

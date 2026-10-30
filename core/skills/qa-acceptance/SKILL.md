@@ -4,7 +4,7 @@ description: Proceso de QA funcional y aceptación (casos de prueba desde criter
 ---
 # QA funcional y aceptación
 
-ENTRADA: `requirements.md` y/o `spec.md`, `test-plan.md`, `verify.md`, entorno a probar. SALIDA: `changes/<id>/qa-report.md`.
+ENTRADA: criterios de aceptación, requisitos y entorno (en el mensaje del orquestador). SALIDA: informe en tu respuesta (no crees archivo salvo que el usuario lo pida).
 Ejecución: web → `qa-web`; mobile → `qa-mobile`.
 
 ## Diseño de casos (antes de ejecutar)
@@ -23,7 +23,7 @@ Ejecución: web → `qa-web`; mobile → `qa-mobile`.
 Pasos: 1… 2… 3…
 Esperado: … (CA/REQ de referencia)
 Obtenido: …
-Evidencia: evidencia/qa-bug-01.png · Entorno/versión: …
+Evidencia: captura/descr. · Entorno/versión: …
 ```
 Severidad: **crítica** (bloquea flujo principal o pierde/corrompe datos), **alta** (función importante falla sin alternativa), **media** (falla con alternativa), **baja** (cosmético).
 
@@ -33,5 +33,5 @@ Severidad: **crítica** (bloquea flujo principal o pierde/corrompe datos), **alt
 - **RECHAZADO**: algún CA falla o hay bug crítico/alto → proponer `/sdd-fix` por bug.
 - Casos bloqueados nunca cuentan como aprobados. El veredicto final de aceptación lo confirma el usuario.
 
-## Formato `qa-report.md`
+## Estructura del informe
 Resumen (veredicto, entorno, versión, fecha) · Matriz CA/REQ → caso → resultado · Bugs · Exploratorio (hallazgos) · Pendientes manuales para el usuario.

@@ -1,6 +1,6 @@
 ---
 name: stack-ios
-description: Desarrollo iOS nativo en Swift con clean code, arquitectura por capas, concurrencia segura (Swift 6), persistencia, red, seguridad y tooling. Usar cuando stack.json incluya ios/swift. Para UI cargar stack-swiftui; para cámara, sensores, ubicación, BLE, NFC, biometría cargar ios-hardware.
+description: Desarrollo iOS nativo en Swift con clean code, arquitectura por capas, concurrencia segura (Swift 6), persistencia, red, seguridad y tooling. Usar cuando el stack detectado incluya ios/swift. Para UI cargar stack-swiftui; para cámara, sensores, ubicación, BLE, NFC, biometría cargar ios-hardware.
 ---
 # iOS nativo — Swift
 

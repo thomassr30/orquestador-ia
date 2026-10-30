@@ -36,7 +36,7 @@ Hechos por área, agrupados por subtítulo, con fecha/fuente al final de cada vi
 `AAAA-MM-DD · <id> · <tipo> · <resumen ≤ 15 palabras> · archivos clave`. Presupuesto: ≤ 200 líneas (luego se resume por mes).
 
 ## sesion.md
-Objetivo · Hecho · Falta · Decisiones de la sesión · Archivos clave · Próximos pasos · Dudas. ≤ 40 líneas. Se sobrescribe en cada "guardar".
+Primera línea: `Proyecto: <ruta raíz>`. Luego: Objetivo · Plan aprobado (resumen) · Hecho · En curso · Falta · Decisiones de la sesión · Archivos clave · Errores y soluciones · Próximos pasos · Dudas. ≤ 40 líneas. Se sobrescribe en cada actualización; es lo que se reinyecta tras compactar.
 
 ## Prohibido en memoria
 Secretos, contraseñas, tokens, cadenas de conexión con credenciales, datos personales, contenido de clientes, valores reales del KV (solo NOMBRES de claves).

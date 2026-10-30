@@ -4,7 +4,7 @@ description: Brief de diseño antes de escribir código para una pantalla o fluj
 ---
 # Brief de diseño (antes de implementar)
 
-Carga `design-quality` (contexto y modo). Salida: sección **"Brief de diseño"** en `changes/<id>/design.md`.
+Carga `design-quality` (contexto y modo). Salida: **"Brief de diseño"** en tu respuesta (forma parte del plan que se aprueba en el GATE).
 
 ## Pasos
 1. **Trabajo**: quién usa esta pantalla, en qué situación y qué resultado necesita (1–3 líneas). Si no está claro, pregunta (máx. 3 preguntas juntas).

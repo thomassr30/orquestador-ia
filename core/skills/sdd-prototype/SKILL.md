@@ -5,10 +5,8 @@ description: Crea un prototipo visual navegable de una pantalla o flujo (web o m
 # /sdd-prototype — Prototipo visual
 
 Solicitud: $ARGUMENTS
-(Si no ves la solicitud arriba, usa el mensaje del usuario.)
+(Si no ves la solicitud arriba, usa el mensaje del usuario y sus adjuntos.)
 
-1. Carga `sdd-orchestrator`. Usa el cambio en curso si existe; si no: `node "{{SDD_HOME}}/bin/new-change.js" --type prototype "<título>"`.
-2. `explore` breve para tokens de diseño y patrones de UI existentes (apoyado en memoria).
-3. Delega en `sdd-prototyper` (skill `prototype`).
-4. Muestra capturas y la ruta del prototipo; pide comentarios y itera.
-5. Al aprobar, ofrece continuar con el desarrollo (`sdd-new`) usando el prototipo como referencia de diseño.
+1. Carga `sdd-orchestrator`. Explorer (tokens y patrones de UI) → `sdd-prototyper`.
+2. El prototipo es lo pedido, así que sí se crea (en `.sdd-prototipos/<nombre>/`, fuera del código de producción).
+3. Muestra capturas y la ruta; itera con los comentarios. Al aprobar, ofrece implementarlo.

@@ -13,6 +13,7 @@
  *   node install.js --no-deps            no instala pdfjs-dist / mammoth
  *   node install.js --auto-edits         Claude Code acepta ediciones de archivos sin preguntar (modo acceptEdits)
  *   node install.js --no-permissions     no agrega permisos preaprobados en Claude Code (git/gh siempre piden aprobación)
+ *   node install.js --no-hooks           no instala el hook de memoria de Claude Code
  *   node install.js --force              sobrescribe skills/agentes con el mismo nombre que no son del orquestador
  *   node install.js --uninstall          desinstala todo lo instalado
  */
@@ -279,11 +280,11 @@ function registerMcp(tkey, t) {
 }
 
 // ---------- permisos preaprobados (Claude Code) ----------
-// Solo tests, lint, build y los scripts del orquestador. Nada de git, nada que borre, publique o despliegue.
+// Tests, lint, build y scripts del orquestador. Nada que borre, publique o despliegue.
 function permissionRules() {
   const bin = `${SDD_HOME_FWD}/bin`;
   return [
-    ...['new-change.js', 'sdd-state.js', 'sdd-status.js', 'to-md.js'].map(f => `Bash(node "${bin}/${f}":*)`),
+    ...['new-change.js', 'sdd-state.js', 'sdd-status.js', 'to-md.js', 'sdd-memory.js', 'sdd-context.js', 'sdd-workspace.js'].map(f => `Bash(node "${bin}/${f}":*)`),
     'Bash(npm test:*)', 'Bash(npm run test:*)', 'Bash(npm run lint:*)', 'Bash(npm run build:*)', 'Bash(npm run typecheck:*)', 'Bash(npm audit:*)',
     'Bash(npx vitest:*)', 'Bash(npx jest:*)', 'Bash(npx playwright test:*)', 'Bash(npx tsc --noEmit:*)', 'Bash(npx eslint:*)', 'Bash(npx stylelint:*)',
     'Bash(ng test:*)', 'Bash(ng lint:*)', 'Bash(ng build:*)', 'Bash(npx ng test:*)', 'Bash(npx ng lint:*)', 'Bash(npx ng build:*)',
@@ -292,11 +293,40 @@ function permissionRules() {
     'Bash(semgrep scan:*)', 'Bash(docker ps:*)'
   ];
 }
-// Git y GitHub SIEMPRE requieren aprobación del usuario (en Claude Code "ask" tiene prioridad sobre "allow" y sobre acceptEdits)
-const GIT_ASK_CLAUDE = ['Bash(git:*)', 'Bash(gh:*)',
-  // infraestructura y entornos: siempre con aprobación (decisiones críticas)
-  'Bash(kubectl:*)', 'Bash(oc:*)', 'Bash(helm:*)', 'Bash(terraform:*)', 'Bash(docker push:*)', 'Bash(consul:*)', 'Bash(vault:*)', 'Bash(az:*)', 'Bash(aws:*)', 'Bash(gcloud:*)'];
-const GIT_ASK_OPENCODE = ['git *', 'gh *', 'kubectl *', 'oc *', 'helm *', 'terraform *', 'docker push *', 'consul *', 'vault *', 'az *', 'aws *', 'gcloud *'];
+// ---------- git: lectura libre, escritura bloqueada (deny > ask > allow en Claude Code) ----------
+const GIT_READ = ['status', 'diff', 'log', 'show', 'blame', 'ls-files', 'ls-tree', 'grep', 'rev-parse', 'describe', 'shortlog',
+  'cat-file', 'merge-base', 'for-each-ref', 'name-rev', 'remote -v', 'remote show', 'branch --list', 'branch -a', 'branch -r',
+  'branch -v', 'branch -vv', 'branch --show-current', 'stash list', 'stash show', 'worktree list', 'config --get', 'config --list', 'reflog show'];
+const GIT_WRITE = ['commit', 'push', 'pull', 'merge', 'rebase', 'reset', 'checkout', 'switch', 'restore', 'add', 'rm', 'mv',
+  'cherry-pick', 'revert', 'clean', 'am', 'apply', 'commit-tree', 'update-ref', 'update-index', 'filter-branch', 'filter-repo',
+  'gc', 'prune', 'init', 'submodule add', 'submodule update', 'submodule deinit', 'worktree add', 'worktree remove', 'worktree prune',
+  'remote add', 'remote remove', 'remote rm', 'remote rename', 'remote set-url', 'remote prune', 'notes add', 'notes remove', 'replace',
+  'reflog expire', 'reflog delete', 'stash push', 'stash pop', 'stash apply', 'stash drop', 'stash clear', 'stash save', 'stash create', 'stash store',
+  'tag -a', 'tag -s', 'tag -d', 'tag -f', 'tag --delete', 'tag --force', 'branch -d', 'branch -D', 'branch -m', 'branch -M', 'branch -c', 'branch -C',
+  'branch --delete', 'branch --move', 'branch --copy', 'branch -f', 'branch --force', 'branch -u', 'branch --set-upstream-to', 'branch --unset-upstream'];
+const FORGE_READ = ['gh pr view', 'gh pr list', 'gh pr diff', 'gh pr checks', 'gh pr status', 'gh issue view', 'gh issue list', 'gh issue status',
+  'gh repo view', 'gh run list', 'gh run view', 'gh release list', 'gh release view', 'gh search', 'glab mr view', 'glab mr list', 'glab mr diff',
+  'glab issue view', 'glab issue list', 'glab repo view', 'glab ci list', 'glab ci view'];
+const FORGE_WRITE = ['gh pr create', 'gh pr merge', 'gh pr close', 'gh pr reopen', 'gh pr edit', 'gh pr comment', 'gh pr review', 'gh pr checkout', 'gh pr ready',
+  'gh issue create', 'gh issue close', 'gh issue reopen', 'gh issue edit', 'gh issue comment', 'gh issue delete', 'gh issue transfer', 'gh issue lock',
+  'gh release create', 'gh release delete', 'gh release edit', 'gh release upload', 'gh repo create', 'gh repo delete', 'gh repo fork', 'gh repo edit',
+  'gh repo rename', 'gh repo archive', 'gh workflow run', 'gh run rerun', 'gh run cancel', 'gh secret set', 'gh variable set',
+  'glab mr create', 'glab mr merge', 'glab mr close', 'glab mr approve', 'glab mr note', 'glab mr update', 'glab issue create', 'glab issue close',
+  'glab issue note', 'glab issue update', 'glab release create', 'glab ci run'];
+// Infraestructura y entornos: siempre con aprobación (decisiones críticas)
+const INFRA_ASK = ['kubectl', 'oc', 'helm', 'terraform', 'docker push', 'consul', 'vault', 'az', 'aws', 'gcloud'];
+
+const CLAUDE_RULES = {
+  allow: [...GIT_READ.map(c => `Bash(git ${c}:*)`), 'Bash(git branch)', 'Bash(git remote)', 'Bash(git stash list)', ...FORGE_READ.map(c => `Bash(${c}:*)`)],
+  deny: [...GIT_WRITE.map(c => `Bash(git ${c}:*)`), 'Bash(git stash)', ...FORGE_WRITE.map(c => `Bash(${c}:*)`)],
+  ask: INFRA_ASK.map(c => `Bash(${c}:*)`), // (no se pone 'git:*' en ask: ask tiene prioridad sobre allow y bloquearía la lectura; lo no listado ya pregunta por defecto)
+};
+// OpenCode: el último patrón que coincide gana → orden: general (ask) → lectura (allow) → escritura (deny)
+const OPENCODE_RULES = [
+  ...['git *', 'gh *', 'glab *', ...INFRA_ASK.map(c => `${c} *`)].map(k => [k, 'ask']),
+  ...GIT_READ.map(c => [`git ${c}*`, 'allow']), ['git branch', 'allow'], ...FORGE_READ.map(c => [`${c}*`, 'allow']),
+  ...GIT_WRITE.map(c => [`git ${c}*`, 'deny']), ['git stash', 'deny'], ...FORGE_WRITE.map(c => [`${c}*`, 'deny']),
+];
 
 function configureClaudePermissions(file) {
   let json;
@@ -304,27 +334,46 @@ function configureClaudePermissions(file) {
   const P = json.permissions = json.permissions || {};
   const prevP = manifest.permissions || {};
   // quitar lo agregado por instalaciones anteriores (se vuelve a agregar lo vigente)
-  const oldAllow = new Set(prevP.added || []); const oldAsk = new Set(prevP.addedAsk || []);
-  P.allow = (P.allow || []).filter(r => !oldAllow.has(r));
-  P.ask = (P.ask || []).filter(r => !oldAsk.has(r));
-  const added = []; const addedAsk = [];
-  if (!opt('no-permissions')) for (const r of permissionRules()) if (!P.allow.includes(r)) { P.allow.push(r); added.push(r); }
-  for (const r of GIT_ASK_CLAUDE) if (!P.ask.includes(r)) { P.ask.push(r); addedAsk.push(r); }
-  if (!P.allow.length) delete P.allow;
-  if (!P.ask.length) delete P.ask;
+  const old = { allow: new Set(prevP.added || []), ask: new Set(prevP.addedAsk || []), deny: new Set(prevP.addedDeny || []) };
+  for (const k of ['allow', 'ask', 'deny']) P[k] = (P[k] || []).filter(r => !old[k].has(r));
+  const added = { allow: [], ask: [], deny: [] };
+  const wanted = { allow: [...(opt('no-permissions') ? [] : permissionRules()), ...CLAUDE_RULES.allow], ask: CLAUDE_RULES.ask, deny: CLAUDE_RULES.deny };
+  for (const k of ['allow', 'ask', 'deny']) for (const r of wanted[k]) if (!P[k].includes(r)) { P[k].push(r); added[k].push(r); }
+  for (const k of ['allow', 'ask', 'deny']) if (!P[k].length) delete P[k];
   let previousMode = prevP.previousMode ?? null;
   if (opt('auto-edits') && P.defaultMode !== 'acceptEdits') { previousMode = P.defaultMode || 'default'; P.defaultMode = 'acceptEdits'; }
   backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n');
-  manifest.permissions = { file, added, addedAsk, previousMode };
-  log(`  ✓ ${added.length} permisos preaprobados · git/gh e infraestructura siempre con tu aprobación${P.defaultMode === 'acceptEdits' ? ' · ediciones automáticas' : ''} → ${file}`);
+  manifest.permissions = { file, added: added.allow, addedAsk: added.ask, addedDeny: added.deny, previousMode };
+  log(`  ✓ permisos: git y gh/glab solo lectura (escritura bloqueada) · infraestructura con aprobación${P.defaultMode === 'acceptEdits' ? ' · ediciones automáticas' : ''} → ${file}`);
+}
+// ---------- hooks de Claude Code: memoria del proyecto al iniciar/reanudar/después de compactar ----------
+const HOOK_MARK = 'sdd-context.js';
+function configureClaudeHooks(file) {
+  let json;
+  try { json = readJson(file); } catch { notes.push(`Claude Code: ${file} no es JSON válido; hooks no configurados.`); return; }
+  json.hooks = json.hooks || {};
+  const list = (json.hooks.SessionStart || []).filter(g => !(g.hooks || []).some(h => String(h.command || '').includes(HOOK_MARK)));
+  list.push({ hooks: [{ type: 'command', command: `node "${SDD_HOME_FWD}/bin/sdd-context.js"`, timeout: 10 }] });
+  json.hooks.SessionStart = list;
+  backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n');
+  manifest.hooks = { file };
+  log(`  ✓ hook: memoria del proyecto al iniciar, reanudar y tras compactar → ${file}`);
+}
+function removeClaudeHooks(h) {
+  if (!h || !fs.existsSync(h.file)) return;
+  let json; try { json = readJson(h.file); } catch { return; }
+  if (!json.hooks || !json.hooks.SessionStart) return;
+  json.hooks.SessionStart = json.hooks.SessionStart.filter(g => !(g.hooks || []).some(x => String(x.command || '').includes(HOOK_MARK)));
+  if (!json.hooks.SessionStart.length) delete json.hooks.SessionStart;
+  if (!Object.keys(json.hooks).length) delete json.hooks;
+  writeFile(h.file, JSON.stringify(json, null, 2) + '\n');
 }
 function removeClaudePermissions(p) {
   if (!p || !fs.existsSync(p.file)) return;
   let json; try { json = readJson(p.file); } catch { return; }
   const P = json.permissions; if (!P) return;
-  const rmA = new Set(p.added || []); const rmK = new Set(p.addedAsk || []);
-  if (P.allow) { P.allow = P.allow.filter(r => !rmA.has(r)); if (!P.allow.length) delete P.allow; }
-  if (P.ask) { P.ask = P.ask.filter(r => !rmK.has(r)); if (!P.ask.length) delete P.ask; }
+  const rm = { allow: new Set(p.added || []), ask: new Set(p.addedAsk || []), deny: new Set(p.addedDeny || []) };
+  for (const k of ['allow', 'ask', 'deny']) if (P[k]) { P[k] = P[k].filter(r => !rm[k].has(r)); if (!P[k].length) delete P[k]; }
   if (p.previousMode !== null && p.previousMode !== undefined && P.defaultMode === 'acceptEdits') {
     if (p.previousMode === 'default') delete P.defaultMode; else P.defaultMode = p.previousMode;
   }
@@ -332,18 +381,21 @@ function removeClaudePermissions(p) {
 }
 function configureOpencodeGit(file) {
   let json;
-  try { json = readJson(file); } catch { notes.push(`OpenCode: ${file} no es JSON puro; agrega manualmente permission.bash {"git *":"ask","gh *":"ask"}.`); return; }
+  try { json = readJson(file); } catch { notes.push(`OpenCode: ${file} no es JSON puro; configura permission.bash manualmente (git lectura allow, escritura deny).`); return; }
   json.permission = json.permission || {};
   let bash = json.permission.bash;
   if (typeof bash === 'string') bash = { '*': bash };
   bash = bash || {};
-  const added = [];
-  for (const k of GIT_ASK_OPENCODE) if (bash[k] !== 'ask') { bash[k] = 'ask'; added.push(k); }
-  json.permission.bash = bash;
-  if (added.length) { backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n'); }
-  const prev = (manifest.opencodePerm || {}).added || [];
-  manifest.opencodePerm = { file, added: [...new Set([...prev, ...added])] };
-  log(`  ✓ git/gh e infraestructura siempre con tu aprobación → ${file}`);
+  const prev = new Set((manifest.opencodePerm || {}).added || []);
+  const ours = new Set(OPENCODE_RULES.map(([k]) => k));
+  // reconstruir: primero lo del usuario (sin nuestras claves), luego nuestras reglas en orden
+  const rebuilt = {};
+  for (const [k, v] of Object.entries(bash)) if (!ours.has(k) && !prev.has(k)) rebuilt[k] = v;
+  for (const [k, v] of OPENCODE_RULES) rebuilt[k] = v;
+  json.permission.bash = rebuilt;
+  backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n');
+  manifest.opencodePerm = { file, added: [...ours] };
+  log(`  ✓ git y gh/glab solo lectura (escritura bloqueada) · infraestructura con aprobación → ${file}`);
 }
 function removeOpencodeGit(p) {
   if (!p || !fs.existsSync(p.file)) return;
@@ -369,6 +421,7 @@ function uninstall() {
   log('Desinstalando Orquestador SDD...');
   removePrevious(prev, false);
   removeClaudePermissions(prev.permissions);
+  removeClaudeHooks(prev.hooks);
   removeOpencodeGit(prev.opencodePerm);
   rmrf(SDD_HOME);
   log('✓ Skills, agentes, comandos y reglas globales eliminados.');
@@ -467,7 +520,7 @@ function install() {
     } else if (k === 'cursor') {
       notes.push(`Cursor: pega el contenido de core/rules/global.md en Cursor → Settings → Rules → User Rules.`);
     }
-    if (t.settings) configureClaudePermissions(t.settings);
+    if (t.settings) { configureClaudePermissions(t.settings); if (!opt('no-hooks')) configureClaudeHooks(t.settings); }
     if (k === 'opencode') configureOpencodeGit(t.mcp.file);
     if (!opt('no-mcp')) registerMcp(k, t);
   }

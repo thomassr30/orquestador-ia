@@ -1,6 +1,6 @@
 ---
 name: stack-adonisjs
-description: Convenciones para desarrollar y testear aplicaciones AdonisJS (Lucid, VineJS, Japa). Usar cuando stack.json incluya adonisjs.
+description: Convenciones para desarrollar y testear aplicaciones AdonisJS (Lucid, VineJS, Japa). Usar cuando el stack detectado incluya adonisjs.
 ---
 # AdonisJS
 

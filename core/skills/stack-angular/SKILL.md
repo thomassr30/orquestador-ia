@@ -1,6 +1,6 @@
 ---
 name: stack-angular
-description: Convenciones para desarrollar y testear aplicaciones Angular modernas (standalone, signals). Usar cuando stack.json incluya angular.
+description: Convenciones para desarrollar y testear aplicaciones Angular modernas (standalone, signals). Usar cuando el stack detectado incluya angular.
 ---
 # Angular
 
@@ -13,7 +13,7 @@ description: Convenciones para desarrollar y testear aplicaciones Angular modern
   - `input()` / `output()` / `model()` en componentes nuevos si la versión lo soporta.
   - Control flow `@if`, `@for` (con `track`), `@switch`.
 - Formularios reactivos tipados; validaciones en el formulario, mensajes de error accesibles.
-- HTTP: servicios por dominio con `HttpClient`; interceptores para auth/errores; tipar respuestas según el contrato de design.md.
+- HTTP: servicios por dominio con `HttpClient`; interceptores para auth/errores; tipar respuestas según el contrato del diseño del plan.
 - Rutas lazy (`loadComponent`/`loadChildren`). Sin lógica de negocio en templates.
 - Si el proyecto es zoneless o usa zone.js, respétalo; no lo cambies.
 

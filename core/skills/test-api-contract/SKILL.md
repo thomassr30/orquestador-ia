@@ -1,12 +1,12 @@
 ---
 name: test-api-contract
-description: Valida que la API cumpla su contrato (OpenAPI o design.md) con tests de esquema y contrato. Usar cuando se crean o modifican endpoints.
+description: Valida que la API cumpla su contrato (OpenAPI o el diseño del plan) con tests de esquema y contrato. Usar cuando se crean o modifican endpoints.
 ---
 # Tests de contrato de API
 
 ## Fuente del contrato
 1. Spec OpenAPI del proyecto (ej. generada por `@nestjs/swagger`, `swag` en Go) si existe.
-2. Si no, la sección "Contratos de API" de `design.md`.
+2. Si no, la sección "Contratos de API" del diseño del plan.
 
 ## Opciones (elige la que encaje con el proyecto)
 - **Validación de esquema en tests de integración**: validar el body de respuesta contra el esquema JSON (ajv en Node; `kin-openapi` en Go).

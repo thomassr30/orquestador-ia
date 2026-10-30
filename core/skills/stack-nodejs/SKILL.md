@@ -1,6 +1,6 @@
 ---
 name: stack-nodejs
-description: Convenciones para código Node.js (scripts, APIs Express/Fastify u otras) sin framework de alto nivel. Usar cuando stack.json incluya nodejs.
+description: Convenciones para código Node.js (scripts, APIs Express/Fastify u otras) sin framework de alto nivel. Usar cuando el stack detectado incluya nodejs.
 ---
 # Node.js
 
@@ -12,7 +12,7 @@ description: Convenciones para código Node.js (scripts, APIs Express/Fastify u 
 - Valida toda entrada externa (body, query, params) con el validador del proyecto.
 - Errores: clases de error propias o del framework; middleware central de errores; no filtrar stack traces al cliente.
 - SQL parametrizado o vía ORM/query builder del proyecto.
-- Dependencias: `npm ci` en CI; no agregues paquetes sin justificarlo en design.md.
+- Dependencias: `npm ci` en CI; no agregues paquetes sin justificarlo en el diseño del plan.
 
 ## Tests
 - Usa el runner existente (`vitest`, `jest` o `node --test`). APIs HTTP con `supertest`. BD con Testcontainers (skill `test-db`).

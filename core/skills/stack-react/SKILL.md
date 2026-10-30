@@ -1,6 +1,6 @@
 ---
 name: stack-react
-description: Convenciones para desarrollar y testear aplicaciones React (sin Next.js). Usar cuando stack.json incluya react.
+description: Convenciones para desarrollar y testear aplicaciones React (sin Next.js). Usar cuando el stack detectado incluya react.
 ---
 # React
 

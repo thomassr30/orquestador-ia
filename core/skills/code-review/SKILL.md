@@ -4,8 +4,8 @@ description: Checklist y formato de informe para revisar código por calidad, se
 ---
 # Revisión de código
 
-ENTRADA: `changes/<id>/input.md` (alcance), `stack.json`. SALIDA: `changes/<id>/review.md`
-Carga las skills `stack-*` de `stack.json` para comparar contra sus convenciones.
+ENTRADA: alcance (archivos/diff) y stack, en el mensaje. SALIDA: revisión en tu respuesta (no crees archivo salvo que el usuario lo pida).
+Carga las skills `stack-*` del stack detectado para comparar contra sus convenciones.
 
 ## Qué revisar
 1. **Correctitud**: lógica, casos borde, manejo de errores, nulos, concurrencia.
@@ -16,7 +16,7 @@ Carga las skills `stack-*` de `stack.json` para comparar contra sus convenciones
 6. **Tests**: existen, cubren casos importantes, no son frágiles.
 7. **Convenciones**: las del `AGENTS.md` del proyecto y las skills del stack.
 
-## Formato de `review.md`
+## Estructura de la respuesta
 ```markdown
 # Revisión: <alcance>
 ## Resumen (3 líneas) — veredicto: Aprobable | Aprobable con cambios | Requiere cambios

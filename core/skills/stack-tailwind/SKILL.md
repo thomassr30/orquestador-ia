@@ -1,6 +1,6 @@
 ---
 name: stack-tailwind
-description: Convenciones para estilos con Tailwind CSS v3 o v4. Usar cuando stack.json incluya tailwind.
+description: Convenciones para estilos con Tailwind CSS v3 o v4. Usar cuando el stack detectado incluya tailwind.
 ---
 # Tailwind CSS
 

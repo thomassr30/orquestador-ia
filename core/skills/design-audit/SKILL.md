@@ -22,5 +22,5 @@ Si el usuario lo habilitó (memoria: `diseno.md` → "Detector: habilitado"), ej
 (en PowerShell, definir las variables con `$env:VAR="1"` antes). La primera vez descarga el paquete: es agregar una herramienta → pedir aprobación. Sus hallazgos son señales a revisar, no veredictos.
 
 ## Severidad y salida
-P0–P3 (como `design-critique`). → `changes/<id>/design-review.md` (sección Auditoría): tabla de áreas con puntaje, hallazgos ordenados por severidad con evidencia y sugerencia.
+P0–P3 (como `design-critique`). → informe en tu respuesta: tabla de áreas con puntaje, hallazgos ordenados por severidad con evidencia y sugerencia.
 **Gate de diseño**: con P0 o P1 abiertos, el cambio no se da por terminado (vuelve al implementer con `design-polish`); P2/P3 se reportan.

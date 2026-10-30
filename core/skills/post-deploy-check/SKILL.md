@@ -13,9 +13,9 @@ Entrada: entorno (dev/qa/prod), servicio(s), versión/commit esperado y el cambi
 4. **Health**: `/health/ready` y `/health/live` responden 200.
 5. **Smoke funcional**: con `sdd-browser-operator` (skill `browser-automation`), recorrer 1–3 flujos clave del cambio en el entorno (solo lectura salvo que el usuario autorice crear datos de prueba).
 6. **Errores**: revisar consola/red en el navegador y logs del servicio durante el smoke.
-7. **Verificaciones manuales pendientes** del `test-plan.md` del cambio (ej. TP de despliegue): ejecutarlas o listarlas para el usuario.
+7. **Verificaciones manuales pendientes** del el plan de pruebas del cambio (ej. TP de despliegue): ejecutarlas o listarlas para el usuario.
 
-## Resultado → `changes/<id>/deploy-check.md` (o reporte directo si no hay cambio)
+## Resultado (en el chat)
 ```markdown
 # Verificación post-despliegue — <entorno> — OK | CON OBSERVACIONES | FALLIDA
 | Verificación | Resultado | Evidencia |
@@ -23,4 +23,4 @@ Entrada: entorno (dev/qa/prod), servicio(s), versión/commit esperado y el cambi
 ## Recomendación: continuar | corregir con /sdd-fix | rollback (comando propuesto, NO ejecutado)
 ```
 - Rollback y cualquier acción sobre el entorno = decisión crítica: solo proponer el comando.
-- Registra en memoria (`temas/despliegue.md`) lo aprendido de forma durable (ej. claves de configuración requeridas por entorno).
+- Si aprendiste algo durable (ej. claves requeridas por entorno), ofrece al usuario guardarlo en la memoria; no lo guardes sin que lo pida.

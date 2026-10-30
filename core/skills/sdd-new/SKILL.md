@@ -2,14 +2,11 @@
 name: sdd-new
 description: Desarrolla funcionalidades nuevas con el flujo SDD completo (especificar, diseñar, testear, implementar, verificar). Usar cuando el usuario pida agregar, crear, desarrollar o implementar algo en el proyecto, adjunte un requerimiento, o escriba /sdd-new.
 ---
-# /sdd-new — Cambio nuevo (feature)
+# /sdd-new — Desarrollo nuevo
 
-Solicitud del usuario: $ARGUMENTS
-(Si no ves la solicitud arriba, usa el mensaje del usuario que acompaña al comando.)
+Solicitud: $ARGUMENTS
+(Si no ves la solicitud arriba, usa el mensaje del usuario y sus adjuntos.)
 
-1. Carga la skill `sdd-orchestrator` y actúa como ORQUESTADOR durante todo el flujo.
-2. Crea el cambio (deterministico, sin gastar tokens):
-   `node "{{SDD_HOME}}/bin/new-change.js" --type feature "<título corto de la solicitud>"`
-   El script imprime el `<id>` y crea `changes/<id>/state.json`.
-3. Si hay archivos adjuntos o rutas `@...` → fase `ingest` (skill `sdd-ingest`). Si es solo texto → guarda la solicitud literal en `changes/<id>/input.md`.
-4. Ejecuta el flujo `feature` hasta el GATE y espera la aprobación del usuario.
+1. Carga `sdd-orchestrator` y sigue el flujo `feature` (o `fix` si es pequeño): todo en el chat, sin archivos de trabajo.
+2. Adjuntos (PDF, DOCX, imágenes): léelos con `sdd-ingest` (conversión temporal, sin guardar en el proyecto).
+3. Entender en paralelo (explorer ∥ analista si es un requerimiento de negocio) → plan → GATE con el plan completo → construir y verificar en paralelo.

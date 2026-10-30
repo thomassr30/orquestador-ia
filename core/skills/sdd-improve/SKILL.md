@@ -1,14 +1,14 @@
 ---
 name: sdd-improve
-description: Mejora continua conservadora del orquestador — registra incidentes de los agentes y, solo cuando hay evidencia suficiente, propone pocos ajustes concretos a reglas, skills o agentes (preferir editar antes que crear) y poda de lo que sobra, siempre con aprobación. Usar al cerrar un cambio con incidentes, cuando el usuario corrija el comportamiento de un agente, o con /sdd-improve.
+description: Mejora continua conservadora del orquestador — registra incidentes de los agentes y, solo cuando hay evidencia suficiente, propone pocos ajustes concretos a reglas, skills o agentes (preferir editar antes que crear) y poda de lo que sobra, siempre con aprobación. Usar cuando el usuario pida registrar un incidente o revisar/mejorar el orquestador, o con /sdd-improve.
 ---
 # Mejora continua (conservadora)
 
 Registro: `{{SDD_SOURCE}}/mejora/registro.md` (repo del orquestador, versionado por el usuario).
 Script: `node "{{SDD_HOME}}/bin/sdd-improve.js" log|summary|resolve`.
 
-## 1. Registrar (barato, al cerrar un cambio)
-Registra SOLO si ocurrió alguno de estos (una línea cada uno):
+## 1. Registrar (solo si el usuario lo pide)
+Al cerrar un trabajo, el orquestador menciona en el chat los incidentes del propio sistema; se registran solo si el usuario dice que sí. Tipos válidos:
 - `regla-violada`: un agente incumplió una regla existente (ej. anuló un RECHAZADO, ejecutó git).
 - `correccion-usuario`: el usuario corrigió el **comportamiento** del agente (no un cambio de requisitos).
 - `gate-fallido`: el verifier/QA rechazó por algo que el proceso debió prevenir.

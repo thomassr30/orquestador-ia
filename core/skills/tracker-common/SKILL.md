@@ -14,9 +14,9 @@ El gestor del proyecto se registra en memoria (`MEMORIA.md` → Comandos/Integra
 3. **Sin integración**: pide al usuario que pegue el ticket (título, descripción, criterios, adjuntos) o lo exporte.
 
 ## Leer un ticket → cambio SDD
-1. Copia a `changes/<id>/input.md`: clave, título, tipo, descripción, criterios de aceptación, comentarios relevantes, adjuntos (ingesta), enlaces. Sin datos personales innecesarios.
+1. Toma como entrada del flujo (en el chat, sin guardar): clave, título, tipo, descripción, criterios de aceptación, comentarios relevantes, adjuntos (ingesta), enlaces. Sin datos personales innecesarios.
 2. Mapea el tipo: historia/feature/task → `feature`; bug/defect/incidente → `fix`; spike/investigación → `analysis` o `ask`; mejora técnica → `refactor`.
-3. Nombre del cambio con la clave: `new-change.js --type <flujo> "<CLAVE> <título>"` (ej. `LAB-123 filtro por fecha`).
+3. Usa la clave en el anuncio del flujo y en el mensaje de commit sugerido (ej. `LAB-123 filtro por fecha`).
 4. Si el ticket no tiene criterios de aceptación claros → fase `analysis` y preguntas al cliente/PO.
 
 ## Escribir en el gestor (siempre con confirmación — es enviar datos a un servicio externo)

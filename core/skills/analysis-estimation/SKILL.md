@@ -4,7 +4,7 @@ description: Estimación de esfuerzo de un requerimiento o cambio (desglose por 
 ---
 # Estimación
 
-ENTRADA: `requirements.md` (o `spec.md`/`tasks.md`), `explore.md`, memoria (`historial.md` para comparar con trabajos similares). SALIDA: `changes/<id>/estimate.md`.
+ENTRADA: análisis o plan (en el mensaje), hallazgos del explorer y memoria si existe. SALIDA: estimación en tu respuesta (no crees archivo salvo que el usuario lo pida).
 
 ## Método
 1. **Desglose** por historia y por capa (análisis, backend, frontend, mobile, BD, infra, QA, documentación, despliegue). Ítems de ≤ 2 días; si es mayor, dividir.
@@ -15,7 +15,7 @@ ENTRADA: `requirements.md` (o `spec.md`/`tasks.md`), `explore.md`, memoria (`his
 6. **Contingencia** justificada según incertidumbre (más alta si hay preguntas abiertas o integraciones nuevas).
 7. Unidad según el equipo: horas, días-persona o puntos de historia (si el equipo usa puntos, no convertir a horas sin pedírselo).
 
-## Formato `estimate.md`
+## Estructura de la respuesta
 ```markdown
 # Estimación: <título> — <fecha>
 | Ítem | Capa | O | M | P | Esperado |

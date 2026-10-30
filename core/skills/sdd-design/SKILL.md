@@ -4,8 +4,8 @@ description: Define arquitectura, contratos y decisiones técnicas del cambio. U
 ---
 # Diseñar
 
-ENTRADA: `spec.md`, `explore.md`, `stack.json`. SALIDA: `changes/<id>/design.md`
-Carga las skills `stack-*` listadas en `stack.json` SOLO para respetar sus convenciones.
+ENTRADA: requisitos y hallazgos (en el mensaje). SALIDA: diseño en tu respuesta (no crees archivo salvo que el usuario lo pida):
+Carga las skills `stack-*` listadas en el stack detectado SOLO para respetar sus convenciones.
 
 ```markdown
 # Diseño
@@ -19,4 +19,4 @@ Carga las skills `stack-*` listadas en `stack.json` SOLO para respetar sus conve
 ## Seguridad y validaciones
 ## Riesgos y mitigación
 ```
-Reglas: si backend y frontend cambian, el contrato de API debe quedar cerrado aquí (permite implementar en paralelo). Devuelve ≤10 líneas.
+Reglas: si backend y frontend cambian, el contrato de API debe quedar cerrado aquí (permite implementar backend y frontend en paralelo). Explica las decisiones con lo necesario.

@@ -1,6 +1,6 @@
 ---
 name: stack-expo
-description: Convenciones para apps con Expo (SDK, Expo Router, módulos expo-*, config plugins, prebuild/CNG, EAS Build/Submit/Update). Usar cuando stack.json incluya expo. Complementa a stack-react-native.
+description: Convenciones para apps con Expo (SDK, Expo Router, módulos expo-*, config plugins, prebuild/CNG, EAS Build/Submit/Update). Usar cuando el stack detectado incluya expo. Complementa a stack-react-native.
 ---
 # Expo
 

@@ -10,7 +10,7 @@
 - Modo extensión de Playwright MCP o "Claude in Chrome": controla pestañas reales con sesiones abiertas. Más cómodo pero más riesgoso: confirma cada acción que modifique datos y no navegues fuera del objetivo.
 
 ## Descargas y subidas
-- Descargas: indica la carpeta destino (`changes/<id>/descargas/` o la que diga el usuario); verifica nombre y tamaño del archivo.
+- Descargas: indica la carpeta destino (la que indique el usuario; por defecto la carpeta de descargas del sistema); verifica nombre y tamaño del archivo.
 - Subidas: solo archivos que el usuario indicó explícitamente (`browser_file_upload`).
 
 ## Sitios internos / institucionales

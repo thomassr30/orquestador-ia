@@ -80,8 +80,9 @@ muéstrame cómo se ve /muestras en móvil           → [SDD] Flujo: browser (a
 ```
 
 - Para una respuesta sin flujo, di **"directo"** o **"sin sdd"**.
-- La IA siempre se detiene a pedir tu aprobación antes de modificar código.
-- **Git y GitHub nunca son automáticos:** ningún `git` ni `gh` (commit, push, PR…) se ejecuta sin tu aprobación. Al terminar, la IA te propone los comandos y espera tu "sí".
+- La IA se detiene una vez a pedir tu aprobación del plan (mostrado completo en el chat); luego trabaja en paralelo hasta terminar.
+- **Sin archivos de trabajo**: análisis, planes y reportes quedan explicados en el chat (si quieres un documento, pídelo). La **memoria del proyecto** sí se mantiene sola: lee lo relevante al empezar, guarda lo durable al terminar y te dice qué recordó.
+- **Git solo lectura:** puede usar `git status/diff/log/show/blame` y consultas de `gh`/`glab` libremente; commit, push, merge, PR, etc. están **bloqueados**. Al terminar te sugiere el mensaje de commit y tú lo ejecutas.
 
 Los comandos siguen disponibles si quieres forzar un flujo:
 
@@ -178,7 +179,8 @@ Cada proyecto guarda su memoria en `.sdd/memoria/` (recomendado versionarla en g
 | `historial.md` | Rara vez | Una línea por cambio cerrado |
 | `sesion.md` | Al retomar | Contexto de trabajo actual |
 
-- **Antes de compactar la conversación**: di "guarda el contexto" (o `/sdd-memory guardar`), luego compacta; al volver, `/sdd-continue`.
+- **Compactación automática sin pérdida**: la herramienta compacta sola cerca del límite; en Claude Code un hook vuelve a cargar la memoria del proyecto justo después, y `sesion.md` (actualizado durante el trabajo) permite seguir donde quedaste. En otras herramientas, la IA relee la memoria al notar la compactación.
+- **Aislada por proyecto**: cada proyecto usa solo su `.sdd/memoria/`; nunca se mezcla información entre proyectos.
 - **Compactar la memoria**: `/sdd-memory compactar` → muestra qué fusiona/archiva y pide confirmación.
 - Nunca guarda secretos, valores de configuración ni datos personales.
 
