@@ -147,11 +147,15 @@ function parseFrontmatter(text) {
   return { meta, body: m[2].trim() + '\n' };
 }
 
+function modelsConfig() {
+  try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'config', 'models.json'), 'utf8')); } catch { return {}; /* sin config */ }
+}
 function modelFor(target, tier) {
-  let cfg = {};
-  try { cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'config', 'models.json'), 'utf8')); } catch { /* sin config */ }
-  const m = (cfg[target] || {})[tier || 'strong'];
+  const m = (modelsConfig()[target] || {})[tier || 'strong'];
   return m && m !== 'inherit' ? m : null;
+}
+function effortFor(target) {
+  return (modelsConfig()[target] || {}).effort || null;
 }
 
 // ---------- generadores de agentes ----------
@@ -159,8 +163,10 @@ function renderAgent(fmt, target, a) {
   const { meta, body } = a; const model = modelFor(target, meta.tier);
   const b = render(body);
   switch (fmt) {
-    case 'claude':
-      return `---\nname: ${meta.name}\ndescription: ${q(meta.description)}\nmodel: ${model || 'inherit'}\n---\n${b}`;
+    case 'claude': {
+      const effort = effortFor(target);
+      return `---\nname: ${meta.name}\ndescription: ${q(meta.description)}\nmodel: ${model || 'inherit'}\n${effort ? `effort: ${effort}\n` : ''}---\n${b}`;
+    }
     case 'opencode':
       return `---\ndescription: ${q(meta.description)}\nmode: subagent\n${model ? `model: ${model}\n` : ''}---\n${b}`;
     case 'gemini':
