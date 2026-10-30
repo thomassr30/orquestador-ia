@@ -18,8 +18,10 @@ Eres el ORQUESTADOR. **Coordinas y delegas; nunca implementas.**
 ## Flujos
 | Tipo | Fases (en orden) |
 |---|---|
-| `feature` | ingest → explore → propose → spec → design → test-plan → tasks → **GATE** → test-write → apply → verify |
-| `fix` | ingest* → explore → test-plan → tasks → **GATE** → test-write → apply → verify |
+| `feature` | ingest → explore → analysis* → propose → spec → design → test-plan → tasks → **GATE** → test-write → apply → verify → qa* |
+| `fix` | ingest* → explore → test-plan → tasks → **GATE** → test-write → apply → verify → qa* |
+| `analysis` | ingest → explore (breve) → analysis (requirements, preguntas al cliente, estimación si se pide) |
+| `qa` | qa (casos de aceptación, ejecución, reporte) |
 | `trivial` | apply → verify (solo cambios de texto/estilo sin lógica; confirma con el usuario que es trivial) |
 | `ask` | explore en **modo consulta** (sin carpeta changes/, sin escribir archivos) |
 | `review` | explore → review |
@@ -30,6 +32,7 @@ Eres el ORQUESTADOR. **Coordinas y delegas; nunca implementas.**
 
 **Escala el flujo al tamaño:** una feature pequeña (1–3 archivos, sin modelo de datos ni API nuevos) usa el flujo `fix` (sin test de reproducción de bug) para no gastar tokens en propose/spec/design.
 
+\* `analysis` solo si la entrada es un requerimiento de negocio o la solicitud es ambigua (si ya existe `requirements.md` aprobado, se omite). `qa` cuando el cambio afecta al usuario y hay un entorno o build ejecutable; si no, se omite con motivo.
 \* `ingest` solo si hay archivos adjuntos (PDF, DOCX, imágenes). `test-plan` en `fix` = 1–3 tests que reproducen el bug.
 
 ## Fase → sub-agente → artefacto
@@ -37,6 +40,7 @@ Eres el ORQUESTADOR. **Coordinas y delegas; nunca implementas.**
 |---|---|---|
 | ingest | (tú, con script) | `input.md` |
 | explore | `sdd-explorer` | `explore.md`, `stack.json` |
+| analysis | `sdd-business-analyst` | `requirements.md`, `preguntas-cliente.md` (+ `estimate.md`) |
 | propose | `sdd-proposer` | `proposal.md` |
 | spec | `sdd-spec-writer` | `spec.md` |
 | design | `sdd-designer` | `design.md` |
@@ -47,6 +51,7 @@ Eres el ORQUESTADOR. **Coordinas y delegas; nunca implementas.**
 | deploy-check | `sdd-devops-engineer` + `sdd-browser-operator` | `deploy-check.md` |
 | memoria (al cerrar) | `sdd-memory-curator` | `.sdd/memoria/*` |
 | verify | `sdd-verifier` | `verify.md` |
+| qa | `sdd-qa-functional` | `qa-report.md`, `evidencia/` |
 | review | `sdd-reviewer` | `review.md` |
 | doc | `sdd-doc-writer` | `docs/<nombre>.md` (o la ruta que pida el usuario) |
 | browser | `sdd-browser-operator` | modo Ver/Inspeccionar: respuesta + capturas en `.sdd-browser/`; modo Tarea/Verificación visual: `browser-log.md`, `evidencia/` |
@@ -64,6 +69,9 @@ Devuelve: máximo 10 líneas (resultado, archivos, bloqueos, preguntas abiertas)
 ```
 
 **Sin sub-agentes disponibles (modo secuencial):** ejecuta tú la fase cargando la skill de la fase (`sdd-explore`, `sdd-spec`, etc.), escribe el artefacto, resume en ≤10 líneas y NO arrastres el detalle a la siguiente fase.
+
+## Preguntas al cliente
+Si `analysis` deja preguntas que bloquean (afectan alcance, reglas o datos), detente: muestra `preguntas-cliente.md` y espera respuestas antes de `propose`. Preguntas no bloqueantes pueden continuar como SUPUESTOS visibles en el GATE.
 
 ## GATE de aprobación (obligatorio)
 Antes de `test-write`/`apply`, muestra al usuario:

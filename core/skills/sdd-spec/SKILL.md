@@ -4,7 +4,7 @@ description: Escribe la especificación con requisitos numerados y escenarios Da
 ---
 # Especificar
 
-ENTRADA: `proposal.md` (+ `input.md` si necesitas citar). SALIDA: `changes/<id>/spec.md`
+ENTRADA: `proposal.md` (+ `requirements.md` si existe: cada HU/criterio de aceptación se traduce a REQ/escenarios con trazabilidad `HU-01 → REQ-01`; + `input.md` si necesitas citar). SALIDA: `changes/<id>/spec.md`
 
 ```markdown
 # Especificación

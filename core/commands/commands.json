@@ -5,6 +5,11 @@
     "skill": "sdd-ask"
   },
   {
+    "name": "sdd-analyze",
+    "description": "Analizar un requerimiento: historias, criterios, preguntas, estimación",
+    "skill": "sdd-analyze"
+  },
+  {
     "name": "sdd-new",
     "description": "Nuevo cambio (feature) con flujo SDD completo",
     "skill": "sdd-new"
@@ -18,6 +23,11 @@
     "name": "sdd-continue",
     "description": "Retomar un cambio SDD pendiente",
     "skill": "sdd-continue"
+  },
+  {
+    "name": "sdd-qa",
+    "description": "QA funcional y de aceptación con reporte de bugs",
+    "skill": "sdd-qa"
   },
   {
     "name": "sdd-status",

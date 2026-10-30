@@ -3,8 +3,8 @@
 Orquestador de agentes para desarrollo guiado por especificaciones (SDD). Se instala **una vez** y queda disponible en **todos tus proyectos** y en **6 herramientas de IA**: Claude Code, OpenCode, Gemini CLI, Codex CLI, Cursor y VS Code Copilot.
 
 - **1 orquestador**: coordina el trabajo y no programa.
-- **17 sub-agentes**, de 20 a 30 líneas cada uno.
-- **60 skills** con el conocimiento detallado.
+- **19 sub-agentes**, de 20 a 30 líneas cada uno.
+- **82 skills** con el conocimiento detallado.
 - **10 comandos** para consultar, desarrollar, corregir, testear, refactorizar, revisar y documentar. Se cargan solo cuando se necesitan.
 
 ---
@@ -87,6 +87,7 @@ Los comandos siguen disponibles si quieres forzar un flujo:
 
 | Necesito… | Comando | ¿Modifica código? |
 |---|---|---|
+| **Analizar** un requerimiento (historias, criterios, preguntas al cliente, estimación) | `/sdd-analyze <texto o @archivo>` | ❌ Solo documentos |
 | **Consultar** el código ("¿dónde se valida el RUT?") | `/sdd-ask <pregunta>` | ❌ Nunca |
 | **Desarrollar** algo nuevo (texto o `@archivo.pdf`) | `/sdd-new <descripción>` | ✅ tras tu aprobación |
 | **Corregir** un bug | `/sdd-fix <qué pasa, dónde, qué debería pasar>` | ✅ tras tu aprobación |
@@ -97,6 +98,7 @@ Los comandos siguen disponibles si quieres forzar un flujo:
 | **Navegador**: ver, inspeccionar (consola/red), verificar visualmente o hacer tareas web | `/sdd-browser <qué>` | ❌ |
 | **Retomar** un cambio a medias | `/sdd-continue [id]` | — |
 | Ver el **estado** de los cambios | `/sdd-status [--all]` | — (script, sin tokens) |
+| **QA funcional / UAT** (casos de aceptación, bugs, veredicto) | `/sdd-qa <qué probar>` | ❌ |
 | **Verificar un despliegue** (pods, logs, config, smoke) | `/sdd-deploy-check <servicio> <entorno>` | ❌ (rollback solo propuesto) |
 | **Memoria** del proyecto: ver, guardar contexto, compactar, olvidar | `/sdd-memory [acción]` | Solo `.sdd/memoria/` |
 
@@ -122,6 +124,7 @@ Todo queda trazado en `changes/<id>/` dentro del proyecto: `input.md`, `explore.
 TÚ → ORQUESTADOR (skill sdd-orchestrator: solo lee state.json y resúmenes)
         │ delega con rutas, recibe ≤10 líneas
         ├─ sdd-explorer          → explore.md, stack.json
+        ├─ sdd-business-analyst  → requirements.md, preguntas-cliente.md, estimate.md
         ├─ sdd-proposer          → proposal.md
         ├─ sdd-spec-writer       → spec.md (REQ-NN, Dado/Cuando/Entonces)
         ├─ sdd-designer          → design.md (datos, contratos API, ADR)
@@ -131,6 +134,7 @@ TÚ → ORQUESTADOR (skill sdd-orchestrator: solo lee state.json y resúmenes)
         ├─ sdd-test-writer       → tests (TDD)
         ├─ sdd-backend-implementer / sdd-frontend-implementer / sdd-db-implementer / sdd-mobile-implementer
         ├─ sdd-verifier          → verify.md (quality gates)
+        ├─ sdd-qa-functional     → qa-report.md (aceptación, bugs, veredicto)
         ├─ sdd-reviewer          → review.md (/sdd-review)
         ├─ sdd-doc-writer        → docs/*.md (/sdd-doc)
         ├─ sdd-devops-engineer   → Dockerfile, pipelines, k8s, configuración, post-despliegue
@@ -142,6 +146,10 @@ TÚ → ORQUESTADOR (skill sdd-orchestrator: solo lee state.json y resúmenes)
 - **Stack:** `stack-go`, `stack-nodejs`, `stack-nestjs`, `stack-adonisjs`, `stack-angular`, `stack-react`, `stack-nextjs`, `stack-html-css`, `stack-tailwind`, `stack-scss`, `stack-postgres`, `stack-sqlserver`.
 - **Mobile:** `stack-react-native`, `stack-expo`, `rn-animations`, `stack-ios`, `stack-swiftui`, `ios-hardware`, `stack-android`, `stack-compose`, `android-hardware`, `mobile-design`, `test-mobile`.
 - **Diseño:** `design-quality` (web y mobile, anti diseño genérico).
+- **DevOps (una skill por plataforma):** `devops-cicd` (principios y mapa), `ci-github-actions`, `ci-gitlab`, `ci-azure-pipelines`, `ci-jenkins`, `ci-bitbucket`, `container-docker`, `deploy-kubernetes`, `deploy-openshift`, `deploy-helm`, `deploy-kustomize`, `iac-terraform`, `config-consul`, `config-vault`, `ops-observability`, `post-deploy-check`.
+- **Análisis funcional:** `analysis-requirements`, `analysis-modeling`, `analysis-estimation`.
+- **QA funcional:** `qa-acceptance`, `qa-web`, `qa-mobile`.
+- **Memoria:** `sdd-memory`.
 - **Revisión y documentación:** `code-review`, `tech-docs`.
 - **Testing:** `test-strategy`, `test-unit`, `test-integration`, `test-db` (Testcontainers), `test-api-contract`, `test-e2e` (Playwright), `test-visual`, `test-a11y` (axe), `test-performance` (k6 / Lighthouse), `test-security`.
 - **Sin sub-agentes:** si una IA no puede lanzar sub-agentes, el orquestador ejecuta las fases en secuencia cargando cada skill (modo secuencial).

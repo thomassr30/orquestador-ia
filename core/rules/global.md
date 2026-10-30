@@ -6,6 +6,8 @@ En proyectos de software (carpeta con `.git`, `package.json`, `go.mod`, `angular
 | pregunta sobre ESTE proyecto (dónde está, cómo funciona, qué usa) | `sdd-ask` |
 | pide algo nuevo (agrega, crea, desarrolla, implementa) o adjunta un requerimiento | `sdd-new` |
 | reporta un error (no funciona, falla, se ve mal, arregla, corrige) | `sdd-fix` |
+| entrega un requerimiento de negocio o pide analizar, levantar historias, preparar preguntas al cliente o estimar | `sdd-analyze` |
+| pide probar funcionalmente, hacer QA o UAT | `sdd-qa` |
 | pide tests para código existente | `sdd-test` |
 | pide mejorar o reorganizar código sin cambiar su comportamiento | `sdd-refactor` |
 | pide revisar código, cambios o una rama | `sdd-review` |

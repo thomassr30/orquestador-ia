@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Crea changes/<AAAA-MM-DD-slug>/state.json en el proyecto actual.
-// Uso: node new-change.js --type <feature|fix|trivial|browser|review|test|refactor|doc|deploy-check> "título del cambio"
+// Uso: node new-change.js --type <feature|fix|trivial|browser|review|test|refactor|doc|deploy-check|analysis|qa> "título del cambio"
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -14,8 +14,10 @@ for (let i = 0; i < args.length; i++) {
   else words.push(args[i]);
 }
 const FLOWS = {
-  feature: ['ingest', 'explore', 'propose', 'spec', 'design', 'test-plan', 'tasks', 'gate', 'test-write', 'apply', 'verify'],
-  fix: ['ingest', 'explore', 'test-plan', 'tasks', 'gate', 'test-write', 'apply', 'verify'],
+  feature: ['ingest', 'explore', 'analysis', 'propose', 'spec', 'design', 'test-plan', 'tasks', 'gate', 'test-write', 'apply', 'verify', 'qa'],
+  fix: ['ingest', 'explore', 'test-plan', 'tasks', 'gate', 'test-write', 'apply', 'verify', 'qa'],
+  analysis: ['ingest', 'explore', 'analysis'],
+  qa: ['qa'],
   trivial: ['apply', 'verify'],
   browser: ['browser'],
   review: ['explore', 'review'],
