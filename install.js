@@ -292,8 +292,10 @@ function permissionRules() {
   ];
 }
 // Git y GitHub SIEMPRE requieren aprobación del usuario (en Claude Code "ask" tiene prioridad sobre "allow" y sobre acceptEdits)
-const GIT_ASK_CLAUDE = ['Bash(git:*)', 'Bash(gh:*)'];
-const GIT_ASK_OPENCODE = ['git *', 'gh *'];
+const GIT_ASK_CLAUDE = ['Bash(git:*)', 'Bash(gh:*)',
+  // infraestructura y entornos: siempre con aprobación (decisiones críticas)
+  'Bash(kubectl:*)', 'Bash(oc:*)', 'Bash(helm:*)', 'Bash(terraform:*)', 'Bash(docker push:*)', 'Bash(consul:*)', 'Bash(vault:*)', 'Bash(az:*)', 'Bash(aws:*)', 'Bash(gcloud:*)'];
+const GIT_ASK_OPENCODE = ['git *', 'gh *', 'kubectl *', 'oc *', 'helm *', 'terraform *', 'docker push *', 'consul *', 'vault *', 'az *', 'aws *', 'gcloud *'];
 
 function configureClaudePermissions(file) {
   let json;
@@ -313,7 +315,7 @@ function configureClaudePermissions(file) {
   if (opt('auto-edits') && P.defaultMode !== 'acceptEdits') { previousMode = P.defaultMode || 'default'; P.defaultMode = 'acceptEdits'; }
   backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n');
   manifest.permissions = { file, added, addedAsk, previousMode };
-  log(`  ✓ ${added.length} permisos preaprobados · git/gh siempre con tu aprobación${P.defaultMode === 'acceptEdits' ? ' · ediciones automáticas' : ''} → ${file}`);
+  log(`  ✓ ${added.length} permisos preaprobados · git/gh e infraestructura siempre con tu aprobación${P.defaultMode === 'acceptEdits' ? ' · ediciones automáticas' : ''} → ${file}`);
 }
 function removeClaudePermissions(p) {
   if (!p || !fs.existsSync(p.file)) return;
@@ -340,7 +342,7 @@ function configureOpencodeGit(file) {
   if (added.length) { backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n'); }
   const prev = (manifest.opencodePerm || {}).added || [];
   manifest.opencodePerm = { file, added: [...new Set([...prev, ...added])] };
-  log(`  ✓ git/gh siempre con tu aprobación → ${file}`);
+  log(`  ✓ git/gh e infraestructura siempre con tu aprobación → ${file}`);
 }
 function removeOpencodeGit(p) {
   if (!p || !fs.existsSync(p.file)) return;

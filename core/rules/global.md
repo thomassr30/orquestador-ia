@@ -11,9 +11,13 @@ En proyectos de software (carpeta con `.git`, `package.json`, `go.mod`, `angular
 | pide revisar código, cambios o una rama | `sdd-review` |
 | pide documentar | `sdd-doc` |
 | pide ver, abrir, mostrar, revisar visualmente o hacer algo en una página web (o en la app corriendo en local) | `sdd-browser` |
+| dice que desplegó, pide verificar un entorno o revisar un pod | `sdd-deploy-check` |
+| pide recordar, guardar contexto, compactar u olvidar algo del proyecto | `sdd-memory` |
 | pregunta qué hay pendiente o quiere seguir algo anterior | `sdd-status` / `sdd-continue` |
 
 Reglas:
+- **Memoria**: al iniciar cualquier flujo lee solo `.sdd/memoria/MEMORIA.md` (y `sesion.md` si existe); el resto de la memoria se lee únicamente cuando el índice indica que aplica. Antes de compactar la conversación, guarda el contexto con `sdd-memory` (guardar).
+- **Autonomía con criterio**: analiza, diseña, desarrolla y testea de forma autónoma; si tienes una duda que cambia el resultado, pregunta (una pregunta concreta). **Decisiones críticas siempre con confirmación**: git/gh; comandos contra clusters, nube, registros, Consul o Vault; migraciones o scripts sobre bases compartidas; borrar archivos o datos; agregar dependencias o frameworks; cambiar contratos de API públicos, autenticación o permisos; aceptar excepciones de quality gates; compactar u olvidar memoria; enviar datos a servicios externos.
 - Anuncia en una línea `[SDD] Flujo: <tipo>` y sigue la skill (que carga `sdd-orchestrator`).
 - Responde DIRECTO, sin flujo, si: la pregunta es general y no depende del código del proyecto; es una aclaración o ajuste dentro de un flujo en curso; o el usuario dice "directo" o "sin sdd".
 - Si dudas entre dos flujos, pregunta en una línea. Si hay un cambio en curso, los mensajes siguientes son parte de él salvo que el usuario pida otra cosa.

@@ -10,4 +10,4 @@ Argumentos: $ARGUMENTS (id del cambio, opcional)
 2. Ejecuta `node "{{SDD_HOME}}/bin/sdd-status.js"` y elige:
    - el id indicado por el usuario, o
    - si hay un solo cambio abierto, ese; si hay varios, pregunta cuál.
-3. Lee SOLO `changes/<id>/state.json` y continúa desde la primera fase no completada. Si el GATE no está aprobado, vuelve a presentarlo.
+3. Lee `.sdd/memoria/sesion.md` (si existe) y SOLO `changes/<id>/state.json` y continúa desde la primera fase no completada. Si el GATE no está aprobado, vuelve a presentarlo.

@@ -40,6 +40,16 @@
     "skill": "sdd-test"
   },
   {
+    "name": "sdd-deploy-check",
+    "description": "Verificar un despliegue (pods, logs, config, smoke)",
+    "skill": "sdd-deploy-check"
+  },
+  {
+    "name": "sdd-memory",
+    "description": "Memoria del proyecto: ver, guardar, compactar, olvidar",
+    "skill": "sdd-memory"
+  },
+  {
     "name": "sdd-refactor",
     "description": "Refactorizar sin cambiar comportamiento",
     "skill": "sdd-refactor"

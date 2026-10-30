@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Crea changes/<AAAA-MM-DD-slug>/state.json en el proyecto actual.
-// Uso: node new-change.js --type <feature|fix|trivial|browser|review|test|refactor|doc> "título del cambio"
+// Uso: node new-change.js --type <feature|fix|trivial|browser|review|test|refactor|doc|deploy-check> "título del cambio"
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -21,7 +21,8 @@ const FLOWS = {
   review: ['explore', 'review'],
   test: ['explore', 'test-plan', 'gate', 'test-write', 'verify'],
   refactor: ['explore', 'test-plan', 'tasks', 'gate', 'test-write', 'apply', 'verify'],
-  doc: ['explore', 'doc']
+  doc: ['explore', 'doc'],
+  'deploy-check': ['deploy-check']
 };
 if (!FLOWS[type]) { console.error(`Tipo inválido: ${type}. Usa: ${Object.keys(FLOWS).join(', ')}`); process.exit(1); }
 const title = words.join(' ').trim() || 'cambio';

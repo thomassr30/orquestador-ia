@@ -3,8 +3,8 @@
 Orquestador de agentes para desarrollo guiado por especificaciones (SDD). Se instala **una vez** y queda disponible en **todos tus proyectos** y en **6 herramientas de IA**: Claude Code, OpenCode, Gemini CLI, Codex CLI, Cursor y VS Code Copilot.
 
 - **1 orquestador**: coordina el trabajo y no programa.
-- **15 sub-agentes**, de 20 a 30 líneas cada uno.
-- **56 skills** con el conocimiento detallado.
+- **17 sub-agentes**, de 20 a 30 líneas cada uno.
+- **60 skills** con el conocimiento detallado.
 - **10 comandos** para consultar, desarrollar, corregir, testear, refactorizar, revisar y documentar. Se cargan solo cuando se necesitan.
 
 ---
@@ -97,6 +97,8 @@ Los comandos siguen disponibles si quieres forzar un flujo:
 | **Navegador**: ver, inspeccionar (consola/red), verificar visualmente o hacer tareas web | `/sdd-browser <qué>` | ❌ |
 | **Retomar** un cambio a medias | `/sdd-continue [id]` | — |
 | Ver el **estado** de los cambios | `/sdd-status [--all]` | — (script, sin tokens) |
+| **Verificar un despliegue** (pods, logs, config, smoke) | `/sdd-deploy-check <servicio> <entorno>` | ❌ (rollback solo propuesto) |
+| **Memoria** del proyecto: ver, guardar contexto, compactar, olvidar | `/sdd-memory [acción]` | Solo `.sdd/memoria/` |
 
 En **Codex** se usan con `$`: `$sdd-fix ...`.
 
@@ -131,6 +133,8 @@ TÚ → ORQUESTADOR (skill sdd-orchestrator: solo lee state.json y resúmenes)
         ├─ sdd-verifier          → verify.md (quality gates)
         ├─ sdd-reviewer          → review.md (/sdd-review)
         ├─ sdd-doc-writer        → docs/*.md (/sdd-doc)
+        ├─ sdd-devops-engineer   → Dockerfile, pipelines, k8s, configuración, post-despliegue
+        ├─ sdd-memory-curator    → .sdd/memoria (al cerrar cada cambio)
         └─ sdd-browser-operator  → evidencia/
 ```
 
@@ -142,7 +146,24 @@ TÚ → ORQUESTADOR (skill sdd-orchestrator: solo lee state.json y resúmenes)
 - **Testing:** `test-strategy`, `test-unit`, `test-integration`, `test-db` (Testcontainers), `test-api-contract`, `test-e2e` (Playwright), `test-visual`, `test-a11y` (axe), `test-performance` (k6 / Lighthouse), `test-security`.
 - **Sin sub-agentes:** si una IA no puede lanzar sub-agentes, el orquestador ejecuta las fases en secuencia cargando cada skill (modo secuencial).
 
-## 6. Personalizar
+## 6. Memoria del proyecto
+
+Cada proyecto guarda su memoria en `.sdd/memoria/` (recomendado versionarla en git para compartirla con el equipo):
+
+| Archivo | Se lee | Contiene |
+|---|---|---|
+| `MEMORIA.md` | En cada flujo (≤ 60 líneas) | Índice: qué es, stack, mapa de módulos, convenciones, comandos, temas |
+| `temas/*.md` | Solo si el índice dice que aplica | Conocimiento por área (configuración, despliegue, módulos) |
+| `decisiones.md` | Al diseñar | Decisiones con motivo y estado (vigente/reemplazada) |
+| `pendientes.md` | Al planificar | Deuda técnica, riesgos, preguntas abiertas |
+| `historial.md` | Rara vez | Una línea por cambio cerrado |
+| `sesion.md` | Al retomar | Contexto de trabajo actual |
+
+- **Antes de compactar la conversación**: di "guarda el contexto" (o `/sdd-memory guardar`), luego compacta; al volver, `/sdd-continue`.
+- **Compactar la memoria**: `/sdd-memory compactar` → muestra qué fusiona/archiva y pide confirmación.
+- Nunca guarda secretos, valores de configuración ni datos personales.
+
+## 7. Personalizar
 
 | Quiero… | Edito | Luego |
 |---|---|---|
@@ -154,7 +175,7 @@ TÚ → ORQUESTADOR (skill sdd-orchestrator: solo lee state.json y resúmenes)
 
 **No edites** los archivos instalados en `~/.claude`, `~/.agents`, etc.: se regeneran desde `core/`. Versiona esta carpeta en Git.
 
-## 7. GitHub y actualizaciones automáticas
+## 8. GitHub y actualizaciones automáticas
 
 ### Publicar (una vez)
 1. En GitHub crea un repositorio **privado** vacío, por ejemplo `orquestador-sdd` (sin README ni .gitignore).
@@ -189,7 +210,7 @@ node install.js
 Edita en `core/` → `node install.js` (prueba local) → `git commit` → `git push`. Los demás equipos lo reciben con `git pull`.
 Sube la versión en `package.json` y anota el cambio en `CHANGELOG.md`.
 
-## 8. Notas
+## 9. Notas
 
 - OpenCode, Cursor y Copilot leen tanto `~/.claude/skills` como `~/.agents/skills`. Si instalas Claude junto con otras IA, pueden aparecer skills duplicadas; el contenido es idéntico.
 - Al crear `~/.config/opencode/AGENTS.md`, OpenCode deja de usar `~/.claude/CLAUDE.md` como respaldo.
