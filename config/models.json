@@ -1,0 +1,9 @@
+{
+  "_comentario": "Modelo por nivel (tier) y herramienta. 'inherit' o vacío = usa el modelo de la sesión. Edita y vuelve a ejecutar install.js.",
+  "claude":   { "fast": "haiku",   "strong": "inherit" },
+  "opencode": { "fast": "inherit", "strong": "inherit", "_ejemplo": "anthropic/claude-sonnet-5-5" },
+  "gemini":   { "fast": "inherit", "strong": "inherit" },
+  "codex":    { "fast": "inherit", "strong": "inherit" },
+  "cursor":   { "fast": "inherit", "strong": "inherit" },
+  "copilot":  { "fast": "inherit", "strong": "inherit" }
+}

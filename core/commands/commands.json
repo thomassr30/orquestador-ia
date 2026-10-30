@@ -1,0 +1,52 @@
+[
+  {
+    "name": "sdd-ask",
+    "description": "Consultar el código sin modificar nada",
+    "skill": "sdd-ask"
+  },
+  {
+    "name": "sdd-new",
+    "description": "Nuevo cambio (feature) con flujo SDD completo",
+    "skill": "sdd-new"
+  },
+  {
+    "name": "sdd-fix",
+    "description": "Corregir un bug con flujo SDD corto",
+    "skill": "sdd-fix"
+  },
+  {
+    "name": "sdd-continue",
+    "description": "Retomar un cambio SDD pendiente",
+    "skill": "sdd-continue"
+  },
+  {
+    "name": "sdd-status",
+    "description": "Estado de los cambios SDD del proyecto",
+    "skill": "sdd-status"
+  },
+  {
+    "name": "sdd-browser",
+    "description": "Ejecutar una tarea de navegador con evidencia",
+    "skill": "sdd-browser"
+  },
+  {
+    "name": "sdd-review",
+    "description": "Revisar código, rama o PR y entregar informe",
+    "skill": "sdd-review"
+  },
+  {
+    "name": "sdd-test",
+    "description": "Agregar tests a código existente",
+    "skill": "sdd-test"
+  },
+  {
+    "name": "sdd-refactor",
+    "description": "Refactorizar sin cambiar comportamiento",
+    "skill": "sdd-refactor"
+  },
+  {
+    "name": "sdd-doc",
+    "description": "Generar documentación técnica en español",
+    "skill": "sdd-doc"
+  }
+]

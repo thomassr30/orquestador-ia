@@ -1,0 +1,31 @@
+---
+name: sdd-verify
+description: Verifica el cambio contra spec, diseño y quality gates ejecutando tests, lint, seguridad y accesibilidad. Usar en la fase verify del flujo SDD.
+---
+# Verificar
+
+ENTRADA: `spec.md`, `design.md`, `tasks.md`, `test-plan.md`, `stack.json`. SALIDA: `changes/<id>/verify.md`
+
+## Ejecutar (comandos desde stack.json; si no existen, los scripts del proyecto)
+1. Tests de todo el proyecto (unit + integración) y los del plan (e2e, a11y, etc.).
+2. Lint / type-check / build.
+3. Seguridad según skill `test-security` (dependencias + SAST rápido).
+4. Cobertura del código modificado si el runner la soporta.
+
+## Quality gates (todos deben cumplirse)
+- [ ] Todos los tests en verde
+- [ ] Cobertura ≥ 80% en código modificado (si es medible)
+- [ ] 0 errores de lint / type-check; build OK
+- [ ] 0 vulnerabilidades altas/críticas nuevas
+- [ ] 0 violaciones graves de accesibilidad (si hubo UI)
+- [ ] Cada REQ de spec.md trazado a ≥1 test que pasa
+- [ ] El diff no toca archivos fuera de tasks.md (justificar si lo hace)
+
+```markdown
+# Verificación — APROBADO | RECHAZADO
+## Gates (tabla gate | resultado | evidencia)
+## Trazabilidad REQ → test → estado
+## Fallos (archivo:línea, mensaje, causa probable, tarea responsable)
+## Observaciones (no bloqueantes)
+```
+NO corrijas código: solo reportas. Devuelve ≤10 líneas: APROBADO/RECHAZADO, gates fallidos, tareas a corregir.
