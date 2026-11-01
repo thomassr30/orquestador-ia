@@ -1,5 +1,8 @@
 # Cambios
 
+## 2.4.1 — Corrección de una prueba en CI
+- La prueba de `sdd-salida` usaba `process.exit(3)` justo después de imprimir 1.500 líneas; en Linux/macOS la salida a una tubería es asíncrona y se cortaba, así que la prueba fallaba en GitHub Actions (en Windows no). Ahora usa `process.exitCode = 3`. El harness no cambia.
+
 ## 2.4.0 — Harness completo: reglas propias, evaluaciones y repositorio listo para compartir
 - **Reglas propias por proyecto** (linters con mensaje de corrección, práctica de OpenAI): en `harness.json` → `reglas` defines un patrón prohibido, en qué archivos y cómo hacerlo bien. El harness lo revisa antes de escribir, solo sobre el contenido nuevo. `sdd-harness.js reglas` revisa todo el proyecto. El orquestador propone reglas cuando corriges un error que no debe repetirse.
 - **Evaluaciones con tareas reales** (`bin/sdd-eval.js`): corre tareas típicas con la IA sobre una copia temporal del proyecto, las verifica con un comando y registra éxito, turnos, tokens y costo; compara con la corrida anterior. Ejemplo en `evals/`.

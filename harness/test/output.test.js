@@ -38,7 +38,7 @@ test('el comando envuelto se evalúa por su contenido real (no sirve para colar 
 });
 
 test('sdd-salida ejecuta, compacta y conserva el código de salida', () => {
-  const dir = project({ 'package.json': JSON.stringify({ scripts: { test: 'node -e "for(let i=0;i<1500;i++)console.log(\'ok \'+i);console.log(\'FAIL x\');process.exit(3)"' } }) });
+  const dir = project({ 'package.json': JSON.stringify({ scripts: { test: 'node -e "for(let i=0;i<1500;i++)console.log(\'ok \'+i);console.log(\'FAIL x\');process.exitCode=3"' } }) });
   const r = spawnSync(process.execPath, [path.join(REPO, 'bin', 'sdd-salida.js'), Buffer.from('npm test').toString('base64'), '2000'], { cwd: dir, encoding: 'utf8' });
   assert.strictEqual(r.status, 3);
   assert.match(r.stdout, /Salida compactada/);

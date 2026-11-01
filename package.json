@@ -1,6 +1,6 @@
 {
   "name": "orquestador-sdd",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Orquestador de agentes SDD con harness por código (hooks) para Claude Code, Codex, OpenCode, Gemini CLI, Cursor y VS Code Copilot",
   "private": true,
   "scripts": {

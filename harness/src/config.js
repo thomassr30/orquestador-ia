@@ -17,8 +17,8 @@ const DEFAULTS = {
   },
   permisos: { permitir: [], preguntar: [], denegar: [], mcpLibres: [], mcpBloquear: [] },
   salida: { compactar: true, maxCaracteres: 4000 }, // salidas largas de tests/lint/build → errores + resumen
-  presupuesto: { modo: 'ahorro', maxSubagentes: 3 },
-  reglas: [], // reglas propias: [{ nombre, archivos, prohibido (regex), mensaje, excepto }] // ahorro | normal | libre · tope de sub-agentes por mensaje del usuario
+  presupuesto: { modo: 'ahorro', maxSubagentes: 3 }, // ahorro | normal | libre · tope de sub-agentes por mensaje del usuario
+  reglas: [], // reglas propias: [{ nombre, archivos, prohibido (regex), mensaje, excepto }]
 };
 
 function readJson(file) {
