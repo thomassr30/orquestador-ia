@@ -40,5 +40,10 @@
     "_mcp": "mcpLibres: servidores MCP que no piden confirmación (además de playwright, chrome-devtools y context7). mcpBloquear: servidor o servidor__herramienta a bloquear siempre.",
     "mcpLibres": [],
     "mcpBloquear": []
+  },
+  "_presupuesto": "modo ahorro: pedidos tratados como pequeños/medianos y máximo maxSubagentes sub-agentes por mensaje tuyo; si el orquestador quiere más, te pregunta. normal: tope 6. libre: sin tope.",
+  "presupuesto": {
+    "modo": "ahorro",
+    "maxSubagentes": 3
   }
 }

@@ -19,7 +19,7 @@ try {
 export const SddHarness = async ({ client, directory, worktree }) => {
   if (!core) return {};
   const root = util.findProjectRoot(worktree || directory || process.cwd());
-  const ev = (event, extra) => ({ host: 'opencode', event, nativeAsk: false, root, ...extra });
+  const ev = (event, extra) => ({ host: 'opencode', event, nativeAsk: false, canRewrite: true, root, ...extra });
   const argsByCall = new Map();
   const textOf = parts => (parts || []).filter(p => p && p.type === 'text' && !p.synthetic).map(p => p.text || '').join('\n');
 
@@ -49,6 +49,7 @@ export const SddHarness = async ({ client, directory, worktree }) => {
       if (argsByCall.size > 200) argsByCall.delete(argsByCall.keys().next().value);
       const r = await core.handle(ev('pre', { sessionId: input.sessionID, tool: common.normalizeTool(input.tool, args, { opencode: true }) }));
       if (r && r.decision) throw new Error(r.reason);
+      if (r && r.rewrite && output && output.args) output.args.command = r.rewrite;
     },
 
     'tool.execute.after': async (input, output) => {

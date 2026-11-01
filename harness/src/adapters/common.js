@@ -4,6 +4,7 @@ const fs = require('fs');
 const { findProjectRoot } = require('../util');
 const { GATE_QUESTION } = require('../gate');
 const { parseMcpName } = require('../mcp');
+const { isAgentTool } = require('../budget');
 
 const first = (...vals) => vals.find(v => v !== undefined && v !== null && v !== '');
 
@@ -60,9 +61,10 @@ function normalizeTool(name, rawInput, opts = {}) {
   const n = String(name || '');
   const i = parseArgs(rawInput);
   const lower = n.toLowerCase();
+  if (isAgentTool(n)) return { kind: 'agent', name: n, agente: String(first(i.subagent_type, i.agent, i.agent_type, i.name, '')), descripcion: String(first(i.description, i.title, '')).slice(0, 80), paths: [], contents: [] };
   if (['bash', 'shell', 'powershell', 'run_shell_command', 'exec_command', 'local_shell', 'run_in_terminal', 'runinterminal'].includes(lower)) {
     const cmd = Array.isArray(i.command) ? i.command.join(' ') : first(i.command, i.cmd, i.script);
-    return { kind: 'shell', name: n, command: cmd ? String(cmd) : '', paths: [], contents: [] };
+    return { kind: 'shell', name: n, command: cmd ? String(cmd) : '', background: !!(i.run_in_background || i.is_background || i.background), paths: [], contents: [] };
   }
   if (lower === 'apply_patch' || lower === 'patch') {
     const p = parsePatch(first(i.command, i.patch, i.patchText, i.input, typeof rawInput === 'string' ? rawInput : ''));

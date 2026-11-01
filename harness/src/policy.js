@@ -129,6 +129,12 @@ function classifySegment(seg, extra) {
   const norm = n.norm;
   if (!norm) return { decision: 'allow' };
   if (matchesAny(norm, extra.deny)) return { decision: 'deny', reason: `bloqueado por configuración: "${norm}"` };
+  if (/sdd-salida\.js$/i.test(String(n.tokens[1] || ''))) {
+    // Comando envuelto por el compactador de salidas: se evalúa el comando real
+    let inner = '';
+    try { inner = Buffer.from(String(n.tokens[2] || ''), 'base64').toString('utf8'); } catch { /* inválido */ }
+    return inner.trim() ? classifyCommand(inner, extra) : { decision: 'deny', reason: 'comando envuelto inválido' };
+  }
   if (approvesGate(n.tokens)) return { decision: 'deny', reason: 'solo el usuario aprueba el plan (en el chat o desde su terminal); el agente no puede hacerlo' };
   const isGit = norm.startsWith('git ');
   const gitSub = isGit ? norm.slice(4) : '';

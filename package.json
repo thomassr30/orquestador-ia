@@ -1,6 +1,6 @@
 {
   "name": "orquestador-sdd",
-  "version": "2.1.2",
+  "version": "2.4.0",
   "description": "Orquestador de agentes SDD con harness por código (hooks) para Claude Code, Codex, OpenCode, Gemini CLI, Cursor y VS Code Copilot",
   "private": true,
   "scripts": {
@@ -8,7 +8,8 @@
     "uninstall-global": "node install.js --uninstall",
     "update": "node update.js",
     "test": "node harness/test/run.js",
-    "harness": "node bin/sdd-harness.js"
+    "harness": "node bin/sdd-harness.js",
+    "eval": "node bin/sdd-eval.js"
   },
   "engines": {
     "node": ">=18"

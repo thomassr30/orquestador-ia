@@ -1,0 +1,20 @@
+{
+  "_comentario": "Copia este archivo, apunta 'proyecto' a un repo tuyo y define 5 a 10 tareas típicas con un comando que verifique el resultado. Ejecuta: node bin/sdd-eval.js evals/mis.tareas.json — trabaja sobre una copia temporal (tu carpeta no se toca) y consume tokens de tu plan.",
+  "proyecto": "C:/dev/mi-proyecto",
+  "preparar": "npm ci",
+  "modelo": "sonnet",
+  "tareas": [
+    {
+      "nombre": "fix-chico",
+      "pedido": "En el formulario de registro el botón Guardar no se deshabilita mientras se envía. Corrígelo, directo.",
+      "verificar": "npx vitest run src/app/registro",
+      "maxTurnos": 25
+    },
+    {
+      "nombre": "feature-mediana",
+      "pedido": "Agrega un filtro por fecha al listado de muestras, con su test.",
+      "verificar": "npx vitest run src/app/muestras",
+      "maxTurnos": 50
+    }
+  ]
+}

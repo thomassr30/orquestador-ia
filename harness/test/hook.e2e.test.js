@@ -24,7 +24,7 @@ test('Claude Code: GATE, permisos, sensores al terminar y checkpoint de sesión'
 
   assert.match(hook('claude', 'UserPromptSubmit', { ...base, prompt: 'agrega un contador de visitas' }).json.hookSpecificOutput.additionalContext, /Pedido de cambio/);
   assert.strictEqual(hook('claude', 'PreToolUse', edit).json.hookSpecificOutput.permissionDecision, 'deny', 'sin plan aprobado no se edita');
-  assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'npm test' } }).json, null, 'los tests sí se pueden correr');
+  assert.notStrictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'npm test' } }).json.hookSpecificOutput.permissionDecision, 'deny', 'los tests sí se pueden correr (con salida compactada)');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'node "C:/Users/Usuario Siigsa/.sdd-orquestador/bin/sdd-harness.js" estado' } }).json, null, '/sdd-status funciona con el plan pendiente');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'git commit -am x' } }).json.hookSpecificOutput.permissionDecision, 'deny');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'kubectl apply -f k8s/' } }).json.hookSpecificOutput.permissionDecision, 'ask');
@@ -80,6 +80,18 @@ test('MCP: escribir en GitHub se bloquea y una base de datos pide confirmación'
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'mcp__postgres__execute_query', tool_input: {} }).json.hookSpecificOutput.permissionDecision, 'ask');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'mcp__playwright__browser_navigate', tool_input: {} }).json, null);
   assert.match(hook('codex', 'PreToolUse', { ...base, tool_name: 'mcp__postgres__execute_query', tool_input: {} }).json.hookSpecificOutput.permissionDecisionReason, /Requiere confirmación/);
+});
+
+test('comandos de verificación ruidosos se envuelven para compactar su salida', () => {
+  const dir = project({ 'a.js': '' });
+  const base = { session_id: 'out', cwd: dir };
+  const c = hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'npm test', description: 'tests' } }).json.hookSpecificOutput;
+  assert.strictEqual(c.permissionDecision, 'allow');
+  assert.match(c.updatedInput.command, /sdd-salida\.js" bnBtIHRlc3Q= \d+$/);
+  assert.strictEqual(c.updatedInput.description, 'tests', 'conserva los demás campos');
+  assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'npm test', run_in_background: true } }).json, null, 'en segundo plano no se envuelve');
+  assert.match(hook('gemini', 'BeforeTool', { ...base, tool_name: 'run_shell_command', tool_input: { command: 'go test ./...' } }).json.hookSpecificOutput.tool_input.command, /sdd-salida/);
+  assert.strictEqual(hook('copilot', 'preToolUse', { sessionId: 'o', cwd: dir, toolName: 'bash', toolArgs: { command: 'npm test' } }).json, null, 'Copilot: sin reescritura');
 });
 
 test('un error interno nunca bloquea (falla abierta) y la salida es solo JSON', () => {

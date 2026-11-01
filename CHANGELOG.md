@@ -1,5 +1,23 @@
 # Cambios
 
+## 2.4.0 — Harness completo: reglas propias, evaluaciones y repositorio listo para compartir
+- **Reglas propias por proyecto** (linters con mensaje de corrección, práctica de OpenAI): en `harness.json` → `reglas` defines un patrón prohibido, en qué archivos y cómo hacerlo bien. El harness lo revisa antes de escribir, solo sobre el contenido nuevo. `sdd-harness.js reglas` revisa todo el proyecto. El orquestador propone reglas cuando corriges un error que no debe repetirse.
+- **Evaluaciones con tareas reales** (`bin/sdd-eval.js`): corre tareas típicas con la IA sobre una copia temporal del proyecto, las verifica con un comando y registra éxito, turnos, tokens y costo; compara con la corrida anterior. Ejemplo en `evals/`.
+- **Pedido en curso en la memoria**: `sesion.md` guarda el pedido que se está trabajando, para retomar tras `/clear` sin perder el objetivo.
+- **Para compartir el repositorio**: pruebas en CI (Windows, macOS y Linux; Node 18, 20 y 22), `CONTRIBUTING.md`, `SECURITY.md` y `docs/PRACTICAS.md` (qué práctica profesional implementa cada pieza, con fuentes).
+
+## 2.3.0 — Presupuesto de sub-agentes por código y modo ahorro
+- **Tope de sub-agentes por mensaje del usuario**, aplicado por el harness (no por instrucción): cada sub-agente parte de cero y multiplica el consumo. Al superar el tope, Claude Code y Copilot muestran su diálogo ("¿permitir uno más?"); en Codex, Cursor y OpenCode el agente pide un "sí" en el chat, que libera el resto del pedido. Cada mensaje tuyo reinicia la cuenta. Los lanzamientos en paralelo se cuentan de forma atómica.
+- **Modo ahorro (por defecto)**: máximo 3 sub-agentes por mensaje y, en pedidos de cambio, el harness le indica al orquestador que los trate como pequeños o medianos, anuncie el tamaño y pida aprobación para el flujo completo. `presupuesto.modo`: `ahorro` (3), `normal` (6) o `libre` (sin tope); `maxSubagentes` para un tope propio, global o por proyecto.
+- `doctor` muestra el modo y el tope; `estado`, los sub-agentes usados en el último pedido.
+
+## 2.2.0 — Ahorro de tokens sin perder contexto (prácticas de context engineering)
+- **Salidas compactadas**: los comandos de verificación ruidosos (tests, lint, build, typecheck) se envuelven con `sdd-salida.js`. La IA recibe los errores con su contexto y el resumen final, no cientos de líneas; la salida completa queda en un archivo temporal ("compresión restaurable") y el código de salida se conserva. Claude Code, Codex, Gemini CLI y OpenCode. Configurable en `salida`.
+- **Escalado de esfuerzo** en el orquestador: trivial → sin sub-agentes; pequeño → 1 implementer + sensores; mediano → explorer, plan corto, implementers, verifier; grande → flujo completo. Se anuncia el tamaño junto al flujo.
+- **Referencias, no contenido**: al delegar se pasan rutas y líneas; los sub-agentes entregan reportes de ≤ ~1.500 tokens con archivo:línea, sin pegar archivos ni salidas largas.
+- **Tests relacionados durante el trabajo** y suite completa una vez al final; **una tarea por sesión** con `/clear` (la memoria devuelve el contexto).
+- **`sdd-harness.js consumo`**: en qué se fueron los tokens de la última sesión de Claude Code (conversación, caché, sub-agentes y las salidas de herramientas más pesadas).
+
 ## 2.1.2 — GATE: el "sí" del usuario ya no se pierde
 - Si el agente termina su turno con las ediciones bloqueadas, el harness entiende que espera al usuario aunque no lo haya escrito como pregunta («Responda sí…»). El siguiente "sí" (con o sin tilde) aprueba. Antes se perdía y el agente quedaba bloqueado.
 - Con el plan aprobado, mensajes de continuación ("continúa", "sigue", "falta", "también…") ya no reabren el bloqueo; un pedido nuevo sí.

@@ -11,6 +11,11 @@ const { runSensors, summarize, quickCheck } = require('./sensors');
 const memory = require('./memory');
 const { findSecret } = require('./secrets');
 const { classifyMcp } = require('./mcp');
+const { isCompactable } = require('./output');
+const { sessionUsage } = require('./usage');
+const budget = require('./budget');
+const { violation } = require('./project-rules');
+const { SDD_HOME, fwd } = require('./paths');
 const { isInside, relPosix, shortHash } = require('./util');
 
 const tag = s => `[harness] ${s}`;
@@ -48,6 +53,9 @@ function onPrompt(ev) {
   let compacted = false;
   S.updateState(ev.root, ev.sessionId, s => {
     notes = gate.onPrompt(s, ev.prompt, cfg);
+    budget.onPrompt(s);
+    if (s.subagentes.libre) notes.push('El usuario aprobó usar más sub-agentes en este pedido.');
+    else if (s.gate.estado === 'requerido' && budget.modeNote(cfg)) notes.push(budget.modeNote(cfg));
     compacted = s.compactado;
     s.compactado = false;
     s.bloqueos = 0;
@@ -75,6 +83,11 @@ function onPre(ev) {
       if (g && r.decision !== 'allow') out = deny(`${g} Antes de la aprobación solo se permiten comandos de lectura, tests y lint.`);
     }
     if (out) S.log(ev.root, { herramienta: ev.host, evento: 'comando', decision: out.decision, detalle: `${firstWord(t.command)}: ${out.reason}` });
+    if (!out && r.decision === 'allow' && ev.canRewrite && !t.background && cfg.salida.compactar && isCompactable(t.command)) {
+      // Comando ruidoso y seguro: se envuelve para que la IA reciba errores y resumen, no miles de líneas.
+      const b64 = Buffer.from(t.command.trim(), 'utf8').toString('base64');
+      return { rewrite: `node "${fwd(SDD_HOME)}/bin/sdd-salida.js" ${b64} ${Number(cfg.salida.maxCaracteres) || 4000}` };
+    }
     return out;
   }
   if (t.kind === 'edit') {
@@ -88,10 +101,27 @@ function onPre(ev) {
       } else if (r.inside) {
         const g = gate.editBlockReason(st, cfg);
         if (g) out = deny(g);
+        else {
+          const v = violation(ev.root, p, t.contents, cfg.reglas);
+          if (v) out = deny(`regla del proyecto «${v.regla}» en ${v.archivo} (encontré "${v.coincidencia}"): ${v.mensaje}`);
+        }
       }
       if (out) { S.log(ev.root, { herramienta: ev.host, evento: 'edición', decision: out.decision, detalle: `${r.rel}: ${out.reason}` }); return out; }
     }
     return null;
+  }
+  if (t.kind === 'agent') {
+    let r = null;
+    S.updateState(ev.root, ev.sessionId, s => { r = budget.tryLaunch(s, cfg); });
+    if (r.ok) return null;
+    const what = [t.agente, t.descripcion].filter(Boolean).join(': ');
+    const reason = `presupuesto de sub-agentes: este pedido ya lanzó ${r.usados} (tope ${r.tope}${(cfg.presupuesto || {}).modo === 'ahorro' ? ', modo ahorro' : ''})${what ? `. Quiere lanzar ${what}` : ''}`;
+    S.log(ev.root, { herramienta: ev.host, evento: 'sub-agente', decision: ev.nativeAsk ? 'ask' : 'deny', detalle: reason });
+    if (ev.nativeAsk) return { decision: 'ask', reason: tag(`${reason}. ¿Permitir uno más?`) };
+    S.updateState(ev.root, ev.sessionId, s => {
+      s.aprobaciones.pendientes = [...s.aprobaciones.pendientes.filter(p => p.clave !== 'más sub-agentes'), { clave: 'más sub-agentes', en: new Date().toISOString() }].slice(-5);
+    });
+    return deny(`${reason}. Continúa tú mismo con lo que ya tienes, o explica al usuario cuántos agentes más necesitas y para qué, y pídele que responda "sí".`);
   }
   if (t.kind === 'mcp') {
     const r = classifyMcp(t, cfg.permisos);
@@ -164,9 +194,14 @@ async function onStop(ev) {
       }
     }
   }
+  // Consumo de tokens de la sesión (si la herramienta entrega el transcript): solo números, para `sdd-harness consumo`
+  if (ev.transcriptPath) {
+    const u = sessionUsage(ev.transcriptPath);
+    if (u) S.updateState(ev.root, ev.sessionId, s => { s.consumo = { ...u, en: new Date().toISOString(), transcript: ev.transcriptPath }; });
+  }
   // Checkpoint de la sesión en la memoria del proyecto (solo si hubo trabajo y algo cambió)
   if (st.cambios.length) {
-    const sig = shortHash(JSON.stringify([st.gate.estado, st.cambios, st.sensores && st.sensores.resumen]));
+    const sig = shortHash(JSON.stringify([st.gate.estado, st.objetivo, st.cambios, st.sensores && st.sensores.resumen]));
     if (sig !== st.checkpoint || !memory.hasAutoBlock(ev.root)) {
       try { memory.checkpoint(ev.root, st, ev.host); S.updateState(ev.root, ev.sessionId, s => { s.checkpoint = sig; }); } catch { /* sin permisos de escritura */ }
     }

@@ -6,6 +6,8 @@
 //   node sdd-harness.js sensores [ruta]   ejecuta ahora los sensores sobre lo modificado (git status)
 //   node sdd-harness.js registro [n]      últimas decisiones del harness en este proyecto
 //   node sdd-harness.js aprobar  [ruta]   (tú, desde tu terminal) aprueba el plan pendiente de la última sesión
+//   node sdd-harness.js consumo  [ruta]   en qué se fueron los tokens de la última sesión (Claude Code)
+//   node sdd-harness.js reglas   [ruta]   revisa TODO el proyecto contra las reglas propias (harness.json → reglas)
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -39,6 +41,7 @@ function estado() {
   const files = s.cambios.filter(f => !f.startsWith('.sdd/'));
   console.log(`Archivos modificados: ${files.length ? files.join(', ') : '—'}`);
   console.log(`Sensores: ${s.sensores ? `${s.sensores.ok ? 'en verde' : 'con errores'} — ${s.sensores.resumen.map(r => `${r.omitido ? '•' : r.ok ? '✓' : '✗'} ${r.nombre}`).join(' · ')}` : 'sin ejecutar'}${s.sucio ? ' (hay cambios sin verificar)' : ''}`);
+  if (s.subagentes) console.log(`Sub-agentes en el último pedido: ${s.subagentes.lanzados}${s.subagentes.libre ? ' (sin tope: aprobaste más)' : ''}`);
   if (s.aprobaciones.pendientes.length) console.log(`Esperando confirmación en el chat: ${s.aprobaciones.pendientes.map(p => p.clave).join(' · ')}`);
   if (sessions.length > 1) console.log(`Otras sesiones recientes: ${sessions.slice(1, 4).map(x => `${x.sesion} (${x.herramienta || '—'}, GATE ${x.gate.estado})`).join(', ')}`);
 }
@@ -109,6 +112,8 @@ function doctor() {
   const cfg = loadConfig(root);
   console.log(`\nProyecto: ${fwd(root)}`);
   console.log(`Configuración: GATE ${cfg.gate} · sensores al editar ${cfg.sensores.alEditar ? 'sí' : 'no'} · al terminar: ${cfg.sensores.alTerminar.join(', ') || 'ninguno'} · máx. ${cfg.sensores.maxBloqueos} bloqueos`);
+  const { limitFor } = require(path.join(SRC, 'budget'));
+  console.log(`Presupuesto: modo ${(cfg.presupuesto || {}).modo || 'normal'} · ${limitFor(cfg) ? `máx. ${limitFor(cfg)} sub-agentes por mensaje` : 'sin tope de sub-agentes'} · salidas largas ${cfg.salida && cfg.salida.compactar ? 'compactadas' : 'completas'}`);
   const projCfg = path.join(root, '.sdd', 'harness.json');
   console.log(`Config. del proyecto: ${fs.existsSync(projCfg) ? fwd(projCfg) : 'no hay (.sdd/harness.json)'}`);
   const files = changedFiles();
@@ -152,6 +157,51 @@ function aprobar() {
   console.log(`Plan aprobado para la sesión ${last.sesion} (${last.herramienta || '—'}). Pídele al agente que continúe.`);
 }
 
-const cmds = { estado, doctor, sensores, registro, aprobar, hooks: () => { console.log('Hooks por herramienta:'); hookStatus(); } };
-if (!cmds[cmd]) { console.error('Comandos: estado | doctor | sensores | registro | aprobar'); process.exit(1); }
+function consumo() {
+  const { sessionUsage } = require(path.join(SRC, 'usage'));
+  const last = S.listSessions(root).find(x => x.consumo);
+  if (!last) { console.log('Sin datos de consumo todavía (se registran al terminar cada turno en Claude Code).'); return; }
+  const u = sessionUsage(last.consumo.transcript) || last.consumo;
+  const n = x => Math.round(x).toLocaleString('es-CL');
+  const tot = p => p.entrada + p.cacheEscritura + p.cacheLectura + p.salida;
+  const p = u.principal; const s = u.subagentes;
+  console.log(`Sesión ${last.sesion} (${last.herramienta || '—'})`);
+  console.log(`\nConversación principal: ${n(tot(p))} tokens en ${p.mensajes} respuestas`);
+  console.log(`  · leídos de caché (baratos, ~10% del precio): ${n(p.cacheLectura)} (${tot(p) ? Math.round(100 * p.cacheLectura / tot(p)) : 0}%)`);
+  console.log(`  · escritos en caché: ${n(p.cacheEscritura)} · entrada sin caché: ${n(p.entrada)} · salida (lo que escribe la IA): ${n(p.salida)}`);
+  if (s.agentes) console.log(`Sub-agentes (${s.agentes}): ${n(tot(s))} tokens (caché ${n(s.cacheLectura)}, salida ${n(s.salida)})`);
+  const per = Object.entries(u.porHerramienta || {}).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  if (per.length) console.log(`\nResultados de herramientas que entraron al contexto (aprox.): ${per.map(([k, v]) => `${k} ${n(v)}`).join(' · ')}`);
+  if ((u.mayores || []).length) {
+    console.log('Los más pesados:');
+    for (const t of u.mayores) console.log(`  ${String(n(t.tokens)).padStart(8)}  ${t.nombre}${t.detalle ? `: ${t.detalle}` : ''}`);
+  }
+  console.log('\nCada respuesta vuelve a procesar todo el historial: si la mayoría es caché, el costo real es bajo; si crecen "entrada" o los sub-agentes, conviene /clear entre tareas y flujos más livianos.');
+}
+
+function reglas() {
+  const { compile } = require(path.join(SRC, 'project-rules'));
+  const rules = compile(loadConfig(root).reglas);
+  if (!rules.length) { console.log('No hay reglas propias. Agrégalas en .sdd/harness.json → "reglas" (ver README, sección Reglas propias).'); return; }
+  const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.angular', 'coverage', '.next', 'vendor', 'target', '.sdd']);
+  const hits = [];
+  const walk = d => {
+    let es; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of es) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) { if (!SKIP.has(e.name)) walk(p); continue; }
+      const rel = relPosix(root, p);
+      const rs = rules.filter(r => r.files.some(re => re.test(rel)) && !r.except.some(re => re.test(rel)));
+      if (!rs.length) continue;
+      let text; try { if (fs.statSync(p).size > 2e6) continue; text = fs.readFileSync(p, 'utf8'); } catch { continue; }
+      text.split(/\r?\n/).forEach((line, i) => { for (const r of rs) if (r.re.test(line)) hits.push(`${rel}:${i + 1}  [${r.nombre}]  ${line.trim().slice(0, 100)}`); });
+    }
+  };
+  walk(root);
+  console.log(hits.length ? `${hits.length} coincidencia(s) con las reglas (${rules.map(r => r.nombre).join(', ')}):\n${hits.slice(0, 200).join('\n')}` : `Sin violaciones de ${rules.length} regla(s).`);
+  process.exitCode = hits.length ? 1 : 0;
+}
+
+const cmds = { estado, doctor, sensores, registro, aprobar, consumo, reglas, hooks: () => { console.log('Hooks por herramienta:'); hookStatus(); } };
+if (!cmds[cmd]) { console.error('Comandos: estado | doctor | sensores | registro | consumo | reglas | aprobar'); process.exit(1); }
 Promise.resolve(cmds[cmd]()).catch(e => { console.error(e.message); process.exit(1); });

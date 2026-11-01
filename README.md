@@ -210,6 +210,72 @@ En el chat basta con `/sdd-status` o con preguntar "¿cómo está el harness?".
 - **Desactivar los controles por código** sin perder agentes ni skills: `node install.js --no-hooks`. Vuelves a activarlos con `node install.js`.
 - **Un sensor no aplica a tu proyecto**: ajusta `sensores.comandos` o `sensores.alTerminar` en `.sdd/harness.json`. `doctor` te muestra qué correría.
 
+## 5b. Ahorro de tokens
+
+Basado en las prácticas publicadas de *context engineering* (Anthropic, Manus, JetBrains Research): darle a la IA el conjunto más chico de información útil, no todo.
+
+| Qué hace el orquestador | Por qué ahorra |
+|---|---|
+| **Escala el esfuerzo al tamaño del pedido**: trivial sin sub-agentes, pequeño con 1 implementer, mediano con 4 a 5 agentes, grande con el flujo completo | Cada sub-agente parte de cero y relee; un sistema multi-agente gasta del orden de 15 veces más que un chat |
+| **Tope de sub-agentes por código** (modo ahorro: 3 por mensaje tuyo). Si el orquestador quiere más, te pregunta | Una tarea no puede escalar a 10 agentes sin tu "sí", aunque el modelo calcule mal el tamaño |
+| **Compacta las salidas largas** de tests, lint y build: errores con contexto + resumen; la salida completa queda en un archivo temporal | Las salidas de comandos suelen ser lo más pesado de una tarea |
+| **Pasa referencias, no contenido** (rutas y líneas) y pide reportes de ≤ ~1.500 tokens a cada sub-agente | Evita copiar archivos y salidas de agente en agente |
+| **Tests relacionados durante el trabajo**, suite completa una vez al final | No repite cientos de tests en cada vuelta |
+| **Memoria + `sesion.md`** y una tarea por sesión (`/clear` al terminar) | El historial no se arrastra; el contexto vuelve con ~2.000 tokens |
+
+Lo que te toca a ti:
+
+- **Una tarea por sesión**: al terminar, `/clear` (o sesión nueva).
+- **"directo"** para cambios chicos.
+- **Modelo de la sesión**: Sonnet para el día a día y Opus solo para diseño difícil (los sub-agentes heredan el modelo de la sesión).
+- **Servidores MCP**: desactiva con `/mcp` los que no uses.
+
+**Modo de presupuesto** (`harness.json` global o del proyecto):
+
+```json
+{ "presupuesto": { "modo": "ahorro", "maxSubagentes": 3 } }
+```
+
+`ahorro` (por defecto): máximo 3 sub-agentes por mensaje y pedidos tratados como pequeños o medianos. `normal`: tope 6. `libre`: sin tope.
+
+**Ver en qué se van los tokens:**
+
+```powershell
+node "$HOME\.sdd-orquestador\bin\sdd-harness.js" consumo   # última sesión de Claude Code: caché, sub-agentes y salidas más pesadas
+```
+
+En Claude Code también tienes `/context` (qué ocupa el contexto ahora) y `/usage`.
+
+## 5c. Reglas propias y evaluaciones
+
+**Reglas propias.** Cada error que no debe repetirse se convierte en una regla que el harness revisa antes de escribir y que le dice a la IA cómo hacerlo bien. Van en `.sdd/harness.json` del proyecto:
+
+```json
+{
+  "reglas": [
+    {
+      "nombre": "trusted-types",
+      "archivos": "src/**/*.{ts,html}",
+      "prohibido": "innerHTML|outerHTML|DOMParser",
+      "mensaje": "La política Trusted Types lo bloquea: usa el componente de íconos propio.",
+      "excepto": "**/*.spec.ts"
+    }
+  ]
+}
+```
+
+`node ~/.sdd-orquestador/bin/sdd-harness.js reglas` revisa todo el proyecto contra esas reglas.
+
+**Evaluaciones.** Para medir si un cambio al orquestador mejora o empeora, en éxito y en tokens, define 5 a 10 tareas típicas tuyas, cada una con un comando que verifique el resultado (ver `evals/ejemplo.tareas.json`), y ejecuta:
+
+```powershell
+node bin/sdd-eval.js evals/mis.tareas.json
+```
+
+Trabaja sobre una copia temporal del proyecto, así que tu carpeta no se toca. Guarda el historial para comparar con la corrida anterior. Consume tokens de tu plan, así que úsalo con pocas tareas.
+
+Qué práctica profesional implementa cada pieza, con sus fuentes: `docs/PRACTICAS.md`.
+
 ## 6. Arquitectura
 
 ```

@@ -9,7 +9,7 @@ function parse(native, input, env) {
   const event = EVENTS[native];
   if (!event) return null;
   return {
-    host: 'gemini', event, nativeAsk: false,
+    host: 'gemini', event, nativeAsk: false, canRewrite: true,
     reinjectOnPrompt: true, // tras comprimir, Gemini no emite SessionStart: la memoria se reinyecta en el siguiente mensaje
     root: resolveRoot(env.GEMINI_PROJECT_DIR, env.CLAUDE_PROJECT_DIR, input.cwd),
     sessionId: input.session_id || env.GEMINI_SESSION_ID,
@@ -22,6 +22,7 @@ function parse(native, input, env) {
 }
 
 function format(native, r) {
+  if (native === 'BeforeTool' && r.rewrite) return { stdout: json({ hookSpecificOutput: { tool_input: { command: r.rewrite } } }) };
   if (native === 'BeforeTool' && r.decision) return { stdout: json({ decision: 'deny', reason: r.reason }) };
   if (native === 'AfterTool' && r.feedback) return { stdout: json({ hookSpecificOutput: { additionalContext: r.feedback } }) };
   if (native === 'AfterAgent') {

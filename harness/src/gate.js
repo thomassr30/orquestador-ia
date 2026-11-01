@@ -60,12 +60,14 @@ function onPrompt(state, prompt, cfg) {
   const approvesPlan = approval && ((g.estado === 'pendiente' && (g.conPlan || !commandsPending)) || (g.estado === 'requerido' && !commandsPending && !state.conMensajes));
   if (ESCAPE.test(text)) {
     state.gate = { estado: 'libre', desde: now };
+    state.objetivo = text.replace(/\s+/g, ' ').trim().slice(0, 300);
     notes.push('Pedido marcado como directo: puedes editar sin presentar plan (igual valida con tests/lint).');
   } else if (approvesPlan) {
     state.gate = { estado: 'aprobado', desde: now };
     notes.push('Plan aprobado por el usuario: puedes implementar. Los sensores revisarán el código al terminar.');
   } else if (isChangeRequest(text) && !(approval && (g.estado === 'aprobado' || commandsPending)) && !(g.estado === 'aprobado' && CONTINUE.test(text))) {
     state.gate = { estado: 'requerido', desde: now };
+    state.objetivo = text.replace(/\s+/g, ' ').trim().slice(0, 300);
     notes.push('Pedido de cambio: las ediciones de código quedan bloqueadas hasta que presentes el plan y el usuario lo apruebe con «¿Apruebo la implementación? (sí / no / ajustes)». Si es trivial, pregunta si lo aplicas directo.');
   }
   return notes;

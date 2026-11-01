@@ -14,7 +14,7 @@ function claude(home) {
   return {
     SessionStart: [{ hooks: [h('SessionStart', 15)] }],
     UserPromptSubmit: [{ hooks: [h('UserPromptSubmit', 10)] }],
-    PreToolUse: [{ matcher: 'Bash|Edit|Write|MultiEdit|NotebookEdit|Read|Grep|mcp__.*', hooks: [h('PreToolUse', 15)] }],
+    PreToolUse: [{ matcher: 'Bash|Edit|Write|MultiEdit|NotebookEdit|Read|Grep|Task|Agent|mcp__.*', hooks: [h('PreToolUse', 15)] }],
     PostToolUse: [{ matcher: 'Edit|Write|MultiEdit|NotebookEdit', hooks: [h('PostToolUse', 30)] }],
     Stop: [{ hooks: [h('Stop', 900, { statusMessage: STOP_MSG })] }],
     PreCompact: [{ hooks: [h('PreCompact', 15)] }],
@@ -27,7 +27,7 @@ function codex(home) {
   return {
     SessionStart: [{ matcher: 'startup|resume|clear|compact', hooks: [h('SessionStart', 15)] }],
     UserPromptSubmit: [{ hooks: [h('UserPromptSubmit', 10)] }],
-    PreToolUse: [{ matcher: 'Bash|apply_patch|Edit|Write|mcp__.*', hooks: [h('PreToolUse', 15, { statusMessage: 'Harness SDD: revisando permisos' })] }],
+    PreToolUse: [{ matcher: 'Bash|apply_patch|Edit|Write|spawn_agent|Agent|mcp__.*', hooks: [h('PreToolUse', 15, { statusMessage: 'Harness SDD: revisando permisos' })] }],
     PostToolUse: [{ matcher: 'apply_patch|Edit|Write', hooks: [h('PostToolUse', 30)] }],
     Stop: [{ hooks: [h('Stop', 900, { statusMessage: STOP_MSG })] }],
     PreCompact: [{ hooks: [h('PreCompact', 15)] }],
@@ -56,7 +56,7 @@ function cursor(home) {
     beforeShellExecution: [h('beforeShellExecution', 15)],
     beforeReadFile: [h('beforeReadFile', 10)],
     beforeMCPExecution: [h('beforeMCPExecution', 15)],
-    preToolUse: [h('preToolUse', 15, { matcher: '^(?!(Shell|Read|Grep|Glob|Task|LS)$)(?!MCP).+' })],
+    preToolUse: [h('preToolUse', 15, { matcher: '^(?!(Shell|Read|Grep|Glob|LS)$)(?!MCP).+' })],
     postToolUse: [h('postToolUse', 30, { matcher: '^(?!(Shell|Read|Grep|Glob|Task|LS)$)(?!MCP).+' })],
     afterFileEdit: [h('afterFileEdit', 15)],
     afterAgentResponse: [h('afterAgentResponse', 10)],

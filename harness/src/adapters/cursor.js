@@ -13,6 +13,7 @@ function toolFor(native, input) {
   if (native === 'beforeMCPExecution') return { kind: 'mcp', name: String(input.tool_name || ''), server: String(input.server || input.server_name || input.url || input.command || ''), tool: String(input.tool_name || ''), paths: [], contents: [] };
   if (native === 'afterFileEdit') return { kind: 'edit', name: 'Write', paths: [input.file_path].filter(Boolean), contents: [] };
   const name = String(input.tool_name || '');
+  if (/^task$/i.test(name)) return normalizeTool('task', input.tool_input || {});
   if (!EDIT_TOOLS.test(name)) return null; // Shell y Read ya tienen su hook específico
   const t = normalizeTool('write', input.tool_input || {});
   return t.paths.length ? t : null;

@@ -9,7 +9,7 @@ function parse(native, input) {
   const event = EVENTS[native];
   if (!event) return null;
   return {
-    host: 'codex', event, nativeAsk: false,
+    host: 'codex', event, nativeAsk: false, canRewrite: true, toolInput: input.tool_input,
     root: resolveRoot(input.cwd),
     sessionId: input.session_id,
     source: input.source,
@@ -20,7 +20,10 @@ function parse(native, input) {
   };
 }
 
-function format(native, r) {
+function format(native, r, ev) {
+  if (native === 'PreToolUse' && r.rewrite) {
+    return { stdout: json({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow', updatedInput: { ...((ev && ev.toolInput) || {}), command: r.rewrite } } }) };
+  }
   if (native === 'PreToolUse' && r.decision) {
     return { stdout: json({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: r.reason } }) };
   }

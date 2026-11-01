@@ -88,6 +88,7 @@ function checkpoint(root, state, host) {
   const block = [
     AUTO_START,
     `Última actividad: ${stamp} (${host || 'agente'}) · Plan: ${GATE_LABEL[state.gate.estado] || state.gate.estado}`,
+    ...(state.objetivo ? [`Pedido en curso: ${state.objetivo}`] : []),
     `Archivos modificados en la sesión: ${shown.length ? shown.join(', ') : '—'}${files.length > shown.length ? ` (+${files.length - shown.length} más)` : ''}`,
     `Sensores: ${sens}`,
     AUTO_END,
