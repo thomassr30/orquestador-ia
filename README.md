@@ -128,15 +128,17 @@ Las reglas en texto dependen de que el modelo las siga. El harness agrega **cont
 | Al iniciar y tras compactar | Inyecta la memoria **de este proyecto** (índice, sesión de trabajo, temas disponibles). |
 | Cada mensaje tuyo | Detecta pedidos de cambio, que abren el GATE, y tus aprobaciones (`sí`, `dale`, `apruebo`, `directo`). |
 | Antes de cada comando | **Bloquea**: escritura en git, GitHub o GitLab, comandos destructivos y lectura de secretos (`.env`, claves). **Pide confirmación** para: infraestructura (kubectl, terraform, nube, Consul, Vault), clientes de base de datos, borrar archivos, instalar dependencias y `sudo`. **Antes de que apruebes el plan**, solo deja correr lectura, tests y lint. |
+| Antes de cada herramienta MCP | Escribir en GitHub/GitLab por MCP (crear PR, merge, comentar…) se **bloquea**, igual que git. En otros servidores (bases de datos, Jira, etc.), lo que escribe o ejecuta **pide confirmación**. Los servidores del orquestador (navegador y documentación) quedan libres. |
 | Antes de cada edición | No deja editar código sin plan aprobado, ni tocar `.git`, secretos, la configuración del harness o de los hooks, ni el estado del harness. Si la memoria del proyecto trae algo con aspecto de secreto, la escritura se rechaza. |
 | Después de cada edición | Chequeo instantáneo del archivo: JSON y YAML válidos, marcadores de conflicto de merge, sintaxis de Go. Si hay error, se lo devuelve al agente. |
 | Al terminar el turno | Si cambió código, corre lint, tipos y tests relacionados **solo sobre lo modificado** y por módulo (sirve en monorepos). Si fallan, el agente debe corregir: se insiste hasta 2 veces y después solo avisa. Además actualiza un bloque automático en `.sdd/memoria/sesion.md`. |
 
 **Sensores detectados automáticamente:**
 
-- **Node/TS**: eslint sobre los archivos cambiados, `tsc --noEmit` (en Angular, con `tsconfig.app.json`), y `vitest related` o `jest --findRelatedTests`. Karma y los modos watch se omiten.
+- **Node/TS**: eslint sobre los archivos cambiados, `tsc --noEmit`, y `vitest related` o `jest --findRelatedTests`. Los modos watch se omiten.
+- **Angular**: `ng build --configuration development`, que también revisa las plantillas HTML, y Karma con `--watch=false --browsers=ChromeHeadless` (si no hay Chrome, queda omitido).
 - **Go**: `go vet` y `go test` de los paquetes tocados, y `golangci-lint` si está configurado.
-- **Gradle, Xcode y otros**: se configuran a mano (ver más abajo).
+- **Android, iOS, SCSS y otros**: hay plantillas listas en `~/.sdd-orquestador/harness.json` → `sensores._ejemplos`; copia la que aplique a `sensores.comandos` del proyecto.
 
 ### Por herramienta
 
@@ -178,7 +180,7 @@ Global: `~/.sdd-orquestador/harness.json`. Por proyecto: `.sdd/harness.json`, qu
     "timeoutSeg": 240,
     "maxBloqueos": 2
   },
-  "permisos": { "preguntar": ["node scripts/*"], "denegar": ["make deploy"] }
+  "permisos": { "preguntar": ["node scripts/*"], "denegar": ["make deploy"], "mcpLibres": ["jira"], "mcpBloquear": ["notion"] }
 }
 ```
 
@@ -193,7 +195,7 @@ En los comandos, `{archivos}` se reemplaza por los archivos modificados.
 ### Diagnóstico
 
 ```powershell
-node ~/.sdd-orquestador/bin/sdd-harness.js doctor     # hooks por herramienta, configuración y sensores que correrían
+node ~/.sdd-orquestador/bin/sdd-harness.js doctor     # ejecuta cada hook con un "git push" de prueba, muestra configuración y sensores
 node ~/.sdd-orquestador/bin/sdd-harness.js estado     # GATE, archivos modificados y últimos sensores de este proyecto
 node ~/.sdd-orquestador/bin/sdd-harness.js sensores   # corre ahora los sensores sobre lo modificado (git status)
 node ~/.sdd-orquestador/bin/sdd-harness.js registro   # últimas decisiones (qué se bloqueó y por qué)
@@ -203,7 +205,7 @@ En el chat basta con `/sdd-status` o con preguntar "¿cómo está el harness?".
 
 ### Si algo no funciona
 
-- **El agente sigue bloqueado tras tu "sí"**: responde `apruebo`, o agrega `directo` al pedido. Con `estado` ves en qué paso quedó el GATE.
+- **El agente sigue bloqueado tras tu "sí"**: tu "sí" solo aprueba el plan si el agente terminó su mensaje con una pregunta (idealmente «¿Apruebo la implementación?»). Pídele que te muestre el plan, o agrega `directo` al pedido. Con `estado` ves en qué paso quedó el GATE.
 - **Errores tipo "node no se reconoce" al usar la IA**: la herramienta no encuentra Node.js en el PATH. Reiníciala o vuelve a abrir la terminal después de instalar Node.
 - **Desactivar los controles por código** sin perder agentes ni skills: `node install.js --no-hooks`. Vuelves a activarlos con `node install.js`.
 - **Un sensor no aplica a tu proyecto**: ajusta `sensores.comandos` o `sensores.alTerminar` en `.sdd/harness.json`. `doctor` te muestra qué correría.

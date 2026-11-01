@@ -47,7 +47,7 @@ export const SddHarness = async ({ client, directory, worktree }) => {
       const args = (output && output.args) || {};
       argsByCall.set(input.callID, { tool: input.tool, args });
       if (argsByCall.size > 200) argsByCall.delete(argsByCall.keys().next().value);
-      const r = await core.handle(ev('pre', { sessionId: input.sessionID, tool: common.normalizeTool(input.tool, args) }));
+      const r = await core.handle(ev('pre', { sessionId: input.sessionID, tool: common.normalizeTool(input.tool, args, { opencode: true }) }));
       if (r && r.decision) throw new Error(r.reason);
     },
 
@@ -55,7 +55,7 @@ export const SddHarness = async ({ client, directory, worktree }) => {
       const saved = argsByCall.get(input.callID);
       argsByCall.delete(input.callID);
       if (!saved) return;
-      const r = await core.handle(ev('post', { sessionId: input.sessionID, tool: common.normalizeTool(saved.tool, saved.args) }));
+      const r = await core.handle(ev('post', { sessionId: input.sessionID, tool: common.normalizeTool(saved.tool, saved.args, { opencode: true }) }));
       if (r && r.feedback && output && typeof output.output === 'string') output.output += `\n\n${r.feedback}`;
     },
 

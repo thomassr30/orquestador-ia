@@ -6,17 +6,39 @@
     "_alEditar": "chequeo instantáneo de cada archivo editado: JSON/YAML válidos, conflictos de merge, sintaxis Go",
     "alEditar": true,
     "_alTerminar": "al terminar cada turno con código modificado se ejecutan estos sensores sobre lo cambiado; si fallan, el agente debe corregir antes de terminar",
-    "alTerminar": ["lint", "tipos", "tests"],
+    "alTerminar": [
+      "lint",
+      "tipos",
+      "tests"
+    ],
     "_comandos": "vacío = detección automática por stack (eslint/tsc/vitest/jest, go vet/go test). Ejemplo: {\"tipos\": \"npx tsc --noEmit -p tsconfig.app.json\", \"tests\": \"npx vitest related --run {archivos}\"}",
     "comandos": {},
     "timeoutSeg": 240,
     "presupuestoSeg": 600,
-    "maxBloqueos": 2
+    "maxBloqueos": 2,
+    "_ejemplos": {
+      "android": {
+        "tipos": "gradlew.bat compileDebugKotlin",
+        "tests": "gradlew.bat testDebugUnitTest",
+        "lint": "gradlew.bat lintDebug"
+      },
+      "ios": {
+        "tipos": "xcodebuild -scheme App -destination 'generic/platform=iOS Simulator' build",
+        "tests": "xcodebuild test -scheme App -destination 'platform=iOS Simulator,name=iPhone 16'"
+      },
+      "scss": {
+        "lint": "npx --no-install stylelint {archivos}"
+      },
+      "nota": "Copia el bloque que aplique a sensores.comandos en .sdd/harness.json del proyecto. En macOS/Linux usa ./gradlew."
+    }
   },
   "permisos": {
     "_comentario": "Se suman a las reglas fijas (git solo lectura, secretos, infraestructura con confirmación). Prefijos de comando; '*' al final = comodín.",
     "permitir": [],
     "preguntar": [],
-    "denegar": []
+    "denegar": [],
+    "_mcp": "mcpLibres: servidores MCP que no piden confirmación (además de playwright, chrome-devtools y context7). mcpBloquear: servidor o servidor__herramienta a bloquear siempre.",
+    "mcpLibres": [],
+    "mcpBloquear": []
   }
 }

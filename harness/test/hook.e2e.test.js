@@ -72,6 +72,15 @@ test('los mensajes generados por el harness no se toman como pedidos del usuario
   assert.strictEqual(hook('gemini', 'BeforeTool', { ...base, tool_name: 'write_file', tool_input: { file_path: 'src/a.js', content: 'y' } }).json, null, 'el GATE sigue aprobado');
 });
 
+test('MCP: escribir en GitHub se bloquea y una base de datos pide confirmación', () => {
+  const dir = project({ 'a.js': '' });
+  const base = { session_id: 'mcp', cwd: dir };
+  assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'mcp__github__merge_pull_request', tool_input: { pull_number: 3 } }).json.hookSpecificOutput.permissionDecision, 'deny');
+  assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'mcp__postgres__execute_query', tool_input: {} }).json.hookSpecificOutput.permissionDecision, 'ask');
+  assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'mcp__playwright__browser_navigate', tool_input: {} }).json, null);
+  assert.match(hook('codex', 'PreToolUse', { ...base, tool_name: 'mcp__postgres__execute_query', tool_input: {} }).json.hookSpecificOutput.permissionDecisionReason, /Requiere confirmación/);
+});
+
 test('un error interno nunca bloquea (falla abierta) y la salida es solo JSON', () => {
   const r = spawnSync(process.execPath, [HOOK, 'claude', 'PreToolUse'], { input: '{no es json', encoding: 'utf8', env: { ...process.env, SDD_HOME } });
   assert.strictEqual(r.status, 0);

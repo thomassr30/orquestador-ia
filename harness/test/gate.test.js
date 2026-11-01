@@ -76,3 +76,14 @@ test('las aprobaciones de comandos críticos son de un solo uso y caducan', () =
   gate.onPrompt(w, 'mejor no', cfg);
   assert.strictEqual(w.aprobaciones.pendientes.length, 0);
 });
+
+test('si la herramienta entrega el último mensaje, un "sí" sin pregunta previa no aprueba el plan', () => {
+  const s = st();
+  s.conMensajes = true;
+  gate.onPrompt(s, 'agrega un filtro por fecha', cfg);
+  gate.onPrompt(s, 'sí', cfg);
+  assert.ok(gate.editBlockReason(s, cfg), 'el agente aún no mostró el plan');
+  gate.onStop(s, 'Plan…\n¿Apruebo la implementación? (sí / no / ajustes)');
+  gate.onPrompt(s, 'sí', cfg);
+  assert.strictEqual(gate.editBlockReason(s, cfg), null);
+});

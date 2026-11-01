@@ -17,7 +17,8 @@ test('normaliza herramientas de todas las IAs', () => {
   assert.deepStrictEqual(normalizeTool('write', { filePath: 'd.ts', content: 'w' }).paths, ['d.ts']);
   assert.strictEqual(normalizeTool('read_file', { absolute_path: '/x/.env' }).kind, 'read');
   assert.strictEqual(normalizeTool('str_replace_editor', { command: 'view', path: 'e' }).kind, 'read');
-  assert.strictEqual(normalizeTool('mcp__playwright__navigate', {}).kind, 'other');
+  assert.strictEqual(normalizeTool('mcp__playwright__navigate', {}).kind, 'mcp');
+  assert.strictEqual(normalizeTool('TodoWrite', {}).kind, 'other');
 });
 
 test('parches apply_patch: rutas y contenido agregado', () => {
@@ -74,4 +75,22 @@ test('Copilot: camelCase, toolArgs como texto JSON y decisiones de nivel superio
   assert.deepStrictEqual(out(A.copilot.format('preToolUse', DENY)), { permissionDecision: 'deny', permissionDecisionReason: '[harness] no' });
   assert.deepStrictEqual(out(A.copilot.format('postToolUse', { feedback: 'f' })), { additionalContext: 'f' });
   assert.deepStrictEqual(out(A.copilot.format('agentStop', { block: 'b' })), { decision: 'block', reason: 'b' });
+});
+
+test('herramientas MCP: se reconocen en todos los formatos y se clasifican', () => {
+  const { classifyMcp } = require('../src/mcp');
+  const t = normalizeTool('mcp__github__create_pull_request', {});
+  assert.strictEqual(t.kind, 'mcp');
+  assert.strictEqual(classifyMcp(t).decision, 'deny', 'escribir en GitHub por MCP se bloquea como git');
+  assert.strictEqual(classifyMcp(normalizeTool('mcp__github__get_issue', {})).decision, 'allow');
+  const db = classifyMcp(normalizeTool('mcp_postgres_execute_sql', {}));
+  assert.strictEqual(db.decision, 'ask');
+  assert.strictEqual(db.critical, true);
+  assert.strictEqual(classifyMcp(normalizeTool('mcp__playwright__browser_click', {})).decision, 'allow', 'el navegador del orquestador queda libre');
+  assert.strictEqual(classifyMcp(normalizeTool('playwright_browser_type', {}, { opencode: true })).decision, 'allow');
+  assert.strictEqual(normalizeTool('jira_create_issue', {}, { opencode: true }).server, 'jira');
+  assert.strictEqual(classifyMcp(normalizeTool('mcp__jira__create_issue', {}), { mcpLibres: ['jira'] }).decision, 'allow');
+  assert.strictEqual(classifyMcp(normalizeTool('mcp__notion__search', {}), { mcpBloquear: ['notion'] }).decision, 'deny');
+  const c = A.cursor.parse('beforeMCPExecution', { conversation_id: 'c', workspace_roots: ['/tmp'], tool_name: 'merge_pull_request', server: 'github' });
+  assert.strictEqual(c.tool.kind, 'mcp');
 });

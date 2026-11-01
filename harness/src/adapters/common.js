@@ -3,6 +3,7 @@
 const fs = require('fs');
 const { findProjectRoot } = require('../util');
 const { GATE_QUESTION } = require('../gate');
+const { parseMcpName } = require('../mcp');
 
 const first = (...vals) => vals.find(v => v !== undefined && v !== null && v !== '');
 
@@ -55,7 +56,7 @@ const pathOf = i => first(i.file_path, i.filePath, i.path, i.target_file, i.abso
  * Herramienta normalizada desde nombres al estilo Claude Code / Codex / Copilot / Gemini.
  * @returns {{kind:'shell'|'edit'|'read'|'other', name:string, command?:string, paths:string[], contents:string[]}}
  */
-function normalizeTool(name, rawInput) {
+function normalizeTool(name, rawInput, opts = {}) {
   const n = String(name || '');
   const i = parseArgs(rawInput);
   const lower = n.toLowerCase();
@@ -77,6 +78,8 @@ function normalizeTool(name, rawInput) {
     const ps = Array.isArray(i.paths) ? i.paths : [pathOf(i)];
     return { kind: 'read', name: n, paths: ps.filter(p => p && !/[*?]/.test(p)), contents: [] };
   }
+  const mcp = parseMcpName(n, opts);
+  if (mcp) return { kind: 'mcp', name: n, server: mcp.server, tool: mcp.tool, paths: [], contents: [] };
   return { kind: 'other', name: n, paths: [], contents: [] };
 }
 

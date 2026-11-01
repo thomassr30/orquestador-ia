@@ -50,6 +50,12 @@ test('el hook instalado funciona desde ~/.sdd-orquestador (sin el repositorio)',
   assert.strictEqual(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, 'deny');
 });
 
+test('doctor ejecuta los hooks registrados y confirma que bloquean', () => {
+  const r = spawnSync(process.execPath, [path.join(HOME, '.sdd-orquestador/bin/sdd-harness.js'), 'doctor', project({ 'a.js': '' })], { env, encoding: 'utf8' });
+  assert.strictEqual(r.status, 0, r.stdout + r.stderr);
+  assert.strictEqual((r.stdout.match(/prueba en vivo OK/g) || []).length, 5, r.stdout);
+});
+
 test('reinstalar no duplica hooks', () => {
   const r = install('--no-deps', '--no-mcp');
   assert.strictEqual(r.status, 0, r.stderr);

@@ -42,27 +42,69 @@ function estado() {
   if (sessions.length > 1) console.log(`Otras sesiones recientes: ${sessions.slice(1, 4).map(x => `${x.sesion} (${x.herramienta || '—'}, GATE ${x.gate.estado})`).join(', ')}`);
 }
 
+// Prueba en vivo: ejecuta el comando EXACTO registrado en cada herramienta con un "git push" simulado
+// y comprueba que el hook lo bloquee (valida Node en el PATH, comillas de la ruta y el adaptador).
+const LIVE = {
+  'Claude Code': { ev: 'PreToolUse', input: d => ({ session_id: 'doctor', cwd: d, tool_name: 'Bash', tool_input: { command: 'git push' } }), denied: o => /"permissionDecision":"deny"/.test(o) },
+  Codex: { ev: 'PreToolUse', input: d => ({ session_id: 'doctor', cwd: d, tool_name: 'Bash', tool_input: { command: 'git push' } }), denied: o => /"permissionDecision":"deny"/.test(o) },
+  'Gemini CLI': { ev: 'BeforeTool', input: d => ({ session_id: 'doctor', cwd: d, tool_name: 'run_shell_command', tool_input: { command: 'git push' } }), denied: o => /"decision":"deny"/.test(o) },
+  Cursor: { ev: 'beforeShellExecution', input: d => ({ conversation_id: 'doctor', workspace_roots: [d], command: 'git push', cwd: d }), denied: o => /"permission":"deny"/.test(o) },
+  Copilot: { ev: 'preToolUse', input: d => ({ sessionId: 'doctor', cwd: d, toolName: 'bash', toolArgs: { command: 'git push' } }), denied: o => /"permissionDecision":"deny"/.test(o) },
+};
+
+function findCommand(text, ev) {
+  const re = /"command"\s*:\s*"((?:[^"\\]|\\.)*sdd-hook\.js(?:[^"\\]|\\.)*)"/g;
+  let m;
+  while ((m = re.exec(text))) { const c = JSON.parse(`"${m[1]}"`); if (c.trim().endsWith(` ${ev}`)) return c; }
+  return null;
+}
+
+function liveTest(label, text) {
+  const t = LIVE[label];
+  const cmd = t && findCommand(text, t.ev);
+  if (!cmd) return 'sin prueba en vivo';
+  const os = require('os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdd-doctor-'));
+  const r = spawnSync(cmd, { shell: true, input: JSON.stringify(t.input(dir)), encoding: 'utf8', timeout: 20000, windowsHide: true, env: { ...process.env, SDD_HOME: path.join(dir, '.estado') } });
+  try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* temporal */ }
+  if (r.error) return `✗ no se pudo ejecutar (${r.error.message})`;
+  if (t.denied(r.stdout || '')) return 'prueba en vivo OK (bloqueó "git push")';
+  return `✗ la prueba en vivo no bloqueó "git push"${r.stderr ? `: ${r.stderr.trim().split('\n')[0]}` : ''}`;
+}
+
 function hookStatus() {
-  const has = (file, test) => { try { return test(fs.readFileSync(file, 'utf8')); } catch { return null; } };
-  const mark = t => t.includes('sdd-hook.js');
+  const read = file => { try { return fs.readFileSync(file, 'utf8'); } catch { return null; } };
   const rows = [
-    ['Claude Code', path.join(HOME, '.claude', 'settings.json'), mark],
-    ['Codex', path.join(process.env.CODEX_HOME || path.join(HOME, '.codex'), 'hooks.json'), mark],
-    ['Gemini CLI', path.join(HOME, '.gemini', 'settings.json'), mark],
-    ['Cursor', path.join(HOME, '.cursor', 'hooks.json'), mark],
-    ['Copilot', path.join(process.env.COPILOT_HOME || path.join(HOME, '.copilot'), 'hooks', 'sdd-orquestador.json'), mark],
-    ['OpenCode', path.join(HOME, '.config', 'opencode', 'plugins', 'sdd-harness.js'), t => t.includes('SddHarness')],
+    ['Claude Code', path.join(HOME, '.claude', 'settings.json')],
+    ['Codex', path.join(process.env.CODEX_HOME || path.join(HOME, '.codex'), 'hooks.json')],
+    ['Gemini CLI', path.join(HOME, '.gemini', 'settings.json')],
+    ['Cursor', path.join(HOME, '.cursor', 'hooks.json')],
+    ['Copilot', path.join(process.env.COPILOT_HOME || path.join(HOME, '.copilot'), 'hooks', 'sdd-orquestador.json')],
+    ['OpenCode', path.join(HOME, '.config', 'opencode', 'plugins', 'sdd-harness.js')],
   ];
-  for (const [label, file, test] of rows) {
-    const r = has(file, test);
-    console.log(`  ${r ? '✓' : r === null ? '·' : '✗'} ${label.padEnd(12)} ${r ? fwd(file) : r === null ? 'no instalado' : `${fwd(file)} (sin hooks del harness)`}`);
+  let failures = 0;
+  for (const [label, file] of rows) {
+    const text = read(file);
+    const ours = text && (label === 'OpenCode' ? text.includes('SddHarness') : text.includes('sdd-hook.js'));
+    if (text === null) { console.log(`  · ${label.padEnd(12)} no instalado`); continue; }
+    if (!ours) { console.log(`  ✗ ${label.padEnd(12)} ${fwd(file)} (sin hooks del harness)`); failures++; continue; }
+    let live = 'plugin instalado (se carga al abrir OpenCode)';
+    if (label === 'OpenCode') {
+      const m = /const SDD_HOME = '([^']+)'/.exec(text);
+      if (m && !fs.existsSync(path.join(m[1], 'harness', 'src', 'core.js'))) { live = `✗ el plugin apunta a ${m[1]}, donde no está el harness`; failures++; }
+    } else {
+      live = liveTest(label, text);
+      if (live.startsWith('✗')) failures++;
+    }
+    console.log(`  ${live.startsWith('✗') ? '✗' : '✓'} ${label.padEnd(12)} ${fwd(file)} — ${live.replace(/^✗ /, '')}`);
   }
+  return failures;
 }
 
 function doctor() {
   console.log(`Harness SDD · Node ${process.version} · ${fwd(SDD_HOME)}`);
-  console.log('\nHooks por herramienta:');
-  hookStatus();
+  console.log('\nHooks por herramienta (con prueba en vivo):');
+  if (hookStatus()) { console.log('  → Hay hooks que no responden. Ejecuta: node install.js (y revisa que "node" funcione en una terminal nueva).'); process.exitCode = 1; }
   const cfg = loadConfig(root);
   console.log(`\nProyecto: ${fwd(root)}`);
   console.log(`Configuración: GATE ${cfg.gate} · sensores al editar ${cfg.sensores.alEditar ? 'sí' : 'no'} · al terminar: ${cfg.sensores.alTerminar.join(', ') || 'ninguno'} · máx. ${cfg.sensores.maxBloqueos} bloqueos`);

@@ -56,7 +56,7 @@ function onPrompt(state, prompt, cfg) {
 
   if (cfg.gate === 'nunca') return notes;
   // Un "sí" a un comando no aprueba el plan, salvo que el agente haya mostrado la pregunta del GATE.
-  const approvesPlan = approval && ((g.estado === 'pendiente' && (g.conPlan || !commandsPending)) || (g.estado === 'requerido' && !commandsPending));
+  const approvesPlan = approval && ((g.estado === 'pendiente' && (g.conPlan || !commandsPending)) || (g.estado === 'requerido' && !commandsPending && !state.conMensajes));
   if (ESCAPE.test(text)) {
     state.gate = { estado: 'libre', desde: now };
     notes.push('Pedido marcado como directo: puedes editar sin presentar plan (igual valida con tests/lint).');

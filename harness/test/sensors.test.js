@@ -30,6 +30,14 @@ test('Angular usa tsconfig.app.json y no ejecuta Karma en modo watch', () => {
   assert.strictEqual(d.tests, undefined);
 });
 
+test('Angular con CLI local: ng build revisa plantillas y Karma corre headless', () => {
+  const dir = project({ 'package.json': JSON.stringify({ scripts: { test: 'ng test' } }), 'angular.json': '{}', 'tsconfig.json': '{}', 'src/app/x.component.html': '', 'src/app/x.component.ts': '' });
+  bin(dir, 'ng');
+  const d = detect(dir, dir, ['src/app/x.component.html', 'src/app/x.component.ts']);
+  assert.strictEqual(d.tipos.cmd, 'npx --no-install ng build --configuration development');
+  assert.match(d.tests.cmd, /ng test --watch=false --browsers=ChromeHeadless/);
+});
+
 test('monorepo: un plan por módulo con su propio package.json', () => {
   const dir = project({ 'web/package.json': JSON.stringify({ scripts: { lint: 'eslint .' } }), 'web/src/a.js': '', 'api/package.json': JSON.stringify({ scripts: { typecheck: 'tsc' } }), 'api/src/b.ts': '' });
   const steps = plan(dir, ['web/src/a.js', 'api/src/b.ts'], cfg({ alTerminar: ['lint', 'tipos'] }));

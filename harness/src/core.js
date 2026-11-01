@@ -10,6 +10,7 @@ const gate = require('./gate');
 const { runSensors, summarize, quickCheck } = require('./sensors');
 const memory = require('./memory');
 const { findSecret } = require('./secrets');
+const { classifyMcp } = require('./mcp');
 const { isInside, relPosix, shortHash } = require('./util');
 
 const tag = s => `[harness] ${s}`;
@@ -92,6 +93,13 @@ function onPre(ev) {
     }
     return null;
   }
+  if (t.kind === 'mcp') {
+    const r = classifyMcp(t, cfg.permisos);
+    if (r.decision === 'deny') out = deny(r.reason);
+    else if (r.decision === 'ask') out = criticalDecision(ev, st, `mcp ${t.server}/${t.tool}`, r.reason);
+    if (out) S.log(ev.root, { herramienta: ev.host, evento: 'mcp', decision: out.decision, detalle: `${t.server}/${t.tool}` });
+    return out;
+  }
   if (t.kind === 'read') {
     for (const p of t.paths || []) {
       const r = policy.checkPath(p, 'read');
@@ -126,6 +134,7 @@ async function onStop(ev) {
   let last = ev.lastMessage || '';
   let st = S.updateState(ev.root, ev.sessionId, s => {
     last = last || s.ultimoMensaje || '';
+    if (last) s.conMensajes = true; // esta herramienta entrega el último mensaje: el "sí" solo vale tras una pregunta del agente
     gate.onStop(s, last);
     s.ultimoMensaje = null;
     s.herramienta = ev.host;

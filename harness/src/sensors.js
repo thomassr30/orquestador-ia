@@ -69,7 +69,12 @@ function detect(root, modRoot, files) {
     else if (scripts.lint && js.length) out.lint = { cmd: runScript(pm, 'lint'), scoped: false };
     const ts = relFiles.filter(f => TS_EXT.test(f));
     const tcScript = ['typecheck', 'type-check', 'check-types', 'tsc'].find(s => scripts[s]);
-    if (ts.length) {
+    const angular = exists(path.join(modRoot, 'angular.json'));
+    const ngTouched = relFiles.some(f => /\.(m?ts|html|scss|css)$/i.test(f));
+    if (angular && ngTouched && !tcScript && localBin(root, modRoot, 'ng')) {
+      // Angular: el build revisa también las plantillas HTML (tsc no las ve)
+      out.tipos = { cmd: 'npx --no-install ng build --configuration development', scoped: false };
+    } else if (ts.length) {
       if (tcScript) out.tipos = { cmd: runScript(pm, tcScript), scoped: false };
       else if (localBin(root, modRoot, 'tsc')) {
         const app = exists(path.join(modRoot, 'angular.json')) && exists(path.join(modRoot, 'tsconfig.app.json')) ? 'tsconfig.app.json' : exists(path.join(modRoot, 'tsconfig.json')) ? 'tsconfig.json' : null;
@@ -77,7 +82,10 @@ function detect(root, modRoot, files) {
       }
     }
     const test = String(scripts.test || '');
-    if (js.length && test && !/no test specified/i.test(test) && !/\b(ng test|karma|--watch)\b/.test(test)) {
+    if (angular && js.length && /\b(ng test|karma)\b/.test(test) && localBin(root, modRoot, 'ng')) {
+      // Karma sin modo watch y con Chrome headless (si no hay Chrome, queda omitido)
+      out.tests = { cmd: 'npx --no-install ng test --watch=false --browsers=ChromeHeadless', scoped: true };
+    } else if (js.length && test && !/no test specified/i.test(test) && !/\b(ng test|karma|--watch)\b/.test(test)) {
       if (/\bvitest\b/.test(test)) out.tests = { cmd: `npx --no-install vitest related --run --passWithNoTests ${fileArgs(js)}`, scoped: true };
       else if (/\bjest\b/.test(test)) out.tests = { cmd: `npx --no-install jest --ci --passWithNoTests --findRelatedTests ${fileArgs(js)}`, scoped: true };
       else out.tests = { cmd: pm === 'npm' ? 'npm test' : `${pm} test`, scoped: true };
@@ -118,7 +126,7 @@ function plan(root, changed, cfg) {
   return steps;
 }
 
-const MISSING_TOOL = /(could not determine executable to run|is not recognized as an internal or external command|no se reconoce como un comando interno o externo|command not found|: not found|npm ERR! missing script|npm error missing script|Oops! Something went wrong!.*ESLint|Cannot find module '(?:eslint|typescript|vitest|jest)')/is;
+const MISSING_TOOL = /(No binary for ChromeHeadless|Cannot start ChromeHeadless|CHROME_BIN|could not determine executable to run|is not recognized as an internal or external command|no se reconoce como un comando interno o externo|command not found|: not found|npm ERR! missing script|npm error missing script|Oops! Something went wrong!.*ESLint|Cannot find module '(?:eslint|typescript|vitest|jest)')/is;
 const mentionsAny = (output, files = []) => { const o = String(output || '').replace(/\\/g, '/'); return files.some(f => o.includes(f)); };
 
 /** Ejecuta los sensores en secuencia respetando el presupuesto de tiempo. */

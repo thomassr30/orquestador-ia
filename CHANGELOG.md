@@ -1,5 +1,11 @@
 # Cambios
 
+## 2.1.0 — Cierre de huecos del harness
+- **Herramientas MCP bajo control**: escribir en GitHub/GitLab por MCP (crear PR, merge, push, comentar) se bloquea igual que git; en otros servidores (bases de datos, Jira, etc.), lo que escribe o ejecuta pide confirmación. Playwright, Chrome DevTools y Context7 quedan libres para el flujo browser. Configurable con `permisos.mcpLibres` y `permisos.mcpBloquear`. Cubre Claude Code, Codex, Gemini CLI, Cursor (`beforeMCPExecution`), Copilot y OpenCode.
+- **GATE más estricto**: en las herramientas que entregan el último mensaje del agente, tu "sí" solo aprueba el plan si el agente terminó preguntando; un "sí" suelto o a un comando ya no abre las ediciones.
+- **`doctor` con prueba en vivo**: ejecuta el comando exacto registrado en cada herramienta con un "git push" simulado y confirma que lo bloquee. Así detecta Node fuera del PATH, rutas mal citadas o formatos que cambiaron.
+- **Sensores para Angular**: `ng build --configuration development` (revisa también las plantillas HTML) y Karma sin modo watch con Chrome headless. Plantillas listas para Android (Gradle), iOS (xcodebuild) y SCSS (stylelint) en `harness.json`.
+
 ## 2.0.0 — Harness: las reglas se cumplen por código, dentro de tu herramienta
 Sin app propia, sin claves de API y sin red. El harness se enchufa en los hooks que ofrece cada herramienta (Claude Code, Codex, Gemini CLI, Cursor, VS Code Copilot) y como plugin local en OpenCode. Un núcleo común y un adaptador delgado por herramienta.
 - **Permisos por código** (antes de cada comando y edición):

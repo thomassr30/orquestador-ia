@@ -15,7 +15,7 @@ const DEFAULTS = {
     presupuestoSeg: 600,           // total al terminar el turno
     maxBloqueos: 2,                // veces seguidas que se impide terminar con sensores en rojo
   },
-  permisos: { permitir: [], preguntar: [], denegar: [] },
+  permisos: { permitir: [], preguntar: [], denegar: [], mcpLibres: [], mcpBloquear: [] },
 };
 
 function readJson(file) {
@@ -38,7 +38,7 @@ function loadConfig(root) {
   const project = root ? readJson(path.join(root, '.sdd', 'harness.json')) : null;
   let cfg = merge(merge(DEFAULTS, global), project);
   const lists = k => [...((global && global.permisos && global.permisos[k]) || []), ...((project && project.permisos && project.permisos[k]) || [])];
-  cfg.permisos = { ...cfg.permisos, permitir: lists('permitir'), preguntar: lists('preguntar'), denegar: lists('denegar') };
+  cfg.permisos = { ...cfg.permisos, permitir: lists('permitir'), preguntar: lists('preguntar'), denegar: lists('denegar'), mcpLibres: lists('mcpLibres'), mcpBloquear: lists('mcpBloquear') };
   if (!['auto', 'siempre', 'nunca'].includes(cfg.gate)) cfg.gate = 'auto';
   if (!Array.isArray(cfg.sensores.alTerminar)) cfg.sensores.alTerminar = [];
   return cfg;
