@@ -17,6 +17,7 @@ const CHANGE = words(`agreg${W}*|añad${W}*|anad${W}*|incorpor${W}*|cre(?:a|ar|a
 const FIX = words("no funciona|no anda|no carga|no compila|no levanta|no guarda|falla|fallan|fallando|error|errores|bug|bugs|se rompe|se cae|roto|rota|rompi[oó]|se ve mal|crash\\w*|excepci[oó]n|exception|stack ?trace|traceback|broken|not working|doesn'?t work");
 const TICKET = /(?<![A-Za-z0-9_])[A-Z][A-Z0-9]{1,9}-\d+(?![A-Za-z0-9_])/; // LAB-123: trabajar un ticket
 const WORK = words(`resuelv${W}*|resolv${W}*|trabaj[ae]${W}*`);
+const CONTINUE = words('sigue|segu[ií]|contin[uú]a|continuar|contin[uú]e|termina|terminar|falta|faltan|lo que queda|el resto|tambi[eé]n|adem[aá]s|retoma|relanza|reintenta');
 const NON_CODE = words('prototipo|prototipos|maqueta|maquetas|mockup|mockups|wireframe|wireframes'); // solo genera el prototipo
 const GATE_QUESTION = /¿\s*apruebo la implementaci[oó]n\s*\?/i;
 
@@ -63,7 +64,7 @@ function onPrompt(state, prompt, cfg) {
   } else if (approvesPlan) {
     state.gate = { estado: 'aprobado', desde: now };
     notes.push('Plan aprobado por el usuario: puedes implementar. Los sensores revisarán el código al terminar.');
-  } else if (isChangeRequest(text) && !(approval && (g.estado === 'aprobado' || commandsPending))) {
+  } else if (isChangeRequest(text) && !(approval && (g.estado === 'aprobado' || commandsPending)) && !(g.estado === 'aprobado' && CONTINUE.test(text))) {
     state.gate = { estado: 'requerido', desde: now };
     notes.push('Pedido de cambio: las ediciones de código quedan bloqueadas hasta que presentes el plan y el usuario lo apruebe con «¿Apruebo la implementación? (sí / no / ajustes)». Si es trivial, pregunta si lo aplicas directo.');
   }
@@ -74,7 +75,9 @@ function onPrompt(state, prompt, cfg) {
 function onStop(state, lastMessage) {
   const e = state.gate.estado;
   const withPlan = GATE_QUESTION.test(String(lastMessage || ''));
-  if (e === 'requerido' && asksUser(lastMessage)) state.gate = { estado: 'pendiente', desde: new Date().toISOString(), conPlan: withPlan };
+  // Si el agente terminó su turno con las ediciones bloqueadas, está esperando al usuario (aunque no lo haya
+  // formulado como pregunta): el siguiente "sí" cuenta como aprobación.
+  if (e === 'requerido') state.gate = { estado: 'pendiente', desde: new Date().toISOString(), conPlan: withPlan };
   else if (e === 'pendiente' && withPlan) state.gate.conPlan = true;
 }
 
@@ -83,7 +86,7 @@ function editBlockReason(state, cfg) {
   if (cfg.gate === 'nunca') return null;
   const e = state.gate.estado;
   if (e === 'requerido' || e === 'pendiente' || (cfg.gate === 'siempre' && e === 'inicial')) {
-    return 'GATE del harness: el plan de este cambio aún no está aprobado por el usuario. Presenta el plan (qué y por qué, archivos por capa, tests previstos, riesgos) y termina con «¿Apruebo la implementación? (sí / no / ajustes)». Si el cambio es trivial, pregunta si lo aplicas directo. No intentes editar por otra vía hasta la aprobación.';
+    return 'GATE del harness: el plan de este cambio aún no está aprobado por el usuario. Presenta el plan (qué y por qué, archivos por capa, tests previstos, riesgos) y termina con «¿Apruebo la implementación? (sí / no / ajustes)». Si el cambio es trivial, pregunta si lo aplicas directo. Termina tu turno ahí: el siguiente "sí" (con o sin tilde) o "directo" del usuario desbloquea. No intentes editar por otra vía hasta la aprobación.';
   }
   return null;
 }

@@ -114,6 +114,7 @@ function secretReference(raw) {
 // Scripts propios del orquestador (estado, memoria, diagnóstico): siempre permitidos, también antes del GATE.
 const OWN_SCRIPT = /(^|\/)\.sdd-orquestador\/bin\/(sdd-harness|sdd-status|sdd-memory|sdd-context|sdd-workspace|sdd-improve|to-md|new-change|sdd-state)\.js$/;
 const ownScript = tokens => (tokens[0] || '').toLowerCase() === 'node' && OWN_SCRIPT.test(String(tokens[1] || '').replace(/\\/g, '/').toLowerCase());
+const approvesGate = tokens => /sdd-harness\.js$/i.test(String(tokens[1] || '')) && /^(aprobar|directo|liberar)$/i.test(String(tokens[2] || ''));
 
 /** sed y find solo son de lectura en ciertas formas. */
 function readOnlyVariant(norm, tokens) {
@@ -128,6 +129,7 @@ function classifySegment(seg, extra) {
   const norm = n.norm;
   if (!norm) return { decision: 'allow' };
   if (matchesAny(norm, extra.deny)) return { decision: 'deny', reason: `bloqueado por configuración: "${norm}"` };
+  if (approvesGate(n.tokens)) return { decision: 'deny', reason: 'solo el usuario aprueba el plan (en el chat o desde su terminal); el agente no puede hacerlo' };
   const isGit = norm.startsWith('git ');
   const gitSub = isGit ? norm.slice(4) : '';
   if (isGit && matchesAny(gitSub, R.GIT_WRITE)) {

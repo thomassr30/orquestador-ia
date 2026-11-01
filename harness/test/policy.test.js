@@ -49,6 +49,7 @@ test('tests, lint y lectura permitidos; lo desconocido pregunta (sin ser crític
 test('los scripts del orquestador (/sdd-status, memoria) siempre están permitidos', () => {
   for (const c of ['node "C:/Users/Usuario Siigsa/.sdd-orquestador/bin/sdd-harness.js" estado', 'node "C:\\Users\\Usuario Siigsa\\.sdd-orquestador\\bin\\sdd-memory.js" stats', 'node ~/.sdd-orquestador/bin/sdd-status.js --all']) assert.strictEqual(d(c), 'allow', c);
   assert.strictEqual(d('node x.js ~/.sdd-orquestador/bin/sdd-status.js'), 'ask', 'solo si el script es el primer argumento');
+  assert.strictEqual(d('node ~/.sdd-orquestador/bin/sdd-harness.js aprobar'), 'deny', 'el agente no puede aprobar su propio plan');
 });
 
 test('configuración del usuario: denegar y preguntar', () => {

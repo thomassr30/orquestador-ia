@@ -1,5 +1,10 @@
 # Cambios
 
+## 2.1.2 — GATE: el "sí" del usuario ya no se pierde
+- Si el agente termina su turno con las ediciones bloqueadas, el harness entiende que espera al usuario aunque no lo haya escrito como pregunta («Responda sí…»). El siguiente "sí" (con o sin tilde) aprueba. Antes se perdía y el agente quedaba bloqueado.
+- Con el plan aprobado, mensajes de continuación ("continúa", "sigue", "falta", "también…") ya no reabren el bloqueo; un pedido nuevo sí.
+- Escape manual: `node ~/.sdd-orquestador/bin/sdd-harness.js aprobar`, desde TU terminal, aprueba el plan pendiente. El agente no puede ejecutarlo.
+
 ## 2.1.1 — Corrección
 - `/sdd-status` (y los demás scripts del orquestador: memoria, diagnóstico, conversión de PDF) quedaba bloqueado por el GATE mientras había un plan pendiente. Ahora los scripts propios de `~/.sdd-orquestador/bin` siempre están permitidos.
 

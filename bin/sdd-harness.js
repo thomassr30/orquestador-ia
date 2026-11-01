@@ -5,6 +5,7 @@
 //   node sdd-harness.js doctor   [ruta]   hooks instalados por herramienta, configuración y sensores detectados
 //   node sdd-harness.js sensores [ruta]   ejecuta ahora los sensores sobre lo modificado (git status)
 //   node sdd-harness.js registro [n]      últimas decisiones del harness en este proyecto
+//   node sdd-harness.js aprobar  [ruta]   (tú, desde tu terminal) aprueba el plan pendiente de la última sesión
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -143,6 +144,14 @@ function registro() {
   console.log(lines.length ? lines.join('\n') : 'Sin registro del harness en este proyecto.');
 }
 
-const cmds = { estado, doctor, sensores, registro, hooks: () => { console.log('Hooks por herramienta:'); hookStatus(); } };
-if (!cmds[cmd]) { console.error('Comandos: estado | doctor | sensores | registro'); process.exit(1); }
+function aprobar() {
+  const last = S.listSessions(root)[0];
+  if (!last) { console.log('No hay sesiones del harness en este proyecto.'); return; }
+  S.updateState(root, last.sesion, st => { st.gate = { estado: 'aprobado', desde: new Date().toISOString() }; });
+  S.log(root, { herramienta: 'terminal', evento: 'gate', decision: 'aprobado', detalle: 'aprobado manualmente por el usuario' });
+  console.log(`Plan aprobado para la sesión ${last.sesion} (${last.herramienta || '—'}). Pídele al agente que continúe.`);
+}
+
+const cmds = { estado, doctor, sensores, registro, aprobar, hooks: () => { console.log('Hooks por herramienta:'); hookStatus(); } };
+if (!cmds[cmd]) { console.error('Comandos: estado | doctor | sensores | registro | aprobar'); process.exit(1); }
 Promise.resolve(cmds[cmd]()).catch(e => { console.error(e.message); process.exit(1); });

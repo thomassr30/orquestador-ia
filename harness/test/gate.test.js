@@ -77,6 +77,24 @@ test('las aprobaciones de comandos críticos son de un solo uso y caducan', () =
   assert.strictEqual(w.aprobaciones.pendientes.length, 0);
 });
 
+test('caso real: el agente termina pidiendo «responda sí» sin signo de pregunta y el usuario escribe "si"', () => {
+  const s = st();
+  s.conMensajes = true;
+  gate.onPrompt(s, 'agrega la base de íconos y tooltips', cfg);
+  gate.onStop(s, 'Qué necesito de usted\nResponda «sí» otra vez, con tilde, o «directo», para que el harness lo registre.');
+  gate.onPrompt(s, 'si', cfg);
+  assert.strictEqual(gate.editBlockReason(s, cfg), null);
+});
+
+test('con el plan aprobado, "continúa con los tooltips" no vuelve a bloquear', () => {
+  const s = st();
+  s.gate = { estado: 'aprobado' };
+  gate.onPrompt(s, 'continúa y agrega los tooltips que faltan', cfg);
+  assert.strictEqual(s.gate.estado, 'aprobado');
+  gate.onPrompt(s, 'ahora crea el módulo de reportes', cfg);
+  assert.strictEqual(s.gate.estado, 'requerido', 'un pedido nuevo sí pide plan');
+});
+
 test('si la herramienta entrega el último mensaje, un "sí" sin pregunta previa no aprueba el plan', () => {
   const s = st();
   s.conMensajes = true;
