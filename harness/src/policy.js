@@ -111,6 +111,10 @@ function secretReference(raw) {
   return null;
 }
 
+// Scripts propios del orquestador (estado, memoria, diagnóstico): siempre permitidos, también antes del GATE.
+const OWN_SCRIPT = /(^|\/)\.sdd-orquestador\/bin\/(sdd-harness|sdd-status|sdd-memory|sdd-context|sdd-workspace|sdd-improve|to-md|new-change|sdd-state)\.js$/;
+const ownScript = tokens => (tokens[0] || '').toLowerCase() === 'node' && OWN_SCRIPT.test(String(tokens[1] || '').replace(/\\/g, '/').toLowerCase());
+
 /** sed y find solo son de lectura en ciertas formas. */
 function readOnlyVariant(norm, tokens) {
   if (norm.startsWith('sed ')) return tokens.includes('-n') && !tokens.some(t => /^(-i|--in-place)/.test(t));
@@ -140,7 +144,7 @@ function classifySegment(seg, extra) {
   const redirect = seg.replace(/"[^"]*"|'[^']*'/g, '').replace(/\d?>&\d|\d?>>?\s*(\/dev\/null|nul|\$null)\b/gi, '');
   if (/>/.test(redirect)) return { decision: 'ask', reason: 'redirige la salida a un archivo (escritura)' };
   if (isGit && (matchesAny(gitSub, R.GIT_READ) || gitSub === 'branch' || gitSub === 'remote' || gitSub === '--version' || gitSub === 'version')) return { decision: 'allow' };
-  if (matchesAny(norm, R.FORGE_READ) || matchesAny(norm, R.SAFE_COMMANDS) || matchesAny(norm, extra.allow) || readOnlyVariant(norm, n.tokens)) return { decision: 'allow' };
+  if (matchesAny(norm, R.FORGE_READ) || matchesAny(norm, R.SAFE_COMMANDS) || matchesAny(norm, extra.allow) || readOnlyVariant(norm, n.tokens) || ownScript(n.tokens)) return { decision: 'allow' };
   return { decision: extra.fallback, reason: 'comando no reconocido como seguro' };
 }
 

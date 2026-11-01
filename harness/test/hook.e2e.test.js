@@ -25,6 +25,7 @@ test('Claude Code: GATE, permisos, sensores al terminar y checkpoint de sesión'
   assert.match(hook('claude', 'UserPromptSubmit', { ...base, prompt: 'agrega un contador de visitas' }).json.hookSpecificOutput.additionalContext, /Pedido de cambio/);
   assert.strictEqual(hook('claude', 'PreToolUse', edit).json.hookSpecificOutput.permissionDecision, 'deny', 'sin plan aprobado no se edita');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'npm test' } }).json, null, 'los tests sí se pueden correr');
+  assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'node "C:/Users/Usuario Siigsa/.sdd-orquestador/bin/sdd-harness.js" estado' } }).json, null, '/sdd-status funciona con el plan pendiente');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'git commit -am x' } }).json.hookSpecificOutput.permissionDecision, 'deny');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'kubectl apply -f k8s/' } }).json.hookSpecificOutput.permissionDecision, 'ask');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Read', tool_input: { file_path: path.join(dir, '.env') } }).json.hookSpecificOutput.permissionDecision, 'deny');

@@ -1,5 +1,8 @@
 # Cambios
 
+## 2.1.1 — Corrección
+- `/sdd-status` (y los demás scripts del orquestador: memoria, diagnóstico, conversión de PDF) quedaba bloqueado por el GATE mientras había un plan pendiente. Ahora los scripts propios de `~/.sdd-orquestador/bin` siempre están permitidos.
+
 ## 2.1.0 — Cierre de huecos del harness
 - **Herramientas MCP bajo control**: escribir en GitHub/GitLab por MCP (crear PR, merge, push, comentar) se bloquea igual que git; en otros servidores (bases de datos, Jira, etc.), lo que escribe o ejecuta pide confirmación. Playwright, Chrome DevTools y Context7 quedan libres para el flujo browser. Configurable con `permisos.mcpLibres` y `permisos.mcpBloquear`. Cubre Claude Code, Codex, Gemini CLI, Cursor (`beforeMCPExecution`), Copilot y OpenCode.
 - **GATE más estricto**: en las herramientas que entregan el último mensaje del agente, tu "sí" solo aprueba el plan si el agente terminó preguntando; un "sí" suelto o a un comando ya no abre las ediciones.

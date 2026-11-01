@@ -46,6 +46,11 @@ test('tests, lint y lectura permitidos; lo desconocido pregunta (sin ser crític
   assert.strictEqual(d('echo hola > out.txt'), 'ask');
 });
 
+test('los scripts del orquestador (/sdd-status, memoria) siempre están permitidos', () => {
+  for (const c of ['node "C:/Users/Usuario Siigsa/.sdd-orquestador/bin/sdd-harness.js" estado', 'node "C:\\Users\\Usuario Siigsa\\.sdd-orquestador\\bin\\sdd-memory.js" stats', 'node ~/.sdd-orquestador/bin/sdd-status.js --all']) assert.strictEqual(d(c), 'allow', c);
+  assert.strictEqual(d('node x.js ~/.sdd-orquestador/bin/sdd-status.js'), 'ask', 'solo si el script es el primer argumento');
+});
+
 test('configuración del usuario: denegar y preguntar', () => {
   const q = new Policy({ root: '/tmp/proyecto', config: { denegar: ['make deploy'], preguntar: ['node scripts/*'], permitir: ['make test'] } });
   assert.strictEqual(q.checkCommand('make deploy prod').decision, 'deny');
