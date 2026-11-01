@@ -36,7 +36,7 @@ NO se guarda: detalles que el código o git ya muestran, código copiado, pasos 
 Cada entrada lleva fecha y fuente (`cambio <id>` o `archivo:línea`). Actualizar antes que agregar; nunca duplicar.
 
 ## Sesión (compactar sin perder lo importante)
-- Automático: al aprobar el plan, al terminar un trabajo y cuando la conversación se alarga (antes de compactar). También con "guardar". Escribe `sesion.md` con objetivo actual, decisiones tomadas en la sesión, estado (qué está hecho / qué falta), archivos clave, próximos pasos y dudas pendientes (≤ 40 líneas). Luego indica al usuario que ya puede compactar.
+- Automático: al aprobar el plan, al terminar un trabajo y cuando la conversación se alarga (antes de compactar). También con "guardar". Escribe `sesion.md` con objetivo actual, decisiones tomadas en la sesión, estado (qué está hecho / qué falta), archivos clave, próximos pasos y dudas pendientes (≤ 40 líneas). Respeta el bloque `<!-- harness:inicio … -->…<!-- harness:fin -->`: lo mantiene el harness (estado del plan, archivos modificados, sensores) y no se edita a mano. Luego indica al usuario que ya puede compactar.
 - Al retomar (`/sdd-continue` o sesión nueva): lee `sesion.md` + `MEMORIA.md` y resume en 3 líneas dónde quedó.
 - Muestra en el chat qué se guardó ("Recordé: …"), para que nada quede oculto.
 

@@ -1,5 +1,24 @@
 # Cambios
 
+## 2.0.0 — Harness: las reglas se cumplen por código, dentro de tu herramienta
+Sin app propia, sin claves de API y sin red. El harness se enchufa en los hooks que ofrece cada herramienta (Claude Code, Codex, Gemini CLI, Cursor, VS Code Copilot) y como plugin local en OpenCode. Un núcleo común y un adaptador delgado por herramienta.
+- **Permisos por código** (antes de cada comando y edición):
+  - **Bloquea**: escritura en git, GitHub o GitLab, incluso si viene disfrazada (`cd x && git push`, `git -C x commit`, `cmd /c`, `bash -lc`, `$(…)`); comandos destructivos; y lectura o escritura de secretos (`.env`, claves, credenciales).
+  - **Pide confirmación**: infraestructura, clientes de base de datos, borrar archivos, instalar dependencias y `sudo`. Usa el diálogo nativo en Claude Code y Copilot; en el resto la confirmación es en el chat, de un solo uso y válida por 30 minutos.
+- **GATE por código**: un pedido de cambio bloquea las ediciones hasta que el usuario aprueba el plan («¿Apruebo la implementación?»). Mientras tanto solo se permiten lectura, tests y lint. Para algo trivial basta con decir "directo".
+- **Sensores**: chequeo instantáneo tras cada edición (JSON y YAML, conflictos de merge, sintaxis Go). Al terminar el turno corren lint, tipos y tests relacionados de lo modificado, por módulo, con detección automática para Node/TS (eslint, tsc, vitest, jest) y Go (vet, test, golangci-lint). Con errores, el agente no puede dar el trabajo por terminado: se insiste hasta 2 veces.
+- **Memoria y compactación**:
+  - La memoria del proyecto se inyecta al iniciar y tras compactar en Claude Code, Codex, Gemini CLI y OpenCode.
+  - `sesion.md` lleva un bloque automático con el estado del plan, los archivos modificados y los sensores, para retomar sin pérdida.
+  - La memoria rechaza contenido con aspecto de secreto.
+- **El agente no desactiva su harness**: editar `harness.json`, los hooks o la configuración de la IA requiere confirmación. El estado vive fuera del proyecto (`~/.sdd-orquestador/estado`) y el agente no puede escribirlo.
+- **Configuración**: `~/.sdd-orquestador/harness.json` y `.sdd/harness.json` (GATE `auto`/`siempre`/`nunca`, sensores, permisos extra).
+- **Diagnóstico**: `sdd-harness.js doctor | estado | sensores | registro`; `/sdd-status` muestra el estado del harness.
+- **Codex**: reglas nativas `~/.codex/rules/sdd-orquestador.rules` (escritura en git y GitHub/GitLab prohibida) como red de seguridad mientras apruebas los hooks.
+- `harness/src/rules.js` es la fuente única de reglas: la usan los hooks y los permisos nativos que instala `install.js`. Se agregaron psql, sqlcmd, mysql, mongosh, redis-cli y `docker login` a "con confirmación".
+- **Pruebas automáticas** (`npm test`): política, GATE, sensores, adaptadores de las 6 herramientas, hook de punta a punta, plugin de OpenCode e instalación, reinstalación y desinstalación en un HOME simulado.
+- `sdd-context.js` queda como script manual (el hook de memoria ahora es parte del harness). La desinstalación conserva tu `harness.json`.
+
 ## 1.13.0 — Compactación sin pérdida y aislada por proyecto
 - **Hook SessionStart de Claude Code** (`sdd-context.js`): al iniciar, reanudar, limpiar o **después de compactar**, inyecta automáticamente la memoria del proyecto actual (índice + sesión de trabajo + lista de temas), con tope de 9.000 caracteres.
 - **Compact Instructions** en las reglas globales: qué conservar al compactar (proyecto, objetivo, plan aprobado, decisiones, estado de tareas, errores y soluciones, pedidos del usuario, próximos pasos).

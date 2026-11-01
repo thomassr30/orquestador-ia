@@ -13,7 +13,7 @@
  *   node install.js --no-deps            no instala pdfjs-dist / mammoth
  *   node install.js --auto-edits         Claude Code acepta ediciones de archivos sin preguntar (modo acceptEdits)
  *   node install.js --no-permissions     no agrega permisos preaprobados en Claude Code (git/gh siempre piden aprobación)
- *   node install.js --no-hooks           no instala el hook de memoria de Claude Code
+ *   node install.js --no-hooks           no instala los hooks del harness (permisos por código, GATE, sensores, memoria)
  *   node install.js --force              sobrescribe skills/agentes con el mismo nombre que no son del orquestador
  *   node install.js --uninstall          desinstala todo lo instalado
  */
@@ -284,7 +284,7 @@ function registerMcp(tkey, t) {
 function permissionRules() {
   const bin = `${SDD_HOME_FWD}/bin`;
   return [
-    ...['new-change.js', 'sdd-state.js', 'sdd-status.js', 'to-md.js', 'sdd-memory.js', 'sdd-context.js', 'sdd-workspace.js'].map(f => `Bash(node "${bin}/${f}":*)`),
+    ...['new-change.js', 'sdd-state.js', 'sdd-status.js', 'to-md.js', 'sdd-memory.js', 'sdd-context.js', 'sdd-workspace.js', 'sdd-harness.js'].map(f => `Bash(node "${bin}/${f}":*)`),
     'Bash(npm test:*)', 'Bash(npm run test:*)', 'Bash(npm run lint:*)', 'Bash(npm run build:*)', 'Bash(npm run typecheck:*)', 'Bash(npm audit:*)',
     'Bash(npx vitest:*)', 'Bash(npx jest:*)', 'Bash(npx playwright test:*)', 'Bash(npx tsc --noEmit:*)', 'Bash(npx eslint:*)', 'Bash(npx stylelint:*)',
     'Bash(ng test:*)', 'Bash(ng lint:*)', 'Bash(ng build:*)', 'Bash(npx ng test:*)', 'Bash(npx ng lint:*)', 'Bash(npx ng build:*)',
@@ -294,27 +294,9 @@ function permissionRules() {
   ];
 }
 // ---------- git: lectura libre, escritura bloqueada (deny > ask > allow en Claude Code) ----------
-const GIT_READ = ['status', 'diff', 'log', 'show', 'blame', 'ls-files', 'ls-tree', 'grep', 'rev-parse', 'describe', 'shortlog',
-  'cat-file', 'merge-base', 'for-each-ref', 'name-rev', 'remote -v', 'remote show', 'branch --list', 'branch -a', 'branch -r',
-  'branch -v', 'branch -vv', 'branch --show-current', 'stash list', 'stash show', 'worktree list', 'config --get', 'config --list', 'reflog show'];
-const GIT_WRITE = ['commit', 'push', 'pull', 'merge', 'rebase', 'reset', 'checkout', 'switch', 'restore', 'add', 'rm', 'mv',
-  'cherry-pick', 'revert', 'clean', 'am', 'apply', 'commit-tree', 'update-ref', 'update-index', 'filter-branch', 'filter-repo',
-  'gc', 'prune', 'init', 'submodule add', 'submodule update', 'submodule deinit', 'worktree add', 'worktree remove', 'worktree prune',
-  'remote add', 'remote remove', 'remote rm', 'remote rename', 'remote set-url', 'remote prune', 'notes add', 'notes remove', 'replace',
-  'reflog expire', 'reflog delete', 'stash push', 'stash pop', 'stash apply', 'stash drop', 'stash clear', 'stash save', 'stash create', 'stash store',
-  'tag -a', 'tag -s', 'tag -d', 'tag -f', 'tag --delete', 'tag --force', 'branch -d', 'branch -D', 'branch -m', 'branch -M', 'branch -c', 'branch -C',
-  'branch --delete', 'branch --move', 'branch --copy', 'branch -f', 'branch --force', 'branch -u', 'branch --set-upstream-to', 'branch --unset-upstream'];
-const FORGE_READ = ['gh pr view', 'gh pr list', 'gh pr diff', 'gh pr checks', 'gh pr status', 'gh issue view', 'gh issue list', 'gh issue status',
-  'gh repo view', 'gh run list', 'gh run view', 'gh release list', 'gh release view', 'gh search', 'glab mr view', 'glab mr list', 'glab mr diff',
-  'glab issue view', 'glab issue list', 'glab repo view', 'glab ci list', 'glab ci view'];
-const FORGE_WRITE = ['gh pr create', 'gh pr merge', 'gh pr close', 'gh pr reopen', 'gh pr edit', 'gh pr comment', 'gh pr review', 'gh pr checkout', 'gh pr ready',
-  'gh issue create', 'gh issue close', 'gh issue reopen', 'gh issue edit', 'gh issue comment', 'gh issue delete', 'gh issue transfer', 'gh issue lock',
-  'gh release create', 'gh release delete', 'gh release edit', 'gh release upload', 'gh repo create', 'gh repo delete', 'gh repo fork', 'gh repo edit',
-  'gh repo rename', 'gh repo archive', 'gh workflow run', 'gh run rerun', 'gh run cancel', 'gh secret set', 'gh variable set',
-  'glab mr create', 'glab mr merge', 'glab mr close', 'glab mr approve', 'glab mr note', 'glab mr update', 'glab issue create', 'glab issue close',
-  'glab issue note', 'glab issue update', 'glab release create', 'glab ci run'];
-// Infraestructura y entornos: siempre con aprobación (decisiones críticas)
-const INFRA_ASK = ['kubectl', 'oc', 'helm', 'terraform', 'docker push', 'consul', 'vault', 'az', 'aws', 'gcloud'];
+// Fuente única: harness/src/rules.js (las mismas reglas que aplican los hooks del harness)
+const { GIT_READ, GIT_WRITE, FORGE_READ, FORGE_WRITE, INFRA_ASK } = require('./harness/src/rules');
+const HC = require('./harness/src/hooks-config');
 
 const CLAUDE_RULES = {
   allow: [...GIT_READ.map(c => `Bash(git ${c}:*)`), 'Bash(git branch)', 'Bash(git remote)', 'Bash(git stash list)', ...FORGE_READ.map(c => `Bash(${c}:*)`)],
@@ -346,27 +328,62 @@ function configureClaudePermissions(file) {
   manifest.permissions = { file, added: added.allow, addedAsk: added.ask, addedDeny: added.deny, previousMode };
   log(`  ✓ permisos: git y gh/glab solo lectura (escritura bloqueada) · infraestructura con aprobación${P.defaultMode === 'acceptEdits' ? ' · ediciones automáticas' : ''} → ${file}`);
 }
-// ---------- hooks de Claude Code: memoria del proyecto al iniciar/reanudar/después de compactar ----------
-const HOOK_MARK = 'sdd-context.js';
-function configureClaudeHooks(file) {
+// ---------- harness: hooks en cada herramienta (permisos por código, GATE, sensores, memoria) ----------
+const HOOK_FILES = {
+  claude: () => path.join(HOME, '.claude', 'settings.json'),
+  codex: () => path.join(CODEX_HOME, 'hooks.json'),
+  gemini: () => path.join(HOME, '.gemini', 'settings.json'),
+  cursor: () => path.join(HOME, '.cursor', 'hooks.json'),
+};
+const HOOK_LABEL = 'permisos por código · GATE · sensores al editar y al terminar · memoria al iniciar y tras compactar';
+function mergeHooksFile(target, file) {
   let json;
-  try { json = readJson(file); } catch { notes.push(`Claude Code: ${file} no es JSON válido; hooks no configurados.`); return; }
-  json.hooks = json.hooks || {};
-  const list = (json.hooks.SessionStart || []).filter(g => !(g.hooks || []).some(h => String(h.command || '').includes(HOOK_MARK)));
-  list.push({ hooks: [{ type: 'command', command: `node "${SDD_HOME_FWD}/bin/sdd-context.js"`, timeout: 10 }] });
-  json.hooks.SessionStart = list;
+  try { json = readJson(file); } catch { notes.push(`${TARGETS[target].label}: ${file} no es JSON puro (¿tiene comentarios?); hooks del harness no configurados.`); return false; }
+  json.hooks = HC.mergeHooks(json.hooks, HC[target](SDD_HOME_FWD));
+  if (target === 'cursor') json.version = json.version || 1;
   backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n');
-  manifest.hooks = { file };
-  log(`  ✓ hook: memoria del proyecto al iniciar, reanudar y tras compactar → ${file}`);
+  manifest.hooks.push({ target, file });
+  return true;
 }
-function removeClaudeHooks(h) {
-  if (!h || !fs.existsSync(h.file)) return;
-  let json; try { json = readJson(h.file); } catch { return; }
-  if (!json.hooks || !json.hooks.SessionStart) return;
-  json.hooks.SessionStart = json.hooks.SessionStart.filter(g => !(g.hooks || []).some(x => String(x.command || '').includes(HOOK_MARK)));
-  if (!json.hooks.SessionStart.length) delete json.hooks.SessionStart;
-  if (!Object.keys(json.hooks).length) delete json.hooks;
-  writeFile(h.file, JSON.stringify(json, null, 2) + '\n');
+function configureHooks(k) {
+  if (HOOK_FILES[k]) {
+    const file = HOOK_FILES[k]();
+    if (mergeHooksFile(k, file)) log(`  ✓ harness (${HOOK_LABEL}) → ${file}`);
+    if (k === 'codex') {
+      const rules = path.join(CODEX_HOME, 'rules', 'sdd-orquestador.rules');
+      writeFile(rules, HC.codexRules()); manifest.files.push(rules);
+      log(`  ✓ reglas nativas de Codex: git y GitHub/GitLab solo lectura → ${rules}`);
+      notes.push('Codex: abre Codex y ejecuta /hooks para revisar y aprobar los hooks del harness (Codex no ejecuta hooks nuevos sin tu aprobación). Reinicia Codex para cargar las reglas.');
+    }
+    if (k === 'cursor') notes.push('Cursor: los hooks se recargan solos; en Cursor → Settings → Hooks puedes ver que estén activos.');
+    return;
+  }
+  if (k === 'copilot') {
+    const file = path.join(process.env.COPILOT_HOME || path.join(HOME, '.copilot'), 'hooks', 'sdd-orquestador.json');
+    writeFile(file, JSON.stringify(HC.copilot(SDD_HOME_FWD), null, 2) + '\n'); manifest.files.push(file);
+    log(`  ✓ harness (${HOOK_LABEL}) → ${file}`);
+    notes.push('VS Code Copilot: los hooks están en vista previa; se aplican en sesiones con destino "Copilot" (si usas Claude dentro de VS Code, aplica el harness de Claude Code).');
+    return;
+  }
+  if (k === 'opencode') {
+    const file = path.join(HOME, '.config', 'opencode', 'plugins', 'sdd-harness.js');
+    const tpl = fs.readFileSync(path.join(ROOT, 'harness', 'opencode', 'sdd-harness.js'), 'utf8');
+    writeFile(file, tpl.split('{{SDD_HOME}}').join(SDD_HOME_FWD)); manifest.files.push(file);
+    log(`  ✓ harness como plugin de OpenCode (${HOOK_LABEL}) → ${file}`);
+  }
+}
+function removeHooks(list) {
+  // v1.x guardaba { file } con el hook de memoria de Claude Code
+  const entries = Array.isArray(list) ? list : list && list.file ? [{ target: 'claude', file: list.file }] : [];
+  for (const h of entries) {
+    if (!h.file || !fs.existsSync(h.file)) continue;
+    let json; try { json = readJson(h.file); } catch { continue; }
+    if (!json.hooks) continue;
+    json.hooks = HC.mergeHooks(json.hooks, null);
+    if (!Object.keys(json.hooks).length) delete json.hooks;
+    if (h.target === 'cursor' && !json.hooks && Object.keys(json).length === 1 && json.version) { if (!DRY) fs.rmSync(h.file, { force: true }); continue; }
+    writeFile(h.file, JSON.stringify(json, null, 2) + '\n');
+  }
 }
 function removeClaudePermissions(p) {
   if (!p || !fs.existsSync(p.file)) return;
@@ -421,9 +438,12 @@ function uninstall() {
   log('Desinstalando Orquestador SDD...');
   removePrevious(prev, false);
   removeClaudePermissions(prev.permissions);
-  removeClaudeHooks(prev.hooks);
+  removeHooks(prev.hooks);
   removeOpencodeGit(prev.opencodePerm);
+  const userCfg = path.join(SDD_HOME, 'harness.json');
+  const keep = fs.existsSync(userCfg) ? fs.readFileSync(userCfg) : null;
   rmrf(SDD_HOME);
+  if (keep && !DRY) { fs.mkdirSync(SDD_HOME, { recursive: true }); fs.writeFileSync(userCfg, keep); log(`Se conserva tu configuración del harness: ${userCfg}`); }
   log('✓ Skills, agentes, comandos y reglas globales eliminados.');
   if ((prev.mcp || []).length) log(`Los servidores MCP registrados se mantienen (pueden usarlos otras herramientas): ${[...new Set(prev.mcp.map(m => m.name))].join(', ')}`);
   log('Los respaldos *.bak-sdd de tus archivos de configuración se conservan.');
@@ -458,13 +478,19 @@ function install() {
   const owned = new Set([...(prev?.dirs || []), ...(prev?.files || [])]);
   const foreign = p => fs.existsSync(p) && !owned.has(p) && !FORCE;
   manifest.mcp = [...(prev?.mcp || [])];
+  manifest.hooks = [];
+  removeHooks(prev?.hooks); // se vuelven a registrar los vigentes
   if (prev?.permissions) manifest.permissions = prev.permissions;
   if (prev?.opencodePerm) manifest.opencodePerm = prev.opencodePerm;
   removePrevious(prev, true); // reinstalación limpia (las reglas se reemplazan en su lugar)
 
-  // 1. runtime: scripts + dependencias
-  log('• Runtime en ~/.sdd-orquestador');
+  // 1. runtime: scripts, harness + dependencias
+  log('• Runtime y harness en ~/.sdd-orquestador');
   copyDir(path.join(ROOT, 'bin'), path.join(SDD_HOME, 'bin'));
+  rmrf(path.join(SDD_HOME, 'harness'));
+  copyDir(path.join(ROOT, 'harness', 'src'), path.join(SDD_HOME, 'harness', 'src'));
+  const userCfg = path.join(SDD_HOME, 'harness.json');
+  if (!fs.existsSync(userCfg)) writeFile(userCfg, fs.readFileSync(path.join(ROOT, 'config', 'harness.json'), 'utf8'));
   if (!opt('no-deps')) {
     const pkg = { name: 'sdd-orquestador-runtime', private: true, dependencies: { 'pdfjs-dist': '4.10.38', mammoth: '1.8.0' } };
     writeFile(path.join(SDD_HOME, 'package.json'), JSON.stringify(pkg, null, 2));
@@ -520,7 +546,8 @@ function install() {
     } else if (k === 'cursor') {
       notes.push(`Cursor: pega el contenido de core/rules/global.md en Cursor → Settings → Rules → User Rules.`);
     }
-    if (t.settings) { configureClaudePermissions(t.settings); if (!opt('no-hooks')) configureClaudeHooks(t.settings); }
+    if (t.settings) configureClaudePermissions(t.settings);
+    if (!opt('no-hooks')) configureHooks(k);
     if (k === 'opencode') configureOpencodeGit(t.mcp.file);
     if (!opt('no-mcp')) registerMcp(k, t);
   }
@@ -536,6 +563,7 @@ function install() {
   log('\nPrueba en cualquier proyecto:');
   log('  Claude Code / Cursor / Copilot / OpenCode / Gemini:  /sdd-status   /sdd-ask <pregunta>');
   log('  Codex:                                               $sdd-status   $sdd-ask <pregunta>');
+  if (!opt('no-hooks')) log(`  Harness (hooks por herramienta y sensores):         node "${SDD_HOME_FWD}/bin/sdd-harness.js" doctor`);
 }
 
 // ---------- actualización automática tras git pull ----------

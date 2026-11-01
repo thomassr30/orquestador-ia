@@ -1,0 +1,22 @@
+{
+  "_comentario": "Configuración global del harness SDD. Cada proyecto puede sobrescribirla con .sdd/harness.json (mismas claves). El agente no puede modificar estos archivos sin tu permiso.",
+  "_gate": "auto: un pedido de cambio bloquea las ediciones hasta que apruebas el plan en el chat · siempre: toda edición requiere plan aprobado · nunca: sin GATE por código",
+  "gate": "auto",
+  "sensores": {
+    "_alEditar": "chequeo instantáneo de cada archivo editado: JSON/YAML válidos, conflictos de merge, sintaxis Go",
+    "alEditar": true,
+    "_alTerminar": "al terminar cada turno con código modificado se ejecutan estos sensores sobre lo cambiado; si fallan, el agente debe corregir antes de terminar",
+    "alTerminar": ["lint", "tipos", "tests"],
+    "_comandos": "vacío = detección automática por stack (eslint/tsc/vitest/jest, go vet/go test). Ejemplo: {\"tipos\": \"npx tsc --noEmit -p tsconfig.app.json\", \"tests\": \"npx vitest related --run {archivos}\"}",
+    "comandos": {},
+    "timeoutSeg": 240,
+    "presupuestoSeg": 600,
+    "maxBloqueos": 2
+  },
+  "permisos": {
+    "_comentario": "Se suman a las reglas fijas (git solo lectura, secretos, infraestructura con confirmación). Prefijos de comando; '*' al final = comodín.",
+    "permitir": [],
+    "preguntar": [],
+    "denegar": []
+  }
+}

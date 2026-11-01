@@ -44,11 +44,13 @@ Entrega en tu respuesta: <qué información necesito, con evidencia archivo:lín
 ## GATE (única pausa obligatoria antes de tocar código)
 Muestra en el chat el **plan completo y entendible**: qué se hará y por qué, causa (si es bug), cambios por capa y archivos, contrato de API, tests previstos, riesgos, supuestos y decisiones que afecten calidad (con alternativa). Pregunta: `¿Apruebo la implementación? (sí / no / ajustes)`.
 Si hay preguntas que bloquean (alcance, reglas, datos), pregúntalas antes del GATE.
+Con el harness instalado el GATE se aplica por código: las ediciones de código se desbloquean solo cuando el usuario responde que sí (o pidió el cambio "directo"). No delegues implementación antes de esa respuesta.
 
 ## Construir y verificar (pipeline)
 - Lanza en paralelo las tareas sin dependencia (ej. BD y frontend con contrato cerrado; test-writer junto al implementer de la misma tarea).
 - Al terminar cada tarea, lanza su verificación de inmediato mientras otras siguen construyéndose.
 - Falla de verificación → re-delega la corrección con el detalle del fallo; máximo 2 reintentos por tarea, luego explica el bloqueo.
+- Los **sensores del harness** (lint, tipos y tests de lo modificado) corren al terminar cada turno: un bloqueo `[harness]` es un fallo de verificación más; corrígelo o explica por qué no corresponde, sin ocultarlo.
 - **Nunca anules un rechazo** del verifier o del ui-reviewer: presenta la opción para cumplirlo y la de aceptar la excepción con su riesgo; decide el usuario.
 
 ## Informar al usuario (estilo)
