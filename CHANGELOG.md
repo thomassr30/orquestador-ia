@@ -1,5 +1,30 @@
 # Cambios
 
+## 2.8.0 — Carpetas con varios proyectos y workspaces: la IA no pierde el hilo
+- **Espacio de trabajo**: el harness detecta los proyectos dentro de lo que abriste (una carpeta con varios repos o subproyectos, un monorepo, un workspace multi-raíz de VS Code o un `.sdd/workspace.json`) por sus marcadores (`.git`, `package.json`, `angular.json`, `go.mod`, `pom.xml`, `build.gradle`, `.csproj`/`.sln`, `pyproject.toml`, `pubspec.yaml`, Xcode, Helm, Terraform…), hasta 3 niveles, con su stack y si tiene memoria.
+- **Mapa al iniciar y tras compactar**: una línea por proyecto y la instrucción de buscar en todos los involucrados antes de concluir. El orquestador lo pasa a cada sub-agente y lanza un explorer por proyecto.
+- **Memoria por proyecto bajo demanda**: la de cada proyecto se carga cuando lo mencionas o cuando la IA empieza a editar en él (una vez por sesión, y de nuevo tras compactar). La de la raíz es la memoria del espacio. No se mezclan.
+- **Reglas, sensores y protecciones por proyecto**: cada proyecto usa su propio `.sdd/harness.json` (reglas evaluadas con sus rutas, comandos de sensores propios). El `.git` y la configuración del harness de cada proyecto quedan protegidos.
+- **Deshacer en varios repos**: un almacén de puntos por repo (antes los repos internos no se copiaban); los puntos de un turno comparten id y `deshacer` vuelve atrás todos los repos tocados.
+- **`sdd-harness.js workspace`**: muestra lo detectado y, con `--aplicar`, da acceso a las carpetas extra de un workspace multi-raíz en Claude Code (`additionalDirectories`) y Codex (`writable_roots`), que por defecto solo ven la primera carpeta.
+- Las carpetas del workspace ya no cuentan como "fuera del proyecto" (leerlas no pide permiso).
+
+## 2.7.0 — Harness avanzado: deshacer, arquitectura vigilada por código y seguridad
+- **Deshacer lo que hizo la IA**: antes de la primera modificación de cada turno se guarda un punto de restauración en un almacén interno (`~/.sdd-orquestador/puntos`, git propio del harness). El `.git` del proyecto no se toca, no hay commits, no se copian secretos ni lo ignorado por `.gitignore`. `sdd-harness.js puntos` los lista; `deshacer` muestra la vista previa y `deshacer --confirmar` lo aplica (otra vez retrocede otro turno; también se puede rehacer). Si la IA lo ejecuta, pide tu confirmación. Funciona en las 6 herramientas. Rápido: ~200 ms el primer punto de un proyecto de 3.000 archivos y ~30 ms los siguientes; en proyectos muy grandes, `puntos --iniciar` prepara el primero.
+- **Arquitectura vigilada por código** (práctica de OpenAI): nuevos tipos de regla en `reglas` → `noImportar` (capas: módulos o rutas prohibidos, en JS/TS, Go, Python, Java/Kotlin, C# y SCSS), `nombreArchivo` (al crear) y `maxLineas` (aviso tras editar), además de `prohibido`. Cada una con su mensaje de corrección. `sdd-harness.js reglas` revisa todo el proyecto. Ejemplos por stack en `_ejemplosReglas`.
+- **Defensa contra instrucciones inyectadas** ("lethal trifecta"): desde que la sesión lee contenido externo (web, MCP, descargas), los comandos y URLs que pueden enviar datos a otro servidor piden confirmación con el motivo. `localhost` y tu app local no cuentan.
+- **Secretos en el código**: claves y tokens reales (AWS, GitHub, GitLab, OpenAI/Anthropic, Google, Slack, Stripe, SendGrid, credenciales en URLs) se bloquean al escribir; ejemplos y placeholders no.
+- **Publicar paquetes** (`npm publish`, `twine upload`, `cargo publish`…) pasa a ser decisión crítica.
+- Configuración nueva: `deshacer` y `seguridad` en `harness.json`.
+
+## 2.5.0 — Git con confirmación (commit nunca), MCP conectables, commits sin firma de IA y "sin sdd"
+- **Git**: la lectura sigue libre y el resto (push, pull, fetch, merge, rebase, reset, stash, checkout, ramas, tags…) ahora se puede hacer **con tu confirmación**, también con el plan pendiente, para resolver problemas de git. Si la acción descarta cambios o reescribe el remoto (`reset --hard`, `clean`, `push --force`, borrar ramas), el aviso lo dice. En Codex y OpenCode la confirmación la pide la propia herramienta (reglas `prompt` / permiso `ask`), sin doble pregunta.
+- **Commit nunca**, ni aunque lo pidas: `git commit`, `commit-tree`, alias de git que hacen commit y herramientas que crean commits (`npm version`, `release-it`, `semantic-release`, `lerna`…). PR, issues y comentarios en GitHub/GitLab siguen bloqueados.
+- **Mensajes de commit sin firma de IA**: si la respuesta trae `Co-Authored-By: Claude…`, `Generated with…`, `Claude-Session`, `Made-with: Cursor` o similares, el harness pide reescribirla (una vez). En Claude Code el instalador configura `attribution` vacío (si no lo tenías configurado) y lo quita al desinstalar.
+- **MCP**: el agente puede conectar y configurar servidores (`codex mcp add`, `claude mcp add`, `gemini mcp add`, `code --add-mcp`, `.mcp.json`, `.vscode/mcp.json`, `config.toml`…) con tu confirmación; listar es libre.
+- **"sin sdd" para toda la conversación**: apaga el orquestador (sin flujos, sub-agentes ni plan) hasta que escribas "con sdd". El harness se lo recuerda a la IA en cada mensaje. "directo" sigue valiendo para un solo mensaje.
+- `doctor` prueba cada hook con un `git commit` (antes `git push`, que ahora pide confirmación).
+
 ## 2.4.4 — Listo para más usuarios
 - **Licencia MIT** (`LICENSE`) y datos del repositorio en `package.json`.
 - **README nuevo**: qué problema resuelve, un ejemplo de uso, instalación en 3 comandos con verificación, tabla de compatibilidad por herramienta, problemas frecuentes y preguntas frecuentes. Rutas genéricas para cualquier equipo; los detalles largos quedan plegados.

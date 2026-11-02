@@ -33,7 +33,7 @@
     }
   },
   "permisos": {
-    "_comentario": "Se suman a las reglas fijas (git solo lectura, secretos, infraestructura con confirmación). Prefijos de comando; '*' al final = comodín.",
+    "_comentario": "Se suman a las reglas fijas (commit nunca, resto de git con confirmación, secretos, infraestructura con confirmación). Prefijos de comando; '*' al final = comodín.",
     "permitir": [],
     "preguntar": [],
     "denegar": [],
@@ -45,5 +45,73 @@
   "presupuesto": {
     "modo": "ahorro",
     "maxSubagentes": 3
+  },
+  "_reglas": "Reglas propias del proyecto (van en .sdd/harness.json → reglas). Tipos: prohibido (regex), noImportar (capas), nombreArchivo (regex del nombre al crear), maxLineas. El mensaje le enseña a la IA cómo hacerlo bien. Copia y adapta un ejemplo de _ejemplosReglas.",
+  "_ejemplosReglas": [
+    {
+      "nombre": "dominio-sin-infraestructura",
+      "archivos": "src/domain/**",
+      "noImportar": [
+        "src/infrastructure/**",
+        "src/infra/**",
+        "axios",
+        "typeorm",
+        "@prisma/client"
+      ],
+      "mensaje": "El dominio no depende de infraestructura: define una interfaz (puerto) en src/domain y su implementación en src/infrastructure."
+    },
+    {
+      "nombre": "angular-componentes-sin-http",
+      "archivos": "src/app/**/*.component.ts",
+      "noImportar": [
+        "@angular/common/http"
+      ],
+      "mensaje": "Los componentes no llaman HTTP directo: usa o crea un servicio en la carpeta services del módulo."
+    },
+    {
+      "nombre": "react-componentes-sin-fetch",
+      "archivos": "src/components/**/*.{tsx,jsx}",
+      "prohibido": "\\bfetch\\(|\\baxios\\b",
+      "mensaje": "Los componentes no hacen llamadas de red: usa un hook o servicio de src/api."
+    },
+    {
+      "nombre": "nest-controladores-sin-repositorio",
+      "archivos": "src/**/*.controller.ts",
+      "prohibido": "Repository<|@InjectRepository",
+      "mensaje": "El controlador delega en un servicio; el repositorio solo se inyecta en servicios."
+    },
+    {
+      "nombre": "go-dominio-sin-bd",
+      "archivos": "internal/domain/**/*.go",
+      "noImportar": [
+        "database/sql",
+        "gorm.io/gorm"
+      ],
+      "mensaje": "El dominio no conoce la base de datos: define una interfaz de repositorio en internal/domain y su implementación en internal/infra."
+    },
+    {
+      "nombre": "angular-nombres",
+      "archivos": "src/app/**/components/**/*.ts",
+      "nombreArchivo": "\\.(component|spec)\\.ts$|\\.component\\.spec\\.ts$",
+      "mensaje": "Los componentes se nombran <nombre>.component.ts (y su test <nombre>.component.spec.ts)."
+    },
+    {
+      "nombre": "archivos-cortos",
+      "archivos": "src/**/*.{ts,tsx,go}",
+      "excepto": "**/*.spec.ts",
+      "maxLineas": 400,
+      "mensaje": "Archivo demasiado largo: separa responsabilidades en archivos más chicos."
+    }
+  ],
+  "_deshacer": "Antes de cada turno en que la IA modifica archivos se guarda un punto de restauración (copia interna en ~/.sdd-orquestador/puntos, nunca en el .git del proyecto; sin secretos ni lo ignorado por .gitignore). Ver: sdd-harness.js puntos · volver: sdd-harness.js deshacer. excluir: patrones extra que no se copian.",
+  "deshacer": {
+    "activo": true,
+    "maxPuntos": 30,
+    "excluir": []
+  },
+  "_seguridad": "contenidoExterno: tras leer una web, un MCP externo o una descarga, los comandos que pueden enviar datos afuera piden confirmación (defensa contra instrucciones inyectadas). secretosEnCodigo: bloquea claves y tokens escritos en el código.",
+  "seguridad": {
+    "contenidoExterno": true,
+    "secretosEnCodigo": true
   }
 }

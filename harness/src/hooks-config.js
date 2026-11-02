@@ -14,7 +14,7 @@ function claude(home) {
   return {
     SessionStart: [{ hooks: [h('SessionStart', 15)] }],
     UserPromptSubmit: [{ hooks: [h('UserPromptSubmit', 10)] }],
-    PreToolUse: [{ matcher: 'Bash|Edit|Write|MultiEdit|NotebookEdit|Read|Grep|Task|Agent|mcp__.*', hooks: [h('PreToolUse', 15)] }],
+    PreToolUse: [{ matcher: 'Bash|Edit|Write|MultiEdit|NotebookEdit|Read|Grep|Task|Agent|WebFetch|WebSearch|mcp__.*', hooks: [h('PreToolUse', 15)] }],
     PostToolUse: [{ matcher: 'Edit|Write|MultiEdit|NotebookEdit', hooks: [h('PostToolUse', 30)] }],
     Stop: [{ hooks: [h('Stop', 900, { statusMessage: STOP_MSG })] }],
     PreCompact: [{ hooks: [h('PreCompact', 15)] }],
@@ -27,7 +27,7 @@ function codex(home) {
   return {
     SessionStart: [{ matcher: 'startup|resume|clear|compact', hooks: [h('SessionStart', 15)] }],
     UserPromptSubmit: [{ hooks: [h('UserPromptSubmit', 10)] }],
-    PreToolUse: [{ matcher: 'Bash|apply_patch|Edit|Write|spawn_agent|Agent|mcp__.*', hooks: [h('PreToolUse', 15, { statusMessage: 'Harness SDD: revisando permisos' })] }],
+    PreToolUse: [{ matcher: 'Bash|apply_patch|Edit|Write|spawn_agent|Agent|web_search|web_fetch|mcp__.*', hooks: [h('PreToolUse', 15, { statusMessage: 'Harness SDD: revisando permisos' })] }],
     PostToolUse: [{ matcher: 'apply_patch|Edit|Write', hooks: [h('PostToolUse', 30)] }],
     Stop: [{ hooks: [h('Stop', 900, { statusMessage: STOP_MSG })] }],
     PreCompact: [{ hooks: [h('PreCompact', 15)] }],
@@ -40,7 +40,7 @@ function gemini(home) {
   return {
     SessionStart: [{ hooks: [h('SessionStart', 15000)] }],
     BeforeAgent: [{ hooks: [h('BeforeAgent', 10000)] }],
-    BeforeTool: [{ matcher: 'run_shell_command|write_file|replace|edit|smart_edit|read_file|read_many_files|mcp_.*', hooks: [h('BeforeTool', 15000)] }],
+    BeforeTool: [{ matcher: 'run_shell_command|write_file|replace|edit|smart_edit|read_file|read_many_files|web_fetch|google_web_search|mcp_.*', hooks: [h('BeforeTool', 15000)] }],
     AfterTool: [{ matcher: 'write_file|replace|edit|smart_edit', hooks: [h('AfterTool', 30000)] }],
     AfterAgent: [{ hooks: [h('AfterAgent', 900000)] }],
     PreCompress: [{ hooks: [h('PreCompress', 15000)] }],
@@ -84,13 +84,15 @@ function copilot(home) {
 /** Reglas nativas de Codex (~/.codex/rules/): red de seguridad aunque los hooks aún no estén aprobados. */
 function codexRules() {
   const rule = (words, decision, why) => `prefix_rule(pattern = ${JSON.stringify(words)}, decision = "${decision}", justification = ${JSON.stringify(why)})`;
-  const git = 'Orquestador SDD: git es solo lectura. Sugiere el comando al usuario como texto para que lo ejecute él.';
+  const commit = 'Orquestador SDD: los commits los hace el usuario, nunca el agente. Sugiere el mensaje como texto, sin líneas de atribución.';
+  const git = 'Orquestador SDD: modifica el repositorio git. Apruébalo solo si entiendes el efecto.';
   const forge = 'Orquestador SDD: la escritura en GitHub/GitLab la hace el usuario. Sugiérelo como texto.';
   return [
     '# Orquestador SDD — reglas de comandos para Codex. Generado por install.js; se reemplaza al reinstalar.',
-    '# git solo lectura y escritura en GitHub/GitLab bloqueada. Las confirmaciones críticas las pide el hook del harness.',
-    ...R.GIT_WRITE.map(c => rule(['git', ...c.split(' ')], 'forbidden', git)),
-    rule(['git', 'stash'], 'forbidden', git),
+    '# commit nunca (lo hace el usuario) · el resto de git con tu aprobación · escritura en GitHub/GitLab bloqueada.',
+    ...R.GIT_NEVER.map(c => rule(['git', ...c.split(' ')], 'forbidden', commit)),
+    ...R.COMMIT_TOOLS.map(c => rule(c.split(' '), 'forbidden', commit)),
+    ...R.GIT_WRITE.map(c => rule(['git', ...c.split(' ')], 'prompt', git)),
     ...R.FORGE_WRITE.map(c => rule(c.split(' '), 'forbidden', forge)),
     '',
   ].join('\n');

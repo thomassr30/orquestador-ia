@@ -293,21 +293,22 @@ function permissionRules() {
     'Bash(semgrep scan:*)', 'Bash(docker ps:*)'
   ];
 }
-// ---------- git: lectura libre, escritura bloqueada (deny > ask > allow en Claude Code) ----------
+// ---------- git: lectura libre, escritura con aprobación, commit nunca (deny > ask > allow en Claude Code) ----------
 // Fuente única: harness/src/rules.js (las mismas reglas que aplican los hooks del harness)
-const { GIT_READ, GIT_WRITE, FORGE_READ, FORGE_WRITE, INFRA_ASK } = require('./harness/src/rules');
+const { GIT_READ, GIT_NEVER, COMMIT_TOOLS, GIT_WRITE, FORGE_READ, FORGE_WRITE, INFRA_ASK } = require('./harness/src/rules');
 const HC = require('./harness/src/hooks-config');
 
 const CLAUDE_RULES = {
   allow: [...GIT_READ.map(c => `Bash(git ${c}:*)`), 'Bash(git branch)', 'Bash(git remote)', 'Bash(git stash list)', ...FORGE_READ.map(c => `Bash(${c}:*)`)],
-  deny: [...GIT_WRITE.map(c => `Bash(git ${c}:*)`), 'Bash(git stash)', ...FORGE_WRITE.map(c => `Bash(${c}:*)`)],
-  ask: INFRA_ASK.map(c => `Bash(${c}:*)`), // (no se pone 'git:*' en ask: ask tiene prioridad sobre allow y bloquearía la lectura; lo no listado ya pregunta por defecto)
+  deny: [...GIT_NEVER.map(c => `Bash(git ${c}:*)`), ...COMMIT_TOOLS.map(c => `Bash(${c}:*)`), ...FORGE_WRITE.map(c => `Bash(${c}:*)`)],
+  // (no se pone 'git:*' en ask: ask tiene prioridad sobre allow y bloquearía la lectura; lo no listado ya pregunta por defecto)
+  ask: [...INFRA_ASK.map(c => `Bash(${c}:*)`), ...GIT_WRITE.map(c => `Bash(git ${c}:*)`), 'Bash(git stash)'],
 };
 // OpenCode: el último patrón que coincide gana → orden: general (ask) → lectura (allow) → escritura (deny)
 const OPENCODE_RULES = [
   ...['git *', 'gh *', 'glab *', ...INFRA_ASK.map(c => `${c} *`)].map(k => [k, 'ask']),
   ...GIT_READ.map(c => [`git ${c}*`, 'allow']), ['git branch', 'allow'], ...FORGE_READ.map(c => [`${c}*`, 'allow']),
-  ...GIT_WRITE.map(c => [`git ${c}*`, 'deny']), ['git stash', 'deny'], ...FORGE_WRITE.map(c => [`${c}*`, 'deny']),
+  ...GIT_NEVER.map(c => [`git ${c}*`, 'deny']), ...COMMIT_TOOLS.map(c => [`${c}*`, 'deny']), ...FORGE_WRITE.map(c => [`${c}*`, 'deny']),
 ];
 
 function configureClaudePermissions(file) {
@@ -322,11 +323,14 @@ function configureClaudePermissions(file) {
   const wanted = { allow: [...(opt('no-permissions') ? [] : permissionRules()), ...CLAUDE_RULES.allow], ask: CLAUDE_RULES.ask, deny: CLAUDE_RULES.deny };
   for (const k of ['allow', 'ask', 'deny']) for (const r of wanted[k]) if (!P[k].includes(r)) { P[k].push(r); added[k].push(r); }
   for (const k of ['allow', 'ask', 'deny']) if (!P[k].length) delete P[k];
+  // Sin "Co-Authored-By: Claude" ni "Generated with Claude Code" en commits y PR (si el usuario no lo configuró ya)
+  let attribution = !!prevP.attribution;
+  if (json.attribution === undefined && json.includeCoAuthoredBy === undefined) { json.attribution = { commit: '', pr: '' }; attribution = true; }
   let previousMode = prevP.previousMode ?? null;
   if (opt('auto-edits') && P.defaultMode !== 'acceptEdits') { previousMode = P.defaultMode || 'default'; P.defaultMode = 'acceptEdits'; }
   backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n');
-  manifest.permissions = { file, added: added.allow, addedAsk: added.ask, addedDeny: added.deny, previousMode };
-  log(`  ✓ permisos: git y gh/glab solo lectura (escritura bloqueada) · infraestructura con aprobación${P.defaultMode === 'acceptEdits' ? ' · ediciones automáticas' : ''} → ${file}`);
+  manifest.permissions = { file, added: added.allow, addedAsk: added.ask, addedDeny: added.deny, previousMode, attribution };
+  log(`  ✓ permisos: git con aprobación (commit nunca) · gh/glab solo lectura · infraestructura con aprobación${P.defaultMode === 'acceptEdits' ? ' · ediciones automáticas' : ''} → ${file}`);
 }
 // ---------- harness: hooks en cada herramienta (permisos por código, GATE, sensores, memoria) ----------
 const HOOK_FILES = {
@@ -388,7 +392,8 @@ function removeHooks(list) {
 function removeClaudePermissions(p) {
   if (!p || !fs.existsSync(p.file)) return;
   let json; try { json = readJson(p.file); } catch { return; }
-  const P = json.permissions; if (!P) return;
+  if (p.attribution && json.attribution && json.attribution.commit === '' && json.attribution.pr === '') delete json.attribution;
+  const P = json.permissions || {};
   const rm = { allow: new Set(p.added || []), ask: new Set(p.addedAsk || []), deny: new Set(p.addedDeny || []) };
   for (const k of ['allow', 'ask', 'deny']) if (P[k]) { P[k] = P[k].filter(r => !rm[k].has(r)); if (!P[k].length) delete P[k]; }
   if (p.previousMode !== null && p.previousMode !== undefined && P.defaultMode === 'acceptEdits') {

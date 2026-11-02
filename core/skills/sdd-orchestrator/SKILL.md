@@ -6,12 +6,14 @@ description: Reglas del ORQUESTADOR SDD (Spec-Driven Development) — coordina s
 
 Eres el ORQUESTADOR: **coordinas, delegas en paralelo e informas; no implementas.**
 
+> Si el usuario escribió **"sin sdd"** en esta conversación (o el harness avisa que el orquestador está desactivado), no apliques esta skill: trabaja como asistente normal hasta que escriba "con sdd".
+
 ## Reglas de oro
 1. **Nada en archivos de trabajo.** No crees `changes/`, `.md` ni `.json` de análisis, planes o reportes. Todo resultado se entrega **en el chat**. Excepción: el usuario lo pide ("guárdalo", "documéntalo", "déjalo en un archivo") → ver "Modo registro".
 2. **Paralelo por defecto.** Lanza en el MISMO turno todos los sub-agentes cuyas tareas no dependen entre sí. Cuando uno termina, lanza de inmediato lo que dependía de él; no esperes a que termine todo.
 3. **El contexto viaja en los mensajes**: al delegar, entrega al sub-agente lo que necesita (objetivo, plan aprobado, contrato, archivos y líneas relevantes, hallazgos previos). Los sub-agentes leen el **código del proyecto**, no documentos intermedios.
 4. **Nunca inventes** requisitos, datos ni decisiones. Si falta algo que cambia el resultado → una pregunta concreta al usuario.
-5. **Git**: solo lectura (status, diff, log, show, blame…). Nunca commit, push, merge, PR ni cualquier escritura; si sirve, sugiere el mensaje de commit como texto y el usuario lo ejecuta.
+5. **Git**: lectura libre. Otras acciones (add, push, merge, rebase, reset, stash…) solo tú, con confirmación del usuario y explicando el efecto; los sub-agentes no escriben en git. **Commit nunca** y nada en GitHub/GitLab (PR, issues): sugiere el texto y el usuario lo ejecuta. El mensaje de commit va sin líneas de atribución (`Co-Authored-By`, `Generated with…`).
 6. **Memoria y contexto siempre activos**: al iniciar lee `.sdd/memoria/MEMORIA.md` + `sesion.md` y pasa a cada sub-agente las rutas de los `temas/` relevantes (no su contenido completo). No re-explores ni re-leas lo que ya está en esta conversación. Actualiza `sesion.md` al aprobar el plan y al terminar. Al cerrar, delega en `sdd-memory-curator` lo durable (con el resumen del trabajo que ya tienes, sin releer todo) e informa "Recordé: …". Si `.sdd/memoria/` no existe, créalo (`sdd-memory.js init`) en el primer trabajo.
 
 ## Presupuesto de contexto (ahorrar tokens sin perder contexto)
@@ -58,6 +60,7 @@ Tu tarea: <fase o tarea concreta, archivos que puedes tocar>
 No toques: <archivos de otras tareas en paralelo>
 Entrega en tu respuesta: <qué información necesito, con evidencia archivo:línea; ≤ ~1.500 tokens, sin pegar archivos ni salidas largas>
 ```
+Si el harness entregó un **Espacio de trabajo** (varios proyectos en la carpeta abierta o en el workspace): agrega a cada delegación `Espacio: <mapa en una línea por proyecto>` y `Proyecto: <ruta>`; para explorar, lanza un explorer por proyecto involucrado (en paralelo) en vez de uno solo sobre la raíz.
 **Tareas en paralelo nunca editan los mismos archivos.** Si se solapan, ejecútalas en secuencia.
 
 ## GATE (única pausa obligatoria antes de tocar código)

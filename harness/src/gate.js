@@ -12,7 +12,10 @@ const startsWith = (list) => new RegExp(`^[\\s¡!"'«]*(?:${list})(?!${W})`, 'iu
 const APPROVAL = startsWith('s[ií]|ok(?:ay|ey|i)?|dale|apruebo|aprobad[oa]|adelante|procede[r]?|h[aá]zlo|hacelo|h[aá]gale|de acuerdo|perfecto|listo|vamos|correcto|conforme|claro|genial|excelente|me parece bien|est[aá] bien|metele|m[aá]ndale|de una|yes|yep|go|lgtm');
 const NEGATED = /^[\s¡!"'«]*[\p{L}]+\s+que\s+no(?![\p{L}])/iu; // "claro que no", "obvio que no"
 const CONDITIONAL_SI = /^[\s¡!"'«]*si\s+(?:puedes|pod[eé]s|podr[ií]as|quieres|quer[eé]s|hay|es|est[aá]n?|tienes|ten[eé]s|no|se|me|te|lo|la|los|las|el|ella|ellos|existe|falla|funciona|fuera|fuese|necesitas|ves)(?![\p{L}\p{N}_])/iu;
-const ESCAPE = words('directo|directamente|sin plan|sin sdd|sin gate|no (?:necesito|hace falta) (?:el |un )?plan');
+const ESCAPE = words('directo|directamente|sin plan|sin gate|no (?:necesito|hace falta) (?:el |un )?plan');
+// Apagar / volver a encender el orquestador para el resto de la conversación
+const SDD_OFF = words('sin sdd|sin (?:el )?orquestador|(?:desactiva|desactivar|apaga|apagar|deshabilita) (?:el )?(?:sdd|orquestador)|no uses (?:el )?(?:sdd|orquestador)');
+const SDD_ON = words('con sdd|(?:activa|activar|reactiva|reactivar|enciende|usa|usar|vuelve a usar) (?:el )?(?:sdd|orquestador)');
 const CHANGE = words(`agreg${W}*|añad${W}*|anad${W}*|incorpor${W}*|cre(?:a|ar|ame|alo|ala|ate|en|emos)|implement${W}*|desarroll${W}*|constru${W}*|codific${W}*|corrig${W}*|corrij${W}*|arregl${W}*|solucion${W}*|repar${W}*|refactori${W}*|reorganiz${W}*|reestructur${W}*|reescrib${W}*|migr[ae]${W}*|actualiz${W}*|modific${W}*|cambi[ae]${W}*|elimin${W}*|borr[ae]${W}*|quit[ae]${W}*|renombr${W}*|muev[ae]${W}*|integr[ae]${W}*|conect[ae]${W}*|configur[ae]${W}*|optimiz${W}*|ajust[ae]${W}*|add|create|implement${W}*|build|fix${W}*|refactor${W}*|migrate|update|upgrade|change|remove|delete|rename|rewrite|optimi[sz]e`);
 const FIX = words("no funciona|no anda|no carga|no compila|no levanta|no guarda|falla|fallan|fallando|error|errores|bug|bugs|se rompe|se cae|roto|rota|rompi[oó]|se ve mal|crash\\w*|excepci[oó]n|exception|stack ?trace|traceback|broken|not working|doesn'?t work");
 const TICKET = /(?<![A-Za-z0-9_])[A-Z][A-Z0-9]{1,9}-\d+(?![A-Za-z0-9_])/; // LAB-123: trabajar un ticket
@@ -88,6 +91,23 @@ function onPrompt(state, prompt, cfg) {
     state.aprobaciones.pendientes = [];
   }
 
+  // Orquestador apagado por el usuario para esta conversación: sin GATE ni flujos hasta que diga «con sdd».
+  const wasOff = state.sdd === 'off';
+  if (wasOff && SDD_ON.test(text)) {
+    state.sdd = 'on';
+    state.gate = { estado: 'inicial', desde: now };
+    notes.push('El usuario reactivó el orquestador SDD: vuelve a usar los flujos, y en pedidos de cambio presenta el plan y espera su aprobación.');
+    return notes;
+  }
+  if (wasOff || SDD_OFF.test(text)) {
+    state.sdd = 'off';
+    state.gate = { estado: 'libre', desde: now };
+    notes.push(wasOff
+      ? 'Orquestador SDD desactivado por el usuario: responde y edita directo, sin flujos [SDD], sub-agentes ni plan.'
+      : 'El usuario DESACTIVÓ el orquestador SDD para esta conversación: responde y edita directo, como un asistente normal. No anuncies flujos [SDD], no lances sub-agentes, no presentes plan ni preguntes «¿Apruebo la implementación?». Se reactiva si escribe «con sdd». Siguen vigentes: commit nunca, git con confirmación y secretos protegidos.');
+    return notes;
+  }
+
   if (cfg.gate === 'nunca') return notes;
   // Un "sí" a un comando no aprueba el plan, salvo que el agente haya mostrado la pregunta del GATE.
   const approvesPlan = approval && ((g.estado === 'pendiente' && (g.conPlan || !commandsPending)) || (g.estado === 'requerido' && !commandsPending && !state.conMensajes));
@@ -108,6 +128,7 @@ function onPrompt(state, prompt, cfg) {
 
 /** Al terminar el turno: si el agente quedó preguntando, el GATE pasa a "pendiente" (conPlan: mostró la pregunta del GATE). */
 function onStop(state, lastMessage) {
+  if (state.sdd === 'off') return;
   const e = state.gate.estado;
   const withPlan = GATE_QUESTION.test(String(lastMessage || ''));
   // Si el agente terminó su turno con las ediciones bloqueadas, está esperando al usuario (aunque no lo haya
@@ -119,7 +140,7 @@ function onStop(state, lastMessage) {
 }
 
 /** Tipo de mensaje, para el registro (sin guardar el texto). */
-const classify = text => ESCAPE.test(text) ? 'directo' : isApproval(text) ? 'aprobación' : isChangeRequest(text) ? 'pedido de cambio' : 'otro';
+const classify = text => SDD_OFF.test(text) ? 'sin sdd' : SDD_ON.test(text) ? 'con sdd' : ESCAPE.test(text) ? 'directo' : isApproval(text) ? 'aprobación' : isChangeRequest(text) ? 'pedido de cambio' : 'otro';
 
 /** Aprobación pura: "sí", "dale", "ok, adelante"… sin pedidos nuevos (para el respaldo desde la conversación). */
 const isPureApproval = text => { const t = String(text || '').trim(); return t.length <= 60 && isApproval(t) && !isChangeRequest(t); };
@@ -133,7 +154,7 @@ function approveFromTranscript(state, cfg) {
 
 /** Motivo de bloqueo para editar, o null si se puede. */
 function editBlockReason(state, cfg) {
-  if (cfg.gate === 'nunca') return null;
+  if (cfg.gate === 'nunca' || state.sdd === 'off') return null;
   const e = state.gate.estado;
   if (e === 'requerido' || e === 'pendiente' || (cfg.gate === 'siempre' && e === 'inicial')) {
     return 'GATE del harness: el plan de este cambio aún no está aprobado por el usuario. Presenta el plan (qué y por qué, archivos por capa, tests previstos, riesgos) y termina con «¿Apruebo la implementación? (sí / no / ajustes)». Si el cambio es trivial, pregunta si lo aplicas directo. Termina tu turno ahí: el siguiente "sí" (con o sin tilde) o "directo" del usuario desbloquea. No intentes editar por otra vía hasta la aprobación.'

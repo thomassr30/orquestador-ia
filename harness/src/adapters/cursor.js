@@ -10,10 +10,15 @@ const EDIT_TOOLS = /^(write|edit|multiedit|strreplace|str_replace|delete|create|
 function toolFor(native, input) {
   if (native === 'beforeShellExecution') return { kind: 'shell', name: 'Shell', command: String(input.command || ''), paths: [], contents: [] };
   if (native === 'beforeReadFile') return { kind: 'read', name: 'Read', paths: [input.file_path].filter(Boolean), contents: [] };
-  if (native === 'beforeMCPExecution') return { kind: 'mcp', name: String(input.tool_name || ''), server: String(input.server || input.server_name || input.url || input.command || ''), tool: String(input.tool_name || ''), paths: [], contents: [] };
+  if (native === 'beforeMCPExecution') {
+    let args = input.tool_input || {};
+    if (typeof args === 'string') { try { args = JSON.parse(args); } catch { args = {}; } }
+    return { kind: 'mcp', name: String(input.tool_name || ''), server: String(input.server || input.server_name || input.url || input.command || ''), tool: String(input.tool_name || ''), args, paths: [], contents: [] };
+  }
   if (native === 'afterFileEdit') return { kind: 'edit', name: 'Write', paths: [input.file_path].filter(Boolean), contents: [] };
   const name = String(input.tool_name || '');
   if (/^task$/i.test(name)) return normalizeTool('task', input.tool_input || {});
+  if (/^(web_?fetch|web_?search|fetch)$/i.test(name)) return normalizeTool(name, input.tool_input || {}); // contenido externo
   if (!EDIT_TOOLS.test(name)) return null; // Shell y Read ya tienen su hook específico
   const t = normalizeTool('write', input.tool_input || {});
   return t.paths.length ? t : null;

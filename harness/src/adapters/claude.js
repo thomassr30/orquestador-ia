@@ -27,6 +27,7 @@ function format(native, r, ev) {
   if (native === 'PreToolUse' && r.decision) {
     return { stdout: json({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: r.decision, permissionDecisionReason: r.reason } }) };
   }
+  if (native === 'PostToolUse' && r.feedback && r.soloContexto) return { stdout: json({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: r.feedback } }) };
   if (native === 'PostToolUse' && r.feedback) return { stdout: json({ decision: 'block', reason: r.feedback }) };
   if (native === 'Stop') {
     if (r.block) return { stdout: json({ decision: 'block', reason: r.block }) };

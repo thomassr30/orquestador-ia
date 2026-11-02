@@ -67,22 +67,26 @@ Tú:      si
 Agente:  implementa → el harness corre lint, tipos y tests de lo modificado
            ↳ si algo falla, no puede terminar hasta corregirlo o explicarlo
          Listo. Commit sugerido: "feat(clientes): exportar listado a Excel"
-           ↳ git commit y push están bloqueados: los ejecutas tú
+           ↳ sin "Co-Authored-By" ni firmas de IA; el commit lo haces tú
 ```
 
-Para algo trivial no hace falta plan: `cambia el título a "Clientes", directo`.
+Para algo trivial no hace falta plan: `cambia el título a "Clientes", directo`. Para trabajar sin el orquestador el resto de la conversación: `sin sdd`.
 
 ## Qué incluye
 
 | | |
 |---|---|
-| **Permisos por código** | Git solo lectura (sin commit, push, merge ni PR, tampoco por MCP), secretos protegidos y comandos destructivos bloqueados. Pide confirmación para infraestructura, bases de datos, borrados y dependencias. |
+| **Permisos por código** | **Commit nunca** (lo haces tú) y nada de PR ni issues en GitHub/GitLab, tampoco por MCP. El resto de git (push, merge, rebase, reset, stash…) con tu confirmación, para resolver problemas de git. Secretos protegidos y comandos destructivos bloqueados. Pide confirmación para infraestructura, bases de datos, borrados, dependencias y configurar servidores MCP. |
+| **Commits sin firma de IA** | Los mensajes de commit sugeridos van sin `Co-Authored-By: Claude`, `Generated with…` ni `Made-with: Cursor`: si aparecen, el harness pide reescribirlos. En Claude Code, además, se desactiva la atribución. |
 | **Plan antes de editar (GATE)** | En un pedido de cambio, las ediciones quedan bloqueadas hasta que respondas `sí`. |
 | **Sensores al terminar** | Lint, tipos y tests relacionados con lo que cambió: Node/TS, Angular y Go automáticos; plantillas para Android, iOS y SCSS. |
 | **Memoria por proyecto** | `.sdd/memoria/` se carga al iniciar y tras compactar. Nunca se mezcla entre proyectos. |
+| **Varios proyectos a la vez** | En una carpeta con varios proyectos o un workspace de VS Code: mapa de todos los proyectos para que la IA busque en todos, y memoria, reglas, sensores y deshacer de cada uno. |
 | **Ahorro de tokens** | Esfuerzo según el tamaño del pedido, tope de sub-agentes, salidas de tests compactadas y reportes cortos. |
 | **Especialistas** | 1 orquestador, 22 sub-agentes, 104 skills (backend, frontend, mobile, bases de datos, DevOps, testing, diseño) y 19 comandos. |
-| **Reglas propias** | Convierte un error que no debe repetirse en una regla que se revisa antes de escribir. |
+| **Deshacer lo que hizo la IA** | Antes de cada turno que modifica archivos se guarda un punto de restauración (fuera del repo, sin commits ni secretos). `deshacer` deja todo como estaba, en cualquier herramienta. |
+| **Arquitectura vigilada por código** | Reglas de capas (qué no puede importar qué), nombres de archivo, tamaño máximo y patrones prohibidos, cada una con el mensaje que le enseña a la IA cómo hacerlo bien. |
+| **Defensa contra instrucciones inyectadas** | Si la sesión leyó una web, un ticket o un MCP externo, cualquier comando que pueda enviar datos afuera pide tu confirmación. Las claves y tokens escritos en el código se bloquean. |
 | **Evaluaciones** | Mide con tareas reales si un cambio al orquestador mejora el éxito y el consumo. |
 
 ## Herramientas compatibles
@@ -123,7 +127,7 @@ El instalador detecta qué herramientas tienes y configura cada una. Antes de to
 node "$HOME/.sdd-orquestador/bin/sdd-harness.js" doctor
 ```
 
-Ejecuta cada hook con un `git push` de prueba y debe mostrar `✓ … prueba en vivo OK` por herramienta. Otra prueba rápida: abre tu IA en cualquier proyecto y pídele *"haz commit de los cambios"* o *"lee el archivo .env"*. Debe responder con un bloqueo `[harness]`.
+Ejecuta cada hook con un `git commit` de prueba y debe mostrar `✓ … prueba en vivo OK` por herramienta. Otra prueba rápida: abre tu IA en cualquier proyecto y pídele *"haz commit de los cambios"* o *"lee el archivo .env"*. Debe responder con un bloqueo `[harness]`.
 
 <details>
 <summary><b>Opciones del instalador</b></summary>
@@ -175,10 +179,12 @@ muéstrame cómo se ve /clientes en móvil          → [SDD] Flujo: browser
 ```
 
 - **Pedido de cambio → plan → tu "sí"**: el agente explora y te muestra el plan en el chat. Aprueba con `sí` (con o sin tilde), `dale`, `ok` o `apruebo`; también vale `sí, pero…`.
-- **"directo"** para cambios triviales: edita sin plan y pasa igual por los sensores.
+- **"directo"** para cambios triviales: edita sin plan y pasa igual por los sensores. Vale para ese mensaje.
+- **"sin sdd"** apaga el orquestador **para el resto de la conversación**: la IA trabaja como asistente normal, sin flujos, sub-agentes ni plan. **"con sdd"** lo vuelve a encender. Las reglas de git y secretos siguen activas.
 - **Al terminar**, el harness revisa lint, tipos y tests de lo modificado. Si algo falla, el agente corrige o te explica por qué no corresponde.
 - **Sin archivos de trabajo**: análisis, planes y reportes quedan en el chat. Si quieres un documento, pídelo.
-- **Git solo lectura**: `status`, `diff`, `log`, `show` y `blame` sí; commit, push, merge y PR no. Te sugiere el mensaje de commit y tú lo ejecutas.
+- **Git**: la lectura (`status`, `diff`, `log`, `show`, `blame`) es libre. Push, pull, merge, rebase, reset, stash, checkout y ramas los puede hacer **con tu confirmación**: antes te explica qué hará, y si algo descarta cambios o reescribe el remoto lo dice. **Commit nunca**: te sugiere el mensaje, sin firmas de IA, y tú lo ejecutas.
+- **MCP**: puede conectar o configurar servidores MCP (`codex mcp add`, `claude mcp add`, `.mcp.json`…) mostrándote antes el cambio; tú lo confirmas.
 
 <details>
 <summary><b>Comandos para forzar un flujo</b> (en Codex se escriben con <code>$</code> en vez de <code>/</code>)</summary>
@@ -214,11 +220,11 @@ Tu herramienta ejecuta los hooks en momentos fijos, y cada uno responde permitir
 |---|---|
 | Al iniciar y tras compactar | Carga la memoria **de este proyecto**: índice, sesión de trabajo y temas disponibles. |
 | Cada mensaje tuyo | Detecta pedidos de cambio, que abren el GATE, y tus aprobaciones (`sí`, `dale`, `directo`). Separa tu texto del contexto que agregan algunas herramientas (archivo abierto, navegador). |
-| Antes de cada comando | **Bloquea** escritura en git, GitHub o GitLab, comandos destructivos y lectura de secretos. **Pide confirmación** para infraestructura (kubectl, terraform, nube, Vault), clientes de base de datos, borrados, instalación de dependencias y `sudo`. Antes de aprobar el plan, solo deja correr lectura, tests y lint. |
+| Antes de cada comando | **Bloquea** `git commit` (también disfrazado: alias, `npm version`, `release-it`), escritura en GitHub o GitLab, comandos destructivos y lectura de secretos. **Pide confirmación** para el resto de git, infraestructura (kubectl, terraform, nube, Vault), clientes de base de datos, borrados, dependencias, `sudo` y configurar servidores MCP. Antes de aprobar el plan, el resto solo deja correr lectura, tests y lint. |
 | Antes de cada herramienta MCP | Escribir en GitHub o GitLab por MCP se bloquea; lo que escribe en otros servidores pide confirmación. Navegador y documentación quedan libres. |
-| Antes de cada edición | Sin plan aprobado no se edita código. Tampoco se tocan `.git`, secretos ni la configuración del harness o de los hooks. |
+| Antes de cada edición | Sin plan aprobado no se edita código. Tampoco se tocan `.git`, secretos ni la configuración del harness o de los hooks. Revisa tus reglas de arquitectura y bloquea claves o tokens reales en el código. La primera modificación del turno guarda antes un **punto de restauración**. |
 | Después de cada edición | Chequeo instantáneo: JSON y YAML válidos, marcadores de conflicto de merge, sintaxis de Go. |
-| Al terminar el turno | Corre lint, tipos y tests **solo de lo modificado**, por módulo (sirve en monorepos). Si fallan, el agente debe corregir; insiste hasta 2 veces y después solo avisa. Guarda el estado del trabajo en `.sdd/memoria/sesion.md`. |
+| Al terminar el turno | Si el mensaje de commit sugerido trae una firma de IA (`Co-Authored-By: Claude`…), pide reescribirlo. Corre lint, tipos y tests **solo de lo modificado**, por módulo (sirve en monorepos). Si fallan, el agente debe corregir; insiste hasta 2 veces y después solo avisa. Guarda el estado del trabajo en `.sdd/memoria/sesion.md`. |
 
 **Sensores detectados automáticamente:**
 
@@ -226,6 +232,32 @@ Tu herramienta ejecuta los hooks en momentos fijos, y cada uno responde permitir
 - **Angular**: `ng build --configuration development` (también revisa las plantillas) y Karma en modo headless.
 - **Go**: `go vet`, `go test` de los paquetes tocados y `golangci-lint` si está configurado.
 - **Android, iOS, SCSS y otros**: plantillas listas en `~/.sdd-orquestador/harness.json` → `sensores._ejemplos`.
+
+**Deshacer lo que hizo la IA.** Antes de la primera modificación de cada turno, el harness guarda una copia del proyecto en un almacén interno (`~/.sdd-orquestador/puntos`). El `.git` del proyecto no se toca ni se crean commits, y no se copian secretos ni lo ignorado por `.gitignore`.
+
+```bash
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" puntos                 # lista los puntos (el 1 es el más reciente)
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" deshacer               # muestra qué volvería atrás
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" deshacer --confirmar   # lo aplica (deshacer otra vez retrocede otro turno)
+```
+
+Antes de aplicar se guarda el estado actual, así que también se puede rehacer. En el chat puedes pedir *"deshaz lo último"*: la IA te muestra la vista previa y aplica solo con tu confirmación.
+
+**Carpetas con varios proyectos y workspaces.** Si abres una carpeta que contiene varios proyectos (repos separados, subcarpetas o un monorepo), o un workspace multi-raíz de VS Code (`*.code-workspace`), el harness detecta cada proyecto por sus archivos (`package.json`, `angular.json`, `go.mod`, `pom.xml`, `.csproj`, `pyproject.toml`, `.git`…) y:
+
+- al iniciar le entrega a la IA un **mapa del espacio** (nombre, ruta, stack y si tiene memoria, una línea por proyecto) con la instrucción de buscar en todos los proyectos involucrados, no solo en el primero;
+- carga la **memoria de cada proyecto** cuando lo mencionas o cuando la IA empieza a editar en él (una vez por sesión), y la de la raíz como memoria del espacio, sin mezclarlas;
+- aplica las **reglas** y los **sensores** de cada proyecto con su propio `.sdd/harness.json`;
+- guarda **puntos de restauración por repo**, incluidos los repos internos, y `deshacer` vuelve atrás todos los que se tocaron en el turno.
+
+```bash
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" workspace             # qué proyectos detectó
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" workspace --aplicar   # workspace multi-raíz: da acceso a las otras carpetas en Claude Code y Codex
+```
+
+En un workspace multi-raíz, Claude Code y Codex trabajan sobre la primera carpeta. `workspace --aplicar` agrega las demás (`additionalDirectories` en Claude Code, `writable_roots` en Codex). Copilot y Cursor ya trabajan con todas.
+
+**Contenido externo.** Una página, un ticket, un PDF o una respuesta de un MCP pueden traer instrucciones escondidas para la IA. Desde que la sesión lee algo externo, cualquier comando o URL que pueda enviar datos a otro servidor (`curl` con datos, `scp`, `ssh`, `nc`, parámetros largos en una URL) pide tu confirmación con el motivo. Tu propia app (`localhost`) no cuenta.
 
 **Garantías de diseño:**
 
@@ -284,24 +316,36 @@ Hay una configuración global en `~/.sdd-orquestador/harness.json` y otra por pr
 | `sensores.comandos` | Comandos propios por sensor; `{archivos}` se reemplaza por los archivos modificados. Vacío = detección automática. |
 | `permisos` | Prefijos de comando que se suman a las reglas fijas; `*` al final es comodín. |
 | `presupuesto.modo` | `ahorro` (tope 3 sub-agentes) · `normal` (tope 6) · `libre` (sin tope). `maxSubagentes` fija un tope propio. |
+| `deshacer` | `activo` (por defecto sí) · `maxPuntos` (30) · `excluir`: patrones extra que no se copian a los puntos. |
+| `seguridad` | `contenidoExterno` (confirmar envíos de datos tras leer algo externo) · `secretosEnCodigo` (bloquear claves en el código). Ambos activos por defecto. |
 
-**Reglas propias.** Cuando corriges un error que no debe repetirse, conviértelo en regla. El harness la revisa antes de cada escritura y le dice a la IA cómo hacerlo bien:
+**Reglas propias y arquitectura.** Cuando corriges un error que no debe repetirse, o quieres que se respete la arquitectura, conviértelo en regla. El harness la revisa al escribir y el `mensaje` le dice a la IA cómo hacerlo bien:
 
 ```json
 {
   "reglas": [
-    {
-      "nombre": "sin-innerhtml",
-      "archivos": "src/**/*.{ts,html}",
-      "prohibido": "innerHTML|outerHTML",
-      "mensaje": "La política Trusted Types lo bloquea: usa el componente de íconos del proyecto.",
-      "excepto": "**/*.spec.ts"
-    }
+    { "nombre": "dominio-sin-infraestructura", "archivos": "src/domain/**",
+      "noImportar": ["src/infrastructure/**", "axios", "typeorm"],
+      "mensaje": "El dominio no depende de infraestructura: define una interfaz en src/domain y su implementación en src/infrastructure." },
+    { "nombre": "componentes-sin-http", "archivos": "src/app/**/*.component.ts", "noImportar": ["@angular/common/http"],
+      "mensaje": "Los componentes no llaman HTTP directo: usa un servicio." },
+    { "nombre": "sin-innerhtml", "archivos": "src/**/*.{ts,html}", "prohibido": "innerHTML|outerHTML", "excepto": "**/*.spec.ts",
+      "mensaje": "La política Trusted Types lo bloquea: usa el componente de íconos del proyecto." },
+    { "nombre": "nombres-de-componentes", "archivos": "src/app/**/components/**/*.ts", "nombreArchivo": "\\.component(\\.spec)?\\.ts$",
+      "mensaje": "Los componentes se nombran <nombre>.component.ts." },
+    { "nombre": "archivos-cortos", "archivos": "src/**/*.ts", "maxLineas": 400, "mensaje": "Separa responsabilidades en archivos más chicos." }
   ]
 }
 ```
 
-`sdd-harness.js reglas` revisa todo el proyecto contra esas reglas.
+| Tipo | Qué revisa | Cuándo |
+|---|---|---|
+| `noImportar` | Módulos o rutas que esos archivos no pueden importar (JS/TS, Go, Python, Java/Kotlin, C#, SCSS) | Antes de escribir: bloquea |
+| `prohibido` | Una expresión regular que no puede aparecer en el contenido nuevo | Antes de escribir: bloquea |
+| `nombreArchivo` | El nombre que debe tener un archivo nuevo | Al crearlo: bloquea |
+| `maxLineas` | El tamaño máximo del archivo | Después de editar: avisa |
+
+`sdd-harness.js reglas` revisa todo el proyecto. Hay más ejemplos por stack (Angular, React, NestJS, Go) en `~/.sdd-orquestador/harness.json` → `_ejemplosReglas`.
 
 **Evaluaciones.** Para medir si un cambio al orquestador mejora o empeora, define 5 a 10 tareas típicas tuyas con un comando que verifique cada resultado (ver [`evals/ejemplo.tareas.json`](evals/ejemplo.tareas.json)) y ejecuta `node bin/sdd-eval.js evals/mis.tareas.json`. Trabaja sobre una copia temporal del proyecto y registra éxito, turnos, tokens y costo. Consume tokens de tu plan.
 
@@ -362,6 +406,8 @@ node "$HOME/.sdd-orquestador/bin/sdd-harness.js" doctor     # prueba en vivo de 
 node "$HOME/.sdd-orquestador/bin/sdd-harness.js" estado     # GATE, archivos modificados y sensores de este proyecto
 node "$HOME/.sdd-orquestador/bin/sdd-harness.js" registro   # últimas decisiones: qué se bloqueó y por qué
 node "$HOME/.sdd-orquestador/bin/sdd-harness.js" sensores   # corre ahora los sensores sobre lo modificado
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" puntos     # puntos de restauración · deshacer [--confirmar] para volver
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" workspace  # proyectos de la carpeta abierta o del workspace
 ```
 
 En el chat basta con `/sdd-status`.
@@ -373,7 +419,10 @@ En el chat basta con `/sdd-status`.
 | Codex no aplica nada | Aprueba los hooks con `/hooks` dentro de Codex y reinícialo. |
 | Copilot no aplica nada | Usa el modo agente con destino *Copilot* y VS Code actualizado. Con la extensión de Claude Code en VS Code aplica el harness de Claude Code. |
 | Un sensor no aplica a tu proyecto | Ajusta `sensores.comandos` o `sensores.alTerminar` en `.sdd/harness.json`. `doctor` muestra qué correría. |
-| Quieres apagar los controles | `node install.js --no-hooks` (conserva agentes y skills) o `"gate": "nunca"` en un proyecto. |
+| La IA no busca en todos los proyectos de la carpeta o del workspace | `sdd-harness.js workspace` muestra qué detectó. En un workspace multi-raíz, ejecuta `workspace --aplicar` y reinicia la herramienta. Si los repos están en carpetas sin relación, decláralos en `.sdd/workspace.json` (skill `multi-repo`). |
+| La IA rompió algo y quieres volver atrás | `sdd-harness.js deshacer` (vista previa) y luego `deshacer --confirmar`. En proyectos muy grandes, la primera vez ejecuta `sdd-harness.js puntos --iniciar`. |
+| Una confirmación por "contenido externo" no corresponde | Revisa que el comando sea el que pediste y apruébalo. Para desactivar la defensa: `"seguridad": { "contenidoExterno": false }`. |
+| Quieres trabajar sin el orquestador | En el chat: `sin sdd` (hasta `con sdd`). En un proyecto: `"gate": "nunca"` en `.sdd/harness.json`. En todo el equipo: `node install.js --no-hooks` (conserva agentes y skills, pero quita también las protecciones de git y secretos). |
 
 ## Preguntas frecuentes
 
@@ -384,7 +433,10 @@ No. Usa la herramienta y el plan que ya tienes. El harness son scripts locales.
 No por el harness: no usa red ni telemetría. Tu herramienta de IA sigue funcionando como siempre.
 
 **¿Puede hacer commits o abrir PR?**
-No. Git es solo lectura por diseño, también por MCP. El agente te sugiere el mensaje y tú lo ejecutas.
+No. Los commits los haces tú, y PR e issues tampoco los crea, ni por MCP. Sí puede ayudarte con el resto de git (push, merge, rebase, resolver conflictos, stash…), siempre con tu confirmación. El mensaje de commit que sugiere va sin firmas de IA.
+
+**¿Puedo usar la IA sin el orquestador?**
+Sí: escribe `sin sdd` y el resto de la conversación trabaja como asistente normal (git y secretos siguen protegidos). `con sdd` lo reactiva. Para un solo mensaje sin plan, usa `directo`.
 
 **¿Gasta más tokens que usar la IA sola?**
 En tareas chicas la diferencia es pequeña: no hay sub-agentes y los avisos del harness son breves. En tareas grandes el plan y la verificación cuestan tokens, pero evitan rehacer trabajo. El tope de sub-agentes y la compactación de salidas mantienen el consumo acotado.

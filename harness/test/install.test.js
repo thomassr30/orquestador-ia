@@ -25,11 +25,14 @@ test('instala el harness en las 6 herramientas', () => {
   assert.strictEqual(ours(claude.hooks.PreToolUse), 1);
   assert.ok(claude.hooks.PreToolUse.some(g => JSON.stringify(g).includes('hook-del-usuario')), 'respeta los hooks del usuario');
   for (const ev of ['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'Stop', 'PreCompact']) assert.strictEqual(ours(claude.hooks[ev]), 1, ev);
-  assert.ok(claude.permissions.deny.includes('Bash(git push:*)'));
+  assert.ok(claude.permissions.deny.includes('Bash(git commit:*)'));
+  assert.ok(claude.permissions.ask.includes('Bash(git push:*)'), 'push con confirmación');
+  assert.deepStrictEqual(claude.attribution, { commit: '', pr: '' }, 'sin líneas de atribución en commits y PR');
   assert.ok(claude.permissions.ask.includes('Bash(psql:*)'));
   const codex = read('.codex/hooks.json');
   assert.strictEqual(ours(codex.hooks.Stop), 1);
-  assert.match(fs.readFileSync(path.join(HOME, '.codex/rules/sdd-orquestador.rules'), 'utf8'), /prefix_rule\(pattern = \["git","push"\], decision = "forbidden"/);
+  assert.match(fs.readFileSync(path.join(HOME, '.codex/rules/sdd-orquestador.rules'), 'utf8'), /prefix_rule\(pattern = \["git","commit"\], decision = "forbidden"/);
+  assert.match(fs.readFileSync(path.join(HOME, '.codex/rules/sdd-orquestador.rules'), 'utf8'), /prefix_rule\(pattern = \["git","push"\], decision = "prompt"/, 'push: Codex pide la aprobación');
   const gem = read('.gemini/settings.json');
   assert.strictEqual(gem.theme, 'GitHub');
   assert.strictEqual(ours(gem.hooks.AfterAgent), 1);
@@ -46,7 +49,7 @@ test('instala el harness en las 6 herramientas', () => {
 test('el hook instalado funciona desde ~/.sdd-orquestador (sin el repositorio)', () => {
   const dir = project({ 'a.js': '' });
   const r = spawnSync(process.execPath, [path.join(HOME, '.sdd-orquestador/bin/sdd-hook.js'), 'claude', 'PreToolUse'],
-    { input: JSON.stringify({ session_id: 'i', cwd: dir, tool_name: 'Bash', tool_input: { command: 'git push' } }), encoding: 'utf8', env });
+    { input: JSON.stringify({ session_id: 'i', cwd: dir, tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }), encoding: 'utf8', env });
   assert.strictEqual(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, 'deny');
 });
 
@@ -72,6 +75,8 @@ test('desinstalar quita solo lo del orquestador y conserva la configuración del
   const claude = read('.claude/settings.json');
   assert.strictEqual(ours(claude.hooks.PreToolUse), 0);
   assert.ok(JSON.stringify(claude).includes('hook-del-usuario'));
+  assert.strictEqual(claude.attribution, undefined, 'se quita la configuración de atribución que puso el instalador');
+  assert.ok(!(claude.permissions && (claude.permissions.deny || []).includes('Bash(git commit:*)')));
   assert.ok(!read('.gemini/settings.json').hooks);
   assert.ok(!fs.existsSync(path.join(HOME, '.copilot/hooks/sdd-orquestador.json')));
   assert.ok(!fs.existsSync(path.join(HOME, '.config/opencode/plugins/sdd-harness.js')));

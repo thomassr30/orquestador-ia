@@ -58,17 +58,32 @@ function workspaceBlock(root) {
   }
 }
 
-/** Contexto de memoria del proyecto (o '' si no hay memoria). */
-function contextBlock(root, { source } = {}) {
+/** Índice de la memoria de un proyecto del espacio (para cargarla cuando se trabaja en él). */
+function projectMemoryBlock(dir, name) {
+  const idx = readCapped(path.join(dir, '.sdd', 'memoria', 'MEMORIA.md'), 40);
+  if (!idx) return '';
+  return `### Memoria del proyecto ${name || path.basename(dir)} (\`${fwd(dir)}\`)\nSolo aplica a ese proyecto. Más detalle: ${fwd(path.join(dir, '.sdd', 'memoria'))}/sesion.md y temas/.\n${idx}`.slice(0, 3000);
+}
+
+/**
+ * Contexto al iniciar o tras compactar: memoria de la raíz, mapa del espacio de trabajo (si hay varios proyectos),
+ * memoria del espacio y, tras compactar, la de los proyectos en que ya se estaba trabajando.
+ * @param {{source?: string, mapa?: string, espacio?: string|null, proyectos?: {ruta:string, nombre:string}[]}} [o]
+ */
+function contextBlock(root, { source, mapa = '', espacio = null, proyectos = [] } = {}) {
   const own = memoryBlock(root, `Memoria del proyecto ${path.basename(root)}`);
-  const ws = workspaceBlock(root);
-  if (!own && !ws) return '';
+  const ws = [workspaceBlock(root), espacio ? memoryBlock(espacio, `Memoria del espacio de trabajo (${path.basename(espacio)}): lo transversal a sus proyectos`) : ''].filter(Boolean).join('\n\n');
+  const extra = proyectos.map(p => projectMemoryBlock(p.ruta, p.nombre)).filter(Boolean).join('\n\n').slice(0, 4000);
+  if (!own && !ws && !mapa && !extra) return '';
   const header = [
     `## Contexto SDD del proyecto: ${fwd(root)}`,
     source === 'compact' ? 'La conversación se acaba de compactar: retoma el trabajo desde aquí (objetivo, plan aprobado, estado y próximos pasos de la sesión).' : 'Memoria cargada automáticamente al iniciar.',
-    'Esta memoria pertenece SOLO a este proyecto. No la apliques a otros proyectos ni mezcles información entre proyectos. Si el código la contradice, manda el código y corrige la memoria.',
+    mapa
+      ? 'Cada memoria pertenece SOLO a su proyecto (o al espacio, si es la de la raíz): no la apliques a otros proyectos ni mezcles información entre ellos. Si el código la contradice, manda el código y corrige la memoria.'
+      : 'Esta memoria pertenece SOLO a este proyecto. No la apliques a otros proyectos ni mezcles información entre proyectos. Si el código la contradice, manda el código y corrige la memoria.',
   ].join('\n');
-  let out = [header, own, ws].filter(Boolean).join('\n\n');
+  // El mapa va primero (es lo que evita "perder la onda" en carpetas con varios proyectos); la memoria se recorta antes que el mapa
+  let out = [header, mapa, own, ws, extra].filter(Boolean).join('\n\n');
   if (out.length > MAX_CHARS) out = `${out.slice(0, MAX_CHARS)}\n[… memoria recortada; leer .sdd/memoria/MEMORIA.md y sesion.md si se necesita más]`;
   return out;
 }
@@ -114,4 +129,4 @@ function hasAutoBlock(root) {
   try { return fs.readFileSync(path.join(root, '.sdd', 'memoria', 'sesion.md'), 'utf8').includes(AUTO_START); } catch { return false; }
 }
 
-module.exports = { contextBlock, checkpoint, hasAutoBlock, AUTO_START, AUTO_END };
+module.exports = { contextBlock, projectMemoryBlock, checkpoint, hasAutoBlock, AUTO_START, AUTO_END };

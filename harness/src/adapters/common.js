@@ -81,8 +81,8 @@ function normalizeTool(name, rawInput, opts = {}) {
     return { kind: 'read', name: n, paths: ps.filter(p => p && !/[*?]/.test(p)), contents: [] };
   }
   const mcp = parseMcpName(n, opts);
-  if (mcp) return { kind: 'mcp', name: n, server: mcp.server, tool: mcp.tool, paths: [], contents: [] };
-  return { kind: 'other', name: n, paths: [], contents: [] };
+  if (mcp) return { kind: 'mcp', name: n, server: mcp.server, tool: mcp.tool, args: i, paths: [], contents: [] };
+  return { kind: 'other', name: n, args: i, paths: [], contents: [] };
 }
 
 const json = obj => `${JSON.stringify(obj)}\n`;

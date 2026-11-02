@@ -135,13 +135,31 @@ function classifySegment(seg, extra) {
     try { inner = Buffer.from(String(n.tokens[2] || ''), 'base64').toString('utf8'); } catch { /* inválido */ }
     return inner.trim() ? classifyCommand(inner, extra) : { decision: 'deny', reason: 'comando envuelto inválido' };
   }
+  if (/sdd-harness\.js$/i.test(String(n.tokens[1] || '')) && /^deshacer$/i.test(String(n.tokens[2] || '')) && n.tokens.some(t => /^--confirmar$/i.test(t))) {
+    return { decision: 'ask', critical: true, reason: 'vuelve los archivos del proyecto a un punto de restauración (decisión del usuario). Muéstrale antes la vista previa' };
+  }
+  if (/sdd-harness\.js$/i.test(String(n.tokens[1] || '')) && /^workspace$/i.test(String(n.tokens[2] || '')) && n.tokens.some(t => /^--aplicar$/i.test(t))) {
+    return { decision: 'ask', critical: true, reason: 'cambia la configuración de la herramienta de IA (carpetas con acceso): decisión del usuario' };
+  }
   if (approvesGate(n.tokens)) return { decision: 'deny', reason: 'solo el usuario aprueba el plan (en el chat o desde su terminal); el agente no puede hacerlo' };
   const isGit = norm.startsWith('git ');
   const gitSub = isGit ? norm.slice(4) : '';
-  if (isGit && matchesAny(gitSub, R.GIT_WRITE)) {
-    return { decision: 'deny', reason: 'git solo lectura: la escritura en git está bloqueada (commit, push, merge, checkout, etc.). Sugiere el comando al usuario como texto para que lo ejecute él.' };
+  if (isGit && matchesAny(gitSub, R.GIT_NEVER)) {
+    return { decision: 'deny', reason: 'los commits los hace el usuario, nunca el agente (aunque lo pida). Sugiere el mensaje de commit como texto, sin líneas de atribución (Co-Authored-By, "Generated with…").' };
   }
-  if (norm === 'git stash') return { decision: 'deny', reason: 'git solo lectura: "git stash" modifica el repositorio.' };
+  if ((isGit && /alias\./i.test(seg) && /commit/i.test(seg)) || matchesAny(norm, R.COMMIT_TOOLS)) {
+    return { decision: 'deny', reason: 'crea commits (alias de git o herramienta de versionado): los commits los hace el usuario, nunca el agente.' };
+  }
+  if (isGit && (matchesAny(gitSub, R.GIT_WRITE) || gitSub === 'stash')) {
+    const raw = ['git', ...n.tokens.slice(1)].join(' ');
+    const destructive = R.GIT_DESTRUCTIVE.some(re => re.test(raw));
+    // gitRule: la herramienta tiene su propia aprobación nativa para este prefijo (reglas de Codex, permisos de OpenCode)
+    return { decision: 'ask', critical: true, git: true, gitRule: !destructive && matchesAny(gitSub, R.GIT_WRITE), reason: destructive
+      ? 'git: esta acción descarta cambios o reescribe el remoto y no se puede deshacer fácilmente. Explica al usuario qué se pierde antes de confirmar (decisión crítica)'
+      : 'git: modifica el repositorio (decisión crítica). Explica al usuario qué hará el comando' };
+  }
+  if (R.MCP_READ.test(norm)) return { decision: 'allow' };
+  if (R.MCP_MANAGE.test(norm)) return { decision: 'ask', critical: true, reason: 'configura un servidor MCP (agregar, quitar o autenticar): decisión del usuario' };
   if (matchesAny(norm, R.FORGE_WRITE)) return { decision: 'deny', reason: 'escritura en GitHub/GitLab bloqueada (PR, issues, comentarios, releases). Sugiérelo al usuario como texto.' };
   if (/^(sudo|runas|doas|su)\b/.test(norm)) return { decision: 'ask', critical: true, reason: 'requiere privilegios elevados' };
   if (matchesAny(norm, R.INFRA_ASK)) return { decision: 'ask', critical: true, reason: 'comando contra infraestructura, bases de datos o entornos reales (decisión crítica)' };
@@ -152,6 +170,7 @@ function classifySegment(seg, extra) {
   const redirect = seg.replace(/"[^"]*"|'[^']*'/g, '').replace(/\d?>&\d|\d?>>?\s*(\/dev\/null|nul|\$null)\b/gi, '');
   if (/>/.test(redirect)) return { decision: 'ask', reason: 'redirige la salida a un archivo (escritura)' };
   if (isGit && (matchesAny(gitSub, R.GIT_READ) || gitSub === 'branch' || gitSub === 'remote' || gitSub === '--version' || gitSub === 'version')) return { decision: 'allow' };
+  if (isGit) return { decision: 'ask', critical: true, git: true, reason: 'git: subcomando que no es de lectura (decisión crítica). Explica al usuario qué hará el comando' };
   if (matchesAny(norm, R.FORGE_READ) || matchesAny(norm, R.SAFE_COMMANDS) || matchesAny(norm, extra.allow) || readOnlyVariant(norm, n.tokens) || ownScript(n.tokens)) return { decision: 'allow' };
   return { decision: extra.fallback, reason: 'comando no reconocido como seguro' };
 }
@@ -187,14 +206,21 @@ const AGENT_CONFIG_FILES = ['.claude/settings.json', '.claude/settings.local.jso
   '.gemini/settings.json', '.cursor/hooks.json', '.config/opencode/opencode.json'];
 const AGENT_CONFIG_DIRS = ['.codex/rules', '.copilot/hooks', '.copilot/session-state', '.codex/sessions', '.codex/archived_sessions', '.claude/projects', '.github/hooks', '.config/opencode/plugins', '.config/opencode/plugin', '.opencode/plugins', '.opencode/plugin'];
 
+// Configuración de servidores MCP: el agente puede conectarlos, pero siempre con confirmación del usuario.
+const MCP_CONFIG_FILES = ['.claude.json', '.mcp.json', '.cursor/mcp.json', '.vscode/mcp.json', '.copilot/mcp-config.json', '.gemini/settings.json',
+  '.codex/config.toml', '.config/opencode/opencode.json', 'opencode.json', '.config/Code/User/mcp.json', 'AppData/Roaming/Code/User/mcp.json',
+  'Library/Application Support/Code/User/mcp.json'];
+
 class Policy {
   /**
    * @param {object} o
    * @param {string} o.root raíz del proyecto
    * @param {object} [o.config] sección "permisos" de la configuración del harness
    */
-  constructor({ root, config = {} }) {
+  constructor({ root, config = {}, folders = [] }) {
     this.root = path.resolve(root);
+    // Carpetas del espacio de trabajo (workspace multi-raíz o declarado): cuentan como "dentro"
+    this.folders = [this.root, ...folders.map(f => path.resolve(f)).filter(f => !isInside(this.root, f))];
     this.extra = {
       allow: config.permitir || [],
       ask: config.preguntar || [],
@@ -206,6 +232,7 @@ class Policy {
     this.protectedFiles = [...AGENT_CONFIG_FILES.map(inHome), ...AGENT_CONFIG_FILES.map(f => path.join(this.root, f)), path.join(this.root, '.sdd', 'harness.json')];
     this.protectedDirs = [SDD_HOME, ...AGENT_CONFIG_DIRS.map(inHome), ...AGENT_CONFIG_DIRS.map(d => path.join(this.root, d))];
     this.stateDir = path.join(SDD_HOME, 'estado');
+    this.mcpFiles = [...MCP_CONFIG_FILES.map(inHome), ...MCP_CONFIG_FILES.map(f => path.join(this.root, f))];
   }
 
   isSecret(abs) {
@@ -230,14 +257,19 @@ class Policy {
   checkPath(p, mode) {
     const abs = path.resolve(this.root, String(p || '.'));
     const rel = relPosix(this.root, abs);
-    const inside = isInside(this.root, abs);
+    const inside = this.folders.some(f => isInside(f, abs));
     if (this.isSecret(abs)) return { decision: 'deny', abs, rel, inside, reason: `archivo con secretos (${path.basename(abs)}): no se lee ni se escribe` };
     if (mode === 'read') return { decision: inside ? 'allow' : 'ask', abs, rel, inside, reason: inside ? undefined : 'lectura fuera del proyecto' };
     if (isInside(this.stateDir, abs)) return { decision: 'deny', abs, rel, inside, reason: 'el estado del harness solo lo modifica el propio harness' };
+    if (this.mcpFiles.some(f => isInside(f, abs)) && !this.protectedDirs.some(d => isInside(d, abs))) {
+      return { decision: 'ask', critical: true, abs, rel, inside, reason: 'configura servidores MCP o la herramienta de IA (decisión del usuario). Muéstrale el cambio exacto' };
+    }
     if (this.protectedFiles.some(f => isInside(f, abs)) || this.protectedDirs.some(d => isInside(d, abs))) {
       return { decision: 'ask', critical: true, abs, rel, inside, reason: 'modifica la configuración del harness o de los hooks del agente (el agente no cambia sus propias protecciones sin permiso del usuario)' };
     }
-    if (inside && (rel === '.git' || rel.startsWith('.git/'))) return { decision: 'deny', abs, rel, inside, reason: 'no se escribe dentro de .git (git es solo lectura)' };
+    if (inside && /(^|\/)\.git(\/|$)/.test(rel)) return { decision: 'deny', abs, rel, inside, reason: 'no se edita .git a mano: usa comandos git (piden confirmación)' };
+    // La configuración del harness de CUALQUIER proyecto del espacio (no solo la de la raíz)
+    if (inside && /(^|\/)\.sdd\/harness\.json$/.test(rel)) return { decision: 'ask', critical: true, abs, rel, inside, reason: 'modifica la configuración del harness de un proyecto (el agente no cambia sus propias protecciones sin permiso del usuario)' };
     if (!inside) return { decision: 'ask', abs, rel, inside, reason: 'escritura fuera del proyecto' };
     return { decision: 'allow', abs, rel, inside };
   }

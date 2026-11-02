@@ -9,10 +9,34 @@ const { Policy, splitSegments } = require('../src/policy');
 const p = new Policy({ root: '/tmp/proyecto' });
 const d = c => p.checkCommand(c).decision;
 
-test('git: lectura permitida, escritura bloqueada aunque venga disfrazada', () => {
+test('git: lectura libre, commit nunca (aunque venga disfrazado), el resto con confirmación', () => {
   for (const c of ['git status', 'git log --oneline | head -5', 'git -C "mi dir" diff', 'git --no-pager log', 'git branch', 'git stash list', '"C:\\Program Files\\Git\\bin\\git.exe" status']) assert.strictEqual(d(c), 'allow', c);
-  for (const c of ['git commit -m x', 'git -C x push', 'cd x && git push', 'git checkout -b y', 'git stash', 'git branch -D main', 'cmd /c "git push"',
-    'powershell -NoProfile -Command "git reset --hard"', 'bash -lc "git add ."', 'echo $(git commit -m x)', 'git -c core.pager=cat commit']) assert.strictEqual(d(c), 'deny', c);
+  for (const c of ['git commit -m x', 'git commit --amend --no-edit', 'cmd /c "git commit -m x"', 'bash -lc "git commit -am x"', 'echo $(git commit -m x)',
+    'git -c core.pager=cat commit', 'git commit-tree abc', 'git config alias.ci commit', 'git -c alias.c=commit c -m x', 'npm version patch', 'npx release-it']) assert.strictEqual(d(c), 'deny', c);
+  for (const c of ['git -C x push', 'cd x && git push', 'git checkout -b y', 'git stash', 'git branch -D main', 'cmd /c "git push"', 'powershell -NoProfile -Command "git reset --hard"',
+    'bash -lc "git add ."', 'git merge main', 'git rebase --continue', 'git pull', 'git fetch', 'git ci -m x']) {
+    const r = p.checkCommand(c);
+    assert.strictEqual(r.decision, 'ask', c);
+    assert.strictEqual(r.critical, true, c);
+  }
+  assert.match(p.checkCommand('git push --force origin main').reason, /no se puede deshacer/);
+  assert.match(p.checkCommand('git reset --hard HEAD~1').reason, /no se puede deshacer/);
+  assert.strictEqual(p.checkCommand('git push origin main').gitRule, true, 'push normal: la herramienta puede pedir la aprobación nativa');
+  assert.ok(!p.checkCommand('git push --force').gitRule, 'push forzado: siempre con la explicación del harness');
+});
+
+test('MCP: listar libre; agregar, quitar o autenticar servidores y editar su configuración pide confirmación', () => {
+  for (const c of ['claude mcp list', 'codex mcp list', 'gemini mcp list']) assert.strictEqual(d(c), 'allow', c);
+  for (const c of ['codex mcp add db -- npx -y @x/mcp', 'claude mcp add --transport http jira https://x', 'codex mcp login jira', 'code --add-mcp "{}"']) {
+    const r = p.checkCommand(c);
+    assert.strictEqual(r.decision, 'ask', c);
+    assert.strictEqual(r.critical, true, c);
+  }
+  for (const f of ['.mcp.json', '.vscode/mcp.json', '.cursor/mcp.json']) {
+    const r = p.checkPath(f, 'write');
+    assert.strictEqual(r.decision, 'ask', f);
+    assert.ok(r.critical && /MCP/.test(r.reason), f);
+  }
 });
 
 test('GitHub/GitLab: consulta sí, escritura no', () => {

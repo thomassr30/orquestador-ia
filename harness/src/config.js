@@ -18,7 +18,9 @@ const DEFAULTS = {
   permisos: { permitir: [], preguntar: [], denegar: [], mcpLibres: [], mcpBloquear: [] },
   salida: { compactar: true, maxCaracteres: 4000 }, // salidas largas de tests/lint/build → errores + resumen
   presupuesto: { modo: 'ahorro', maxSubagentes: 3 }, // ahorro | normal | libre · tope de sub-agentes por mensaje del usuario
-  reglas: [], // reglas propias: [{ nombre, archivos, prohibido (regex), mensaje, excepto }]
+  reglas: [], // reglas propias: [{ nombre, archivos, prohibido (regex) | noImportar | nombreArchivo | maxLineas, mensaje, excepto }]
+  deshacer: { activo: true, maxPuntos: 30, excluir: [] }, // puntos de restauración antes de cada turno que modifica archivos
+  seguridad: { contenidoExterno: true, secretosEnCodigo: true }, // envío de datos tras leer contenido externo · secretos en ediciones
 };
 
 function readJson(file) {
@@ -36,16 +38,35 @@ function merge(base, over) {
   return out;
 }
 
-function loadConfig(root) {
-  const global = readJson(GLOBAL_CONFIG);
-  const project = root ? readJson(path.join(root, '.sdd', 'harness.json')) : null;
-  let cfg = merge(merge(DEFAULTS, global), project);
-  const lists = k => [...((global && global.permisos && global.permisos[k]) || []), ...((project && project.permisos && project.permisos[k]) || [])];
+const projectFile = dir => (dir ? readJson(path.join(dir, '.sdd', 'harness.json')) : null);
+const same = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+
+/**
+ * Configuración efectiva. Con `projectDir` (un proyecto dentro de la carpeta abierta), su .sdd/harness.json manda
+ * sobre el de la raíz: global ← raíz ← proyecto. Las listas de permisos y las reglas se suman.
+ */
+function loadConfig(root, projectDir) {
+  const layers = [readJson(GLOBAL_CONFIG), projectFile(root)];
+  if (projectDir && root && !same(projectDir, root)) layers.push(projectFile(projectDir));
+  const cfg = layers.reduce((acc, l) => merge(acc, l), DEFAULTS);
+  const lists = k => layers.flatMap(l => (l && l.permisos && l.permisos[k]) || []);
   cfg.permisos = { ...cfg.permisos, permitir: lists('permitir'), preguntar: lists('preguntar'), denegar: lists('denegar'), mcpLibres: lists('mcpLibres'), mcpBloquear: lists('mcpBloquear') };
-  cfg.reglas = [...((global && global.reglas) || []), ...((project && project.reglas) || [])];
+  cfg.reglas = layers.flatMap(l => (l && l.reglas) || []);
   if (!['auto', 'siempre', 'nunca'].includes(cfg.gate)) cfg.gate = 'auto';
   if (!Array.isArray(cfg.sensores.alTerminar)) cfg.sensores.alTerminar = [];
   return cfg;
 }
 
-module.exports = { loadConfig, DEFAULTS };
+/**
+ * Reglas propias con la carpeta contra la que se evalúan sus rutas ("archivos", "noImportar"):
+ *   globales → el proyecto del archivo · las de la raíz → la raíz · las de un proyecto con su propio harness.json → ese proyecto.
+ * @returns {{base: string, reglas: object[]}[]}
+ */
+function rulesFor(root, { project, owner } = {}) {
+  const g = readJson(GLOBAL_CONFIG);
+  const out = [{ base: project || root, reglas: (g && g.reglas) || [] }, { base: root, reglas: (projectFile(root) || {}).reglas || [] }];
+  if (owner && !same(owner, root)) out.push({ base: owner, reglas: (projectFile(owner) || {}).reglas || [] });
+  return out.filter(x => Array.isArray(x.reglas) && x.reglas.length);
+}
+
+module.exports = { loadConfig, rulesFor, DEFAULTS };

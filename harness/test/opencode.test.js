@@ -25,7 +25,7 @@ test('plugin de OpenCode: bloquea, da feedback y continúa la sesión si los sen
 
   await h['chat.message']({ sessionID: sid }, { parts: [{ type: 'text', text: 'agrega un botón' }] });
   await assert.rejects(h['tool.execute.before']({ tool: 'edit', sessionID: sid, callID: '1' }, { args: { filePath: path.join(dir, 'src/a.js'), oldString: '', newString: 'x' } }), /GATE/);
-  await assert.rejects(h['tool.execute.before']({ tool: 'bash', sessionID: sid, callID: '2' }, { args: { command: 'git push' } }), /solo lectura/);
+  await assert.rejects(h['tool.execute.before']({ tool: 'bash', sessionID: sid, callID: '2' }, { args: { command: 'git commit -m x' } }), /commits los hace el usuario/);
 
   await h['chat.message']({ sessionID: sid }, { parts: [{ type: 'text', text: 'sí' }] });
   fs.writeFileSync(path.join(dir, 'src/conf.json'), '{"a":1,}');

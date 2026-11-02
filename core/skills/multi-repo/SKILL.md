@@ -5,7 +5,8 @@ description: Cambios que abarcan varios repositorios (backend, frontend, mobile,
 # Multi-repositorio
 
 ## Workspace
-Archivo `.sdd/workspace.json` en una carpeta raíz común (o en el repo principal):
+El harness detecta solo el espacio de trabajo: los proyectos dentro de la carpeta abierta (repos o subcarpetas con `package.json`, `go.mod`, `pom.xml`, `.csproj`, etc.) y las carpetas de un `*.code-workspace` de VS Code. Entrega el mapa al iniciar, carga la memoria de cada proyecto al trabajar en él y aplica reglas, sensores y puntos de restauración por proyecto. `node "{{SDD_HOME}}/bin/sdd-harness.js" workspace` muestra lo detectado y, con `--aplicar`, da acceso a las carpetas extra en Claude Code y Codex.
+Si los repos no están bajo una carpeta común ni en un `.code-workspace`, decláralos en `.sdd/workspace.json` en una carpeta raíz común (o en el repo principal):
 ```json
 {
   "nombre": "laboratorio",

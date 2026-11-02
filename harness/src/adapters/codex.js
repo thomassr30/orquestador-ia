@@ -9,7 +9,7 @@ function parse(native, input) {
   const event = EVENTS[native];
   if (!event) return null;
   return {
-    host: 'codex', event, nativeAsk: false, canRewrite: true, toolInput: input.tool_input,
+    host: 'codex', event, nativeAsk: false, nativeGitAsk: true, canRewrite: true, toolInput: input.tool_input,
     root: resolveRoot(input.cwd),
     sessionId: input.session_id,
     source: input.source,

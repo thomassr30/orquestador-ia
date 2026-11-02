@@ -19,7 +19,7 @@ try {
 export const SddHarness = async ({ client, directory, worktree }) => {
   if (!core) return {};
   const root = util.findProjectRoot(worktree || directory || process.cwd());
-  const ev = (event, extra) => ({ host: 'opencode', event, nativeAsk: false, canRewrite: true, root, ...extra });
+  const ev = (event, extra) => ({ host: 'opencode', event, nativeAsk: false, nativeGitAsk: true, canRewrite: true, root, ...extra });
   const argsByCall = new Map();
   const textOf = parts => (parts || []).filter(p => p && p.type === 'text' && !p.synthetic).map(p => p.text || '').join('\n');
 
