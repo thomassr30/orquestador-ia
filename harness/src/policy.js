@@ -185,7 +185,7 @@ function classifyCommand(cmd, extra) {
 // Configuración que protege al propio agente: cambiarla es decisión del usuario.
 const AGENT_CONFIG_FILES = ['.claude/settings.json', '.claude/settings.local.json', '.codex/hooks.json', '.codex/config.toml',
   '.gemini/settings.json', '.cursor/hooks.json', '.config/opencode/opencode.json'];
-const AGENT_CONFIG_DIRS = ['.codex/rules', '.copilot/hooks', '.github/hooks', '.config/opencode/plugins', '.config/opencode/plugin', '.opencode/plugins', '.opencode/plugin'];
+const AGENT_CONFIG_DIRS = ['.codex/rules', '.copilot/hooks', '.copilot/session-state', '.codex/sessions', '.codex/archived_sessions', '.claude/projects', '.github/hooks', '.config/opencode/plugins', '.config/opencode/plugin', '.opencode/plugins', '.opencode/plugin'];
 
 class Policy {
   /**

@@ -29,6 +29,7 @@ function parse(native, input) {
     root: resolveRoot(Array.isArray(input.workspace_roots) ? input.workspace_roots[0] : null, input.cwd),
     sessionId: first(input.conversation_id, input.session_id),
     prompt: input.prompt,
+    transcriptPath: input.transcript_path,
     tool,
     lastMessage: first(input.text, input.response, input.message, ''),
     aborted: input.status === 'aborted' || input.status === 'error',

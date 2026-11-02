@@ -15,6 +15,7 @@ const { isCompactable } = require('./output');
 const { sessionUsage } = require('./usage');
 const budget = require('./budget');
 const { violation } = require('./project-rules');
+const { gateReply } = require('./transcript');
 const { SDD_HOME, fwd } = require('./paths');
 const { isInside, relPosix, shortHash } = require('./util');
 
@@ -45,14 +46,29 @@ function onSession(ev) {
   return { context: parts.filter(Boolean).join('\n\n') || null };
 }
 
+/**
+ * Respaldo del GATE: ¿la conversación guardada por la herramienta muestra la pregunta del GATE seguida solo de
+ * aprobaciones del usuario? Cubre hooks de mensaje que no llegan o llegan con otro formato.
+ */
+function transcriptApproves(ev, current) {
+  if (!ev.transcriptPath) return false;
+  const tr = gateReply(ev.transcriptPath);
+  const replies = current ? [...tr.replies, current] : tr.replies;
+  return tr.asked && replies.length > 0 && replies.every(gate.isPureApproval);
+}
+
 function onPrompt(ev) {
   // Los mensajes que genera el propio harness (p. ej. "corrige los sensores") no son del usuario.
-  if (/^\s*\[harness\]/.test(String(ev.prompt || ''))) return null;
+  const said = gate.userText(ev.prompt);
+  if (/^\[harness\]/.test(said)) return null;
   const cfg = loadConfig(ev.root);
   let notes = [];
   let compacted = false;
+  let estado = '';
+  const backup = gate.isPureApproval(said) && transcriptApproves(ev, said);
   S.updateState(ev.root, ev.sessionId, s => {
     notes = gate.onPrompt(s, ev.prompt, cfg);
+    if (backup && gate.approveFromTranscript(s, cfg)) notes.push('Plan aprobado por el usuario: puedes implementar. Los sensores revisarán el código al terminar.');
     budget.onPrompt(s);
     if (s.subagentes.libre) notes.push('El usuario aprobó usar más sub-agentes en este pedido.');
     else if (s.gate.estado === 'requerido' && budget.modeNote(cfg)) notes.push(budget.modeNote(cfg));
@@ -60,7 +76,10 @@ function onPrompt(ev) {
     s.compactado = false;
     s.bloqueos = 0;
     s.herramienta = ev.host;
+    estado = s.gate.estado;
   });
+  // Registro de cómo se entendió cada mensaje (para diagnosticar con `sdd-harness registro`)
+  S.log(ev.root, { herramienta: ev.host, evento: 'mensaje', decision: estado, detalle: `«${said.replace(/\s+/g, ' ').slice(0, 60)}»` });
   const parts = [];
   if (compacted && ev.reinjectOnPrompt) parts.push(memory.contextBlock(ev.root, { source: 'compact' }));
   parts.push(...notes.map(tag));
@@ -72,15 +91,23 @@ function onPre(ev) {
   const t = ev.tool || {};
   const cfg = loadConfig(ev.root);
   const policy = new Policy({ root: ev.root, config: cfg.permisos });
-  const st = S.readState(ev.root, ev.sessionId);
+  let st = S.readState(ev.root, ev.sessionId);
   let out = null;
+  // Bloqueo del GATE, con respaldo: si la herramienta no avisó el "sí" pero quedó en la conversación, se aprueba.
+  const gateBlock = () => {
+    const g = gate.editBlockReason(st, cfg);
+    if (!g || !transcriptApproves(ev)) return g;
+    st = S.updateState(ev.root, ev.sessionId, s => { gate.approveFromTranscript(s, cfg); });
+    S.log(ev.root, { herramienta: ev.host, evento: 'gate', decision: 'aprobado', detalle: 'aprobación leída de la conversación (la herramienta no avisó tu mensaje)' });
+    return gate.editBlockReason(st, cfg);
+  };
   if (t.kind === 'shell' && t.command) {
     const r = policy.checkCommand(t.command);
     if (r.decision === 'deny') out = deny(r.reason);
     else if (r.decision === 'ask' && r.critical) out = criticalDecision(ev, st, t.command.trim(), r.reason);
     else {
-      const g = gate.editBlockReason(st, cfg);
-      if (g && r.decision !== 'allow') out = deny(`${g} Antes de la aprobación solo se permiten comandos de lectura, tests y lint.`);
+      const g = r.decision !== 'allow' && gateBlock();
+      if (g) out = deny(`${g} Antes de la aprobación solo se permiten comandos de lectura, tests y lint.`);
     }
     if (out) S.log(ev.root, { herramienta: ev.host, evento: 'comando', decision: out.decision, detalle: `${firstWord(t.command)}: ${out.reason}` });
     if (!out && r.decision === 'allow' && ev.canRewrite && !t.background && cfg.salida.compactar && isCompactable(t.command)) {
@@ -99,7 +126,7 @@ function onPre(ev) {
         const sec = (t.contents || []).map(findSecret).find(Boolean);
         if (sec) out = deny(`la memoria del proyecto no guarda secretos (${sec}). Describe el dato sin su valor (por ejemplo: "la clave está en el vault, ruta X").`);
       } else if (r.inside) {
-        const g = gate.editBlockReason(st, cfg);
+        const g = gateBlock();
         if (g) out = deny(g);
         else {
           const v = violation(ev.root, p, t.contents, cfg.reglas);

@@ -21,6 +21,38 @@ const CONTINUE = words('sigue|segu[ií]|contin[uú]a|continuar|contin[uú]e|term
 const NON_CODE = words('prototipo|prototipos|maqueta|maquetas|mockup|mockups|wireframe|wireframes'); // solo genera el prototipo
 const GATE_QUESTION = /¿\s*apruebo la implementaci[oó]n\s*\?/i;
 
+// Contexto que algunas herramientas anteponen al mensaje del usuario (IDE, navegador integrado, archivo abierto…).
+// Ej.: Codex en VS Code/app → "# Context from my IDE setup: … ## My request for Codex:\nsí";
+// Claude Code en VS Code → "<ide_opened_file>…</ide_opened_file>sí".
+const REQUEST_MARK = /^[ \t]*#{1,6}[ \t]*(?:my (?:request|message|prompt)|user (?:request|message|prompt)|mi (?:pedido|solicitud|mensaje)|(?:pedido|solicitud|mensaje) del usuario)(?![\p{L}])[^\n]*$/gimu;
+const TAG_BLOCK = /<([a-z][\w.:-]*)(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/giu;
+const SELF_TAG = /<[a-z][\w.:-]*(?:\s[^>]*)?\/>/giu;
+const CONTEXT_WORDS = 'context|contexto|browser|navegador|ide|editor|page|p[aá]gina|tab|tabs|pesta[ñn]as?|selection|selecci[oó]n|selected|seleccionado|file|files|archivo|archivos|environment|entorno|url|screenshot|captura';
+const CONTEXT_START = new RegExp(`^\\s*(?:<|[#\\[][^\\n]*?(?<!${W})(?:${CONTEXT_WORDS})(?!${W}))`, 'iu');
+const CONTEXT_LINE = /^\s*(?:[#<>\[`|]|---|[-*•]\s|https?:\/\/|[\p{L}][\p{L}\p{N} _./-]{0,40}:\s*\S)/u;
+
+/** Texto escrito por el usuario, sin el contexto que la herramienta le antepone. */
+function userText(prompt) {
+  let t = String(prompt || '').replace(/\r\n?/g, '\n');
+  let m, end = -1;
+  REQUEST_MARK.lastIndex = 0;
+  while ((m = REQUEST_MARK.exec(t))) end = m.index + m[0].length;
+  if (end >= 0) t = t.slice(end);
+  for (let i = 0; i < 5; i++) {
+    const n = t.replace(TAG_BLOCK, '\n').replace(SELF_TAG, '');
+    if (n === t) break;
+    t = n;
+  }
+  t = t.trim();
+  if (!CONTEXT_START.test(t)) return t;
+  // Bloque de contexto desconocido al inicio: el mensaje del usuario es el último párrafo
+  // (o la última línea si no hay línea en blanco que los separe).
+  const paras = t.split(/\n[ \t]*\n/).map(p => p.trim()).filter(Boolean);
+  const lastPara = paras.length > 1 ? paras[paras.length - 1] : '';
+  if (lastPara && !CONTEXT_LINE.test(lastPara)) return lastPara;
+  return t.split('\n').map(l => l.trim()).filter(Boolean).pop() || t;
+}
+
 const isApproval = text => APPROVAL.test(text) && !CONDITIONAL_SI.test(text) && !NEGATED.test(text);
 const isChangeRequest = text => !NON_CODE.test(text) && (CHANGE.test(text) || FIX.test(text) || TICKET.test(text) || WORK.test(text));
 
@@ -38,7 +70,8 @@ function asksUser(lastMessage) {
  * @param {{gate: string}} cfg
  */
 function onPrompt(state, prompt, cfg) {
-  const text = String(prompt || '');
+  const text = userText(prompt);
+  state.mensajeUsuario = text.replace(/\s+/g, ' ').slice(0, 60);
   const notes = [];
   const g = state.gate;
   const approval = isApproval(text);
@@ -79,8 +112,20 @@ function onStop(state, lastMessage) {
   const withPlan = GATE_QUESTION.test(String(lastMessage || ''));
   // Si el agente terminó su turno con las ediciones bloqueadas, está esperando al usuario (aunque no lo haya
   // formulado como pregunta): el siguiente "sí" cuenta como aprobación.
-  if (e === 'requerido') state.gate = { estado: 'pendiente', desde: new Date().toISOString(), conPlan: withPlan };
+  // Si muestra la pregunta del GATE, queda esperando aprobación aunque el harness no haya detectado el pedido
+  // (gate "siempre", pedido redactado de otra forma, sesión retomada): así el "sí" siguiente siempre cuenta.
+  if (e === 'requerido' || (withPlan && e !== 'pendiente' && e !== 'libre')) state.gate = { estado: 'pendiente', desde: new Date().toISOString(), conPlan: withPlan };
   else if (e === 'pendiente' && withPlan) state.gate.conPlan = true;
+}
+
+/** Aprobación pura: "sí", "dale", "ok, adelante"… sin pedidos nuevos (para el respaldo desde la conversación). */
+const isPureApproval = text => { const t = String(text || '').trim(); return t.length <= 60 && isApproval(t) && !isChangeRequest(t); };
+
+/** Aprueba el plan bloqueado cuando la aprobación se leyó de la conversación guardada por la herramienta. */
+function approveFromTranscript(state, cfg) {
+  if (!editBlockReason(state, cfg)) return false;
+  state.gate = { estado: 'aprobado', desde: new Date().toISOString(), via: 'conversación' };
+  return true;
 }
 
 /** Motivo de bloqueo para editar, o null si se puede. */
@@ -88,9 +133,10 @@ function editBlockReason(state, cfg) {
   if (cfg.gate === 'nunca') return null;
   const e = state.gate.estado;
   if (e === 'requerido' || e === 'pendiente' || (cfg.gate === 'siempre' && e === 'inicial')) {
-    return 'GATE del harness: el plan de este cambio aún no está aprobado por el usuario. Presenta el plan (qué y por qué, archivos por capa, tests previstos, riesgos) y termina con «¿Apruebo la implementación? (sí / no / ajustes)». Si el cambio es trivial, pregunta si lo aplicas directo. Termina tu turno ahí: el siguiente "sí" (con o sin tilde) o "directo" del usuario desbloquea. No intentes editar por otra vía hasta la aprobación.';
+    return 'GATE del harness: el plan de este cambio aún no está aprobado por el usuario. Presenta el plan (qué y por qué, archivos por capa, tests previstos, riesgos) y termina con «¿Apruebo la implementación? (sí / no / ajustes)». Si el cambio es trivial, pregunta si lo aplicas directo. Termina tu turno ahí: el siguiente "sí" (con o sin tilde) o "directo" del usuario desbloquea. No intentes editar por otra vía hasta la aprobación.'
+      + (state.mensajeUsuario ? ` (Último mensaje del usuario según el harness: «${state.mensajeUsuario}»; si no coincide con lo que escribió, pídele que apruebe desde su terminal con: node "$HOME/.sdd-orquestador/bin/sdd-harness.js" aprobar)` : '');
   }
   return null;
 }
 
-module.exports = { onPrompt, onStop, editBlockReason, isApproval, isChangeRequest, asksUser, GATE_QUESTION };
+module.exports = { onPrompt, onStop, editBlockReason, approveFromTranscript, isApproval, isPureApproval, isChangeRequest, asksUser, userText, GATE_QUESTION };

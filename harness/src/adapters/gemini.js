@@ -15,6 +15,7 @@ function parse(native, input, env) {
     sessionId: input.session_id || env.GEMINI_SESSION_ID,
     source: input.source,
     prompt: input.prompt,
+    transcriptPath: input.transcript_path,
     tool: input.tool_name ? normalizeTool(input.tool_name, input.tool_input) : null,
     lastMessage: toText(input.prompt_response),
     stopActive: !!input.stop_hook_active,

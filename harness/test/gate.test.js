@@ -105,3 +105,42 @@ test('si la herramienta entrega el último mensaje, un "sí" sin pregunta previa
   gate.onPrompt(s, 'sí', cfg);
   assert.strictEqual(gate.editBlockReason(s, cfg), null);
 });
+
+test('extrae el mensaje del usuario del contexto que antepone la herramienta', () => {
+  const codex = '# Context from my IDE setup:\n\n## Active file: src/app/fix-login.ts\n\n## Open tabs:\n- error.service.ts\n\n## My request for Codex:\nsi\n';
+  assert.strictEqual(gate.userText(codex), 'si');
+  assert.strictEqual(gate.userText('<ide_opened_file>The user opened src/a.ts</ide_opened_file>\nsí'), 'sí');
+  assert.strictEqual(gate.userText('<environment_context>\n  <cwd>C:\\dev\\x</cwd>\n</environment_context>\r\n\r\nsí, dale'), 'sí, dale');
+  assert.strictEqual(gate.userText('# Browser context\nURL: http://localhost:4200/panel\nTitle: Panel\n\nsi'), 'si');
+  assert.strictEqual(gate.userText('# Contexto del navegador\nURL: http://localhost:4200\nsi'), 'si');
+  assert.strictEqual(gate.userText('[Selección en la página]\nBotón Guardar\n\nsí\npero usa azul'), 'sí\npero usa azul');
+  // Sin contexto reconocible no se recorta nada
+  assert.strictEqual(gate.userText('# Tarea\nAgrega export CSV\n\nGracias'), '# Tarea\nAgrega export CSV\n\nGracias');
+  assert.strictEqual(gate.userText('sí'), 'sí');
+});
+
+test('caso real (Codex con navegador integrado): un "si" con contexto antepuesto aprueba el plan', () => {
+  for (const reply of [
+    '# Context from my IDE setup:\n\n## Open tabs:\n- panel.component.ts\n\n## My request for Codex:\nsi',
+    '# Browser context\nURL: http://localhost:4200/panel\nTitle: Panel de control\n\nsi',
+    '<browser_context url="http://localhost:4200">Panel de control · Error al cargar</browser_context>\nsi',
+  ]) {
+    const s = st();
+    s.conMensajes = true;
+    gate.onPrompt(s, 'corrige el error de Trusted Types en el panel', cfg);
+    gate.onStop(s, 'Plan…\n¿Apruebo la implementación? (sí / no / ajustes)');
+    gate.onPrompt(s, reply, cfg);
+    assert.strictEqual(gate.editBlockReason(s, cfg), null, reply);
+  }
+});
+
+test('el contexto antepuesto no dispara "directo" ni pedidos de cambio, ni entra al objetivo', () => {
+  const s = st();
+  gate.onPrompt(s, '# Browser context\nTitle: Acceso directo · Error 500\nURL: http://localhost/x\n\n¿qué hace este módulo?', cfg);
+  assert.strictEqual(s.gate.estado, 'inicial', 'el texto de la página no es del usuario');
+  const c = st();
+  gate.onPrompt(c, '# Context from my IDE setup:\n\n## Active file: a.ts\n\n## My request for Codex:\nagrega un filtro por fecha', cfg);
+  assert.strictEqual(c.gate.estado, 'requerido');
+  assert.strictEqual(c.objetivo, 'agrega un filtro por fecha');
+  assert.ok(gate.editBlockReason(c, cfg).includes('«agrega un filtro por fecha»'), 'el bloqueo muestra qué leyó el harness');
+});

@@ -3,8 +3,9 @@
 // lanzar muchos multiplica el consumo. El harness cuenta los sub-agentes lanzados desde el último mensaje
 // del usuario y, al superar el tope, pide confirmación (diálogo nativo o "sí" en el chat).
 
-const AGENT_TOOLS = new Set(['task', 'agent', 'spawn_agent', 'delegate', 'delegate_task', 'run_subagent']);
-const isAgentTool = name => AGENT_TOOLS.has(String(name || '').toLowerCase());
+// Se comparan sin mayúsculas, '_' ni '-': run_subagent (Codex/Gemini) = runSubagent (VS Code Copilot).
+const AGENT_TOOLS = new Set(['task', 'agent', 'spawnagent', 'delegate', 'delegatetask', 'runsubagent']);
+const isAgentTool = name => AGENT_TOOLS.has(String(name || '').toLowerCase().replace(/[_-]/g, ''));
 
 function limitFor(cfg) {
   const p = cfg.presupuesto || {};

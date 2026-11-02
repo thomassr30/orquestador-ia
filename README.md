@@ -205,7 +205,7 @@ En el chat basta con `/sdd-status` o con preguntar "¿cómo está el harness?".
 
 ### Si algo no funciona
 
-- **El agente sigue bloqueado tras tu "sí"**: escribe `directo` (siempre desbloquea) o, desde tu terminal, `node ~/.sdd-orquestador/bin/sdd-harness.js aprobar`. Con `estado` ves en qué paso quedó el GATE.
+- **El agente sigue bloqueado tras tu "sí"**: el harness acepta `si`/`sí` con o sin tilde, aunque la herramienta agregue contexto antes, y si su aviso no llega lo lee de la conversación guardada. Si aun así no pasa: escribe `directo` (siempre desbloquea) o, desde tu terminal, `node ~/.sdd-orquestador/bin/sdd-harness.js aprobar`. `estado` muestra en qué paso quedó el GATE y cómo leyó tu último mensaje; `registro` muestra cada mensaje y su efecto.
 - **Errores tipo "node no se reconoce" al usar la IA**: la herramienta no encuentra Node.js en el PATH. Reiníciala o vuelve a abrir la terminal después de instalar Node.
 - **Desactivar los controles por código** sin perder agentes ni skills: `node install.js --no-hooks`. Vuelves a activarlos con `node install.js`.
 - **Un sensor no aplica a tu proyecto**: ajusta `sensores.comandos` o `sensores.alTerminar` en `.sdd/harness.json`. `doctor` te muestra qué correría.

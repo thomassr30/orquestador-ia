@@ -54,3 +54,9 @@ test('las herramientas de lista de tareas no cuentan como sub-agentes', () => {
   assert.notStrictEqual(normalizeTool('TaskCreate', {}).kind, 'agent');
   assert.notStrictEqual(normalizeTool('TodoWrite', {}).kind, 'agent');
 });
+
+test('reconoce la herramienta de sub-agentes de cada host (runSubagent de VS Code incluido)', () => {
+  const { isAgentTool } = require('../src/budget');
+  for (const n of ['Task', 'Agent', 'spawn_agent', 'run_subagent', 'runSubagent', 'delegate_task']) assert.ok(isAgentTool(n), n);
+  for (const n of ['bash', 'edit', 'read_file', 'mcp__x__task_list']) assert.ok(!isAgentTool(n), n);
+});

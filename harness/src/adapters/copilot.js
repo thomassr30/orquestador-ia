@@ -15,6 +15,7 @@ function parse(native, input) {
     sessionId: first(input.sessionId, input.session_id),
     source: input.source,
     prompt: input.prompt,
+    transcriptPath: first(input.transcriptPath, input.transcript_path),
     tool: toolName ? normalizeTool(toolName, first(input.toolArgs, input.tool_input, {})) : null,
     lastMessage: toText(first(input.lastAssistantMessage, input.last_assistant_message)) || (event === 'stop' ? lastFromTranscript(first(input.transcriptPath, input.transcript_path)) : ''),
     stopActive: !!input.stop_hook_active,

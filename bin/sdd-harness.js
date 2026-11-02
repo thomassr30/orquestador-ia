@@ -38,6 +38,7 @@ function estado() {
   const s = sessions[0];
   console.log(`Última sesión: ${s.sesion} (${s.herramienta || '—'}) · actualizada ${String(s.actualizado || '').replace('T', ' ').slice(0, 16)}`);
   console.log(`GATE: ${GATE[s.gate.estado] || s.gate.estado}`);
+  if (s.mensajeUsuario) console.log(`Tu último mensaje, según el harness: «${s.mensajeUsuario}»${s.gate.via ? ` · aprobado desde ${s.gate.via}` : ''}`);
   const files = s.cambios.filter(f => !f.startsWith('.sdd/'));
   console.log(`Archivos modificados: ${files.length ? files.join(', ') : '—'}`);
   console.log(`Sensores: ${s.sensores ? `${s.sensores.ok ? 'en verde' : 'con errores'} — ${s.sensores.resumen.map(r => `${r.omitido ? '•' : r.ok ? '✓' : '✗'} ${r.nombre}`).join(' · ')}` : 'sin ejecutar'}${s.sucio ? ' (hay cambios sin verificar)' : ''}`);

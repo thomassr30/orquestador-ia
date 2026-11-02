@@ -1,5 +1,18 @@
 # Cambios
 
+## 2.4.3 — GATE: el "sí" cuenta aunque la herramienta no le avise al harness
+- **Respaldo desde la conversación**: si el agente quedó bloqueado pero en la conversación guardada por la herramienta (Codex, Claude Code, Copilot CLI) la pregunta del GATE va seguida solo de tu aprobación, el harness la reconoce y deja editar. Cubre hooks de mensaje que no llegan, sesiones retomadas horas después y contexto antepuesto en formatos nuevos. Es seguro: un "sí" junto a un pedido nuevo, o antes de que el agente presente el plan, no aprueba. El agente no puede escribir en esas conversaciones (requiere tu permiso).
+- **Pregunta del GATE = plan pendiente**: si el agente termina con «¿Apruebo la implementación?», tu siguiente "sí" aprueba aunque el harness no hubiera detectado un pedido de cambio (gate `siempre`, pedido redactado de otra forma).
+- Corrección de 2.4.2: el mensaje del usuario se guardaba en el mismo campo que el último mensaje del agente.
+- `registro` anota cada mensaje tuyo y cómo quedó el GATE, para diagnosticar.
+- La tilde nunca fue el problema: `si`, `Si`, `SI`, `sí` y `Sí` se reconocen igual.
+
+## 2.4.2 — GATE: el "sí" funciona aunque la herramienta agregue contexto
+- Codex (con el navegador integrado o en VS Code) y Claude Code en VS Code anteponen un bloque de contexto a tu mensaje (archivo abierto, pestañas, página del navegador). El GATE solo miraba el inicio del mensaje, así que tu "sí" no se registraba. Ahora el harness separa tu texto de ese contexto (`## My request for Codex:`, etiquetas como `<ide_opened_file>`, encabezados de contexto del navegador o del IDE) y evalúa solo lo que escribiste.
+- Seguridad: el texto de la página o del IDE ya no puede activar "directo" ni abrir un pedido de cambio, y no se guarda como "pedido en curso".
+- Si el agente queda bloqueado, el motivo muestra cómo leyó el harness tu último mensaje; `sdd-harness.js estado` también lo muestra.
+- Copilot en VS Code: el tope de sub-agentes ahora reconoce su herramienta `runSubagent`, que antes no contaba.
+
 ## 2.4.1 — Corrección de una prueba en CI
 - La prueba de `sdd-salida` usaba `process.exit(3)` justo después de imprimir 1.500 líneas; en Linux/macOS la salida a una tubería es asíncrona y se cortaba, así que la prueba fallaba en GitHub Actions (en Windows no). Ahora usa `process.exitCode = 3`. El harness no cambia.
 
