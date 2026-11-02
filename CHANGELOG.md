@@ -1,5 +1,10 @@
 # Cambios
 
+## 2.4.4 — Listo para más usuarios
+- **Licencia MIT** (`LICENSE`) y datos del repositorio en `package.json`.
+- **README nuevo**: qué problema resuelve, un ejemplo de uso, instalación en 3 comandos con verificación, tabla de compatibilidad por herramienta, problemas frecuentes y preguntas frecuentes. Rutas genéricas para cualquier equipo; los detalles largos quedan plegados.
+- El registro (`registro`) anota el tipo de cada mensaje (aprobación, pedido de cambio…), nunca su texto. `SECURITY.md` detalla qué guarda el estado y que la conversación de la herramienta solo se lee.
+
 ## 2.4.3 — GATE: el "sí" cuenta aunque la herramienta no le avise al harness
 - **Respaldo desde la conversación**: si el agente quedó bloqueado pero en la conversación guardada por la herramienta (Codex, Claude Code, Copilot CLI) la pregunta del GATE va seguida solo de tu aprobación, el harness la reconoce y deja editar. Cubre hooks de mensaje que no llegan, sesiones retomadas horas después y contexto antepuesto en formatos nuevos. Es seguro: un "sí" junto a un pedido nuevo, o antes de que el agente presente el plan, no aprueba. El agente no puede escribir en esas conversaciones (requiere tu permiso).
 - **Pregunta del GATE = plan pendiente**: si el agente termina con «¿Apruebo la implementación?», tu siguiente "sí" aprueba aunque el harness no hubiera detectado un pedido de cambio (gate `siempre`, pedido redactado de otra forma).

@@ -1,7 +1,26 @@
 {
   "name": "orquestador-sdd",
-  "version": "2.4.3",
+  "version": "2.4.4",
   "description": "Orquestador de agentes SDD con harness por código (hooks) para Claude Code, Codex, OpenCode, Gemini CLI, Cursor y VS Code Copilot",
+  "license": "MIT",
+  "author": "Thomas Soto (https://github.com/thomassr30)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thomassr30/orquestador-ia.git"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "harness",
+    "claude-code",
+    "codex",
+    "github-copilot",
+    "cursor",
+    "gemini-cli",
+    "opencode",
+    "hooks",
+    "sdd"
+  ],
   "private": true,
   "scripts": {
     "install-global": "node install.js",

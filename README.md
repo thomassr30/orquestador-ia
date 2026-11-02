@@ -1,102 +1,187 @@
-# Orquestador SDD — harness global y multi-IA
+# Orquestador SDD
 
-Orquestador de agentes para desarrollo guiado por especificaciones (SDD). Se instala **una vez** y queda disponible en **todos tus proyectos** y en **6 herramientas de IA**: Claude Code, Codex, OpenCode, Gemini CLI, Cursor y VS Code Copilot.
+**Un harness para tus agentes de IA de programación: reglas que se cumplen por código, menos tokens y memoria por proyecto.**
 
-Un agente es **modelo + harness**. El modelo lo pone tu herramienta; este repositorio aporta el harness, que tiene dos partes:
+Funciona dentro de **Claude Code, Codex, GitHub Copilot, Cursor, Gemini CLI y OpenCode**, con tu suscripción de siempre. No es una app aparte: no usa servidores ni claves de API, y tu código no sale de tu equipo.
 
-- **Guías**, que orientan al agente antes de actuar:
-  - 1 orquestador que coordina el trabajo y no programa;
-  - 22 sub-agentes cortos;
-  - 104 skills con el conocimiento detallado;
-  - 19 comandos;
-  - memoria por proyecto.
-- **Controles por código (hooks)**: scripts locales que la propia herramienta ejecuta antes y después de cada acción. Hacen cumplir las reglas aunque el modelo las olvide:
-  - git solo lectura;
-  - no editar sin plan aprobado;
-  - secretos protegidos;
-  - lint, tipos y tests al terminar;
-  - memoria tras compactar.
+[![Pruebas](https://github.com/thomassr30/orquestador-ia/actions/workflows/pruebas.yml/badge.svg)](https://github.com/thomassr30/orquestador-ia/actions/workflows/pruebas.yml)
+[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
+[![Node.js 18+](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
+![Windows · macOS · Linux](https://img.shields.io/badge/Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-lightgrey.svg)
 
-No es una app aparte. No usa claves de API ni red, y no corre ningún proceso propio. Trabajas en tu herramienta de siempre, con su modelo, su sesión y sus permisos.
+Se instala **una vez** y queda activo en **todos tus proyectos**.
 
 ---
 
-## 1. Requisitos
+## Índice
 
-Funciona en **Windows, macOS y Linux**. Las rutas `~` equivalen a `C:\Users\<tú>` en Windows y a `/Users/<tú>` o `/home/<tú>` en macOS/Linux.
+- [¿Por qué?](#por-qué)
+- [Así se ve](#así-se-ve)
+- [Qué incluye](#qué-incluye)
+- [Herramientas compatibles](#herramientas-compatibles)
+- [Instalación](#instalación)
+- [Uso diario](#uso-diario)
+- [Cómo funciona el harness](#cómo-funciona-el-harness)
+- [Ahorro de tokens](#ahorro-de-tokens)
+- [Configuración](#configuración)
+- [Memoria del proyecto](#memoria-del-proyecto)
+- [Arquitectura](#arquitectura)
+- [Diagnóstico y problemas frecuentes](#diagnóstico-y-problemas-frecuentes)
+- [Preguntas frecuentes](#preguntas-frecuentes)
+- [Actualizar, personalizar y desinstalar](#actualizar-personalizar-y-desinstalar)
+- [Contribuir](#contribuir) · [Seguridad](#seguridad) · [Licencia](#licencia)
 
-| Herramienta | Para qué | Comprobar |
-|---|---|---|
-| Node.js 18+ (recomendado 20+) | Instalador, hooks y scripts | `node -v` |
-| Git | Revisar y revertir cambios | `git --version` |
-| Docker Desktop (opcional) | Tests con PostgreSQL / SQL Server reales | `docker ps` |
-| Al menos una IA | Claude Code, Codex, OpenCode, Gemini CLI, Cursor o VS Code con Copilot | — |
+---
 
-## 2. Instalación
+## ¿Por qué?
 
-En PowerShell (o Terminal):
+Los agentes de IA son muy capaces, pero en el trabajo diario a veces:
 
-```powershell
-cd C:\dev\orquestador-ia
-node install.js                      # instala en las IA detectadas en tu equipo
+- hacen commit o push sin que lo pidas, o leen tu `.env`;
+- empiezan a editar antes de que revises qué van a hacer;
+- dicen "listo" con los tests en rojo;
+- pierden el hilo cuando la conversación se compacta;
+- gastan medio plan en una tarea chica.
+
+Una instrucción escrita ("nunca hagas commit") depende de que el modelo la recuerde. Este proyecto agrega dos cosas:
+
+1. **Controles por código (hooks)**: scripts locales que tu herramienta ejecuta antes y después de cada acción. Permiten, bloquean o piden confirmación aunque el modelo olvide las reglas.
+2. **Un orquestador con especialistas**: entiende el pedido, ajusta el esfuerzo a su tamaño, presenta un plan, implementa en paralelo y verifica.
+
+Un agente es **modelo + harness**. El modelo lo pone tu herramienta; el harness lo pone este repositorio.
+
+> **SDD** (*Spec-Driven Development*, desarrollo guiado por especificaciones): entender → especificar → planificar → **aprobar** → construir → verificar.
+
+## Así se ve
+
+```text
+Tú:      agrega exportación a Excel en el listado de clientes
+
+Agente:  [SDD] Flujo: new · tamaño mediano
+         Plan: qué y por qué · archivos por capa · tests · riesgos
+         ¿Apruebo la implementación? (sí / no / ajustes)
+           ↳ si intenta editar antes, el harness lo bloquea
+
+Tú:      si
+
+Agente:  implementa → el harness corre lint, tipos y tests de lo modificado
+           ↳ si algo falla, no puede terminar hasta corregirlo o explicarlo
+         Listo. Commit sugerido: "feat(clientes): exportar listado a Excel"
+           ↳ git commit y push están bloqueados: los ejecutas tú
 ```
 
-Otras opciones:
+Para algo trivial no hace falta plan: `cambia el título a "Clientes", directo`.
 
-```powershell
-node install.js --targets=all                 # todas las IA, aunque no estén instaladas aún
-node install.js --targets=claude,codex        # solo algunas
-node install.js --dry-run                     # simula sin escribir nada
-node install.js --no-hooks                    # sin el harness por código (solo guías)
-node install.js --no-mcp                      # sin registrar Playwright / Context7 / Chrome DevTools
-node install.js --auto-edits                  # Claude Code acepta ediciones sin preguntar
-node install.js --no-permissions              # sin permisos preaprobados en Claude Code
-node install.js --uninstall                   # desinstala todo (conserva tu harness.json)
+## Qué incluye
+
+| | |
+|---|---|
+| **Permisos por código** | Git solo lectura (sin commit, push, merge ni PR, tampoco por MCP), secretos protegidos y comandos destructivos bloqueados. Pide confirmación para infraestructura, bases de datos, borrados y dependencias. |
+| **Plan antes de editar (GATE)** | En un pedido de cambio, las ediciones quedan bloqueadas hasta que respondas `sí`. |
+| **Sensores al terminar** | Lint, tipos y tests relacionados con lo que cambió: Node/TS, Angular y Go automáticos; plantillas para Android, iOS y SCSS. |
+| **Memoria por proyecto** | `.sdd/memoria/` se carga al iniciar y tras compactar. Nunca se mezcla entre proyectos. |
+| **Ahorro de tokens** | Esfuerzo según el tamaño del pedido, tope de sub-agentes, salidas de tests compactadas y reportes cortos. |
+| **Especialistas** | 1 orquestador, 22 sub-agentes, 104 skills (backend, frontend, mobile, bases de datos, DevOps, testing, diseño) y 19 comandos. |
+| **Reglas propias** | Convierte un error que no debe repetirse en una regla que se revisa antes de escribir. |
+| **Evaluaciones** | Mide con tareas reales si un cambio al orquestador mejora el éxito y el consumo. |
+
+## Herramientas compatibles
+
+| Herramienta | Bloqueos | Confirmación crítica | Sensores al terminar | Memoria tras compactar | Salidas compactadas |
+|---|---|---|---|---|---|
+| **Claude Code** (CLI, VS Code, JetBrains, desktop) | ✅ | diálogo nativo | ✅ | ✅ | ✅ |
+| **Codex** (CLI, app, IDE) | ✅ | en el chat | ✅ | ✅ | ✅ |
+| **GitHub Copilot** (VS Code modo agente, Copilot CLI) | ✅ | diálogo nativo | ✅ | la IA la relee | — |
+| **Cursor** | ✅ | en el chat | ✅ | la IA la relee | — |
+| **Gemini CLI** | ✅ | en el chat | ✅ | ✅ | ✅ |
+| **OpenCode** | ✅ (plugin) | en el chat | ✅ | ✅ | ✅ |
+
+- **Copilot**: funciona con cualquier modelo del selector (también Claude), en sesiones con destino *Copilot*. Sus hooks están en vista previa.
+- **"En el chat"**: la herramienta no tiene diálogo de aprobación, así que el agente te muestra el comando exacto y espera tu `sí`. La confirmación vale una vez y caduca a los 30 minutos.
+
+## Instalación
+
+**Requisitos:** [Node.js](https://nodejs.org) 18 o superior, Git y al menos una de las herramientas de arriba. Docker es opcional (tests contra PostgreSQL o SQL Server reales).
+
+```bash
+git clone https://github.com/thomassr30/orquestador-ia.git
+cd orquestador-ia
+node install.js
 ```
 
-Reinstalar es limpio, no duplica nada y recuerda en qué herramientas instalaste (`--detect` para volver a detectarlas).
+El instalador detecta qué herramientas tienes y configura cada una. Antes de tocar un archivo tuyo guarda una copia `*.bak-sdd`, y solo agrega lo suyo: lo que ya tenías no se modifica.
 
-Después de instalar hay pasos que dependen de la herramienta:
+**Pasos extra según la herramienta:**
 
-- **Codex**: abre Codex y ejecuta `/hooks` para revisar y aprobar los hooks del harness. Codex no ejecuta hooks nuevos sin tu aprobación. Después reinicia Codex para que cargue las reglas.
+- **Codex**: ejecuta `/hooks` dentro de Codex para aprobar los hooks (Codex no ejecuta hooks nuevos sin tu aprobación) y reinícialo.
+- **Cursor**: pega `core/rules/global.md` en *Settings → Rules → User Rules*. Los hooks sí se instalan solos.
 - **Gemini CLI**: puede avisarte la primera vez que encuentre hooks nuevos. Es esperado.
-- **Cursor**: pega `core/rules/global.md` en *Settings → Rules → User Rules*, porque Cursor no guarda esas reglas en un archivo. Los hooks sí se instalan solos.
 
-## 3. Qué se instala y dónde
+**Comprueba que quedó activo:**
+
+```bash
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" doctor
+```
+
+Ejecuta cada hook con un `git push` de prueba y debe mostrar `✓ … prueba en vivo OK` por herramienta. Otra prueba rápida: abre tu IA en cualquier proyecto y pídele *"haz commit de los cambios"* o *"lee el archivo .env"*. Debe responder con un bloqueo `[harness]`.
+
+<details>
+<summary><b>Opciones del instalador</b></summary>
+
+```bash
+node install.js --targets=all             # todas las herramientas, aunque aún no estén instaladas
+node install.js --targets=claude,codex    # solo algunas (claude, codex, copilot, cursor, gemini, opencode)
+node install.js --dry-run                 # muestra qué haría, sin escribir nada
+node install.js --no-hooks                # solo guías (agentes y skills), sin controles por código
+node install.js --no-mcp                  # sin registrar Playwright, Context7 ni Chrome DevTools
+node install.js --auto-edits              # Claude Code acepta ediciones sin preguntar
+node install.js --no-permissions          # sin permisos preaprobados en Claude Code
+node install.js --detect                  # vuelve a detectar las herramientas instaladas
+node install.js --uninstall               # desinstala todo (conserva tu harness.json)
+```
+
+Reinstalar es seguro: no duplica nada y recuerda dónde instalaste.
+
+</details>
+
+<details>
+<summary><b>Qué se instala y dónde</b></summary>
+
+`~` es tu carpeta de usuario (`C:\Users\<tú>` en Windows).
 
 | | Skills | Sub-agentes | Reglas globales | Harness (hooks) |
 |---|---|---|---|---|
 | Claude Code | `~/.claude/skills` | `~/.claude/agents` | `~/.claude/CLAUDE.md` | `~/.claude/settings.json` |
 | Codex | `~/.agents/skills` | `~/.codex/agents` | `~/.codex/AGENTS.md` | `~/.codex/hooks.json` + `~/.codex/rules/sdd-orquestador.rules` |
-| OpenCode | `~/.agents/skills` | `~/.config/opencode/agents` | `~/.config/opencode/AGENTS.md` | `~/.config/opencode/plugins/sdd-harness.js` |
-| Gemini CLI | `~/.agents/skills` | `~/.gemini/agents` | `~/.gemini/GEMINI.md` | `~/.gemini/settings.json` |
+| Copilot | `~/.agents/skills` | `~/.copilot/agents` | `~/.copilot/copilot-instructions.md` | `~/.copilot/hooks/sdd-orquestador.json` |
 | Cursor | `~/.agents/skills` | `~/.cursor/agents` | manual (ver arriba) | `~/.cursor/hooks.json` |
-| VS Code Copilot | `~/.agents/skills` | `~/.copilot/agents` | `~/.copilot/copilot-instructions.md` | `~/.copilot/hooks/sdd-orquestador.json` |
+| Gemini CLI | `~/.agents/skills` | `~/.gemini/agents` | `~/.gemini/GEMINI.md` | `~/.gemini/settings.json` |
+| OpenCode | `~/.agents/skills` | `~/.config/opencode/agents` | `~/.config/opencode/AGENTS.md` | `~/.config/opencode/plugins/sdd-harness.js` |
 
-El código del harness y los scripts quedan en `~/.sdd-orquestador/` (`bin/`, `harness/`, `harness.json`).
+El código del harness, los scripts y tu configuración quedan en `~/.sdd-orquestador/`.
 
-Antes de modificar un archivo de configuración tuyo, el instalador guarda una copia `*.bak-sdd`. En los archivos de reglas y de hooks solo agrega lo suyo: lo que ya tenías no se toca, y la desinstalación quita solo lo del orquestador.
+</details>
 
-## 4. Uso diario
+## Uso diario
 
-Abre tu IA en la carpeta del proyecto y escribe normal. El sistema detecta qué necesitas y usa los agentes:
+Abre tu IA en la carpeta del proyecto y escribe normal. El orquestador detecta qué necesitas:
 
+```text
+¿dónde se valida el correo del usuario?          → [SDD] Flujo: ask
+agrega exportación a Excel en el listado         → [SDD] Flujo: new
+al guardar el formulario no aparece la alerta    → [SDD] Flujo: fix
+revisa los cambios antes de subir                → [SDD] Flujo: review
+muéstrame cómo se ve /clientes en móvil          → [SDD] Flujo: browser
 ```
-¿dónde se valida el RUT?                         → [SDD] Flujo: ask
-agrega exportación a Excel en el listado          → [SDD] Flujo: new
-en /muestras al guardar no aparece la alerta      → [SDD] Flujo: fix
-revisa los cambios antes de subir                 → [SDD] Flujo: review
-muéstrame cómo se ve /muestras en móvil           → [SDD] Flujo: browser (abre el navegador y captura)
-```
 
-- **Pedido de cambio → plan → tu "sí"**: al pedir un cambio, el agente explora y te muestra el plan completo en el chat. El harness **bloquea las ediciones** hasta que respondas que sí (`sí`, `dale`, `apruebo`; también vale `sí, pero…`). Luego trabaja en paralelo hasta terminar.
-- **Algo trivial**: agrega **"directo"** al pedido (`cambia el título a "Muestras", directo`) y edita sin plan. Igual pasa por los sensores.
-- **Al terminar**: el harness corre lint, tipos y tests **de lo que se modificó**. Si algo falla, el agente tiene que corregirlo o explicarte por qué no corresponde, antes de darte el trabajo por terminado.
-- **Sin archivos de trabajo**: análisis, planes y reportes quedan en el chat; si quieres un documento, pídelo. La **memoria del proyecto** sí se mantiene sola.
-- **Git solo lectura**: puede usar `git status/diff/log/show/blame` y las consultas de `gh`/`glab`. Commit, push, merge, PR y similares están **bloqueados por código**. Te sugiere el mensaje de commit y tú lo ejecutas.
-- **Decisiones críticas con tu confirmación**: comandos contra clusters, nube o bases de datos, borrar archivos, agregar dependencias y cambiar la configuración del propio harness.
+- **Pedido de cambio → plan → tu "sí"**: el agente explora y te muestra el plan en el chat. Aprueba con `sí` (con o sin tilde), `dale`, `ok` o `apruebo`; también vale `sí, pero…`.
+- **"directo"** para cambios triviales: edita sin plan y pasa igual por los sensores.
+- **Al terminar**, el harness revisa lint, tipos y tests de lo modificado. Si algo falla, el agente corrige o te explica por qué no corresponde.
+- **Sin archivos de trabajo**: análisis, planes y reportes quedan en el chat. Si quieres un documento, pídelo.
+- **Git solo lectura**: `status`, `diff`, `log`, `show` y `blame` sí; commit, push, merge y PR no. Te sugiere el mensaje de commit y tú lo ejecutas.
 
-Los comandos siguen disponibles si quieres forzar un flujo (en **Codex** se usan con `$`):
+<details>
+<summary><b>Comandos para forzar un flujo</b> (en Codex se escriben con <code>$</code> en vez de <code>/</code>)</summary>
 
 | Necesito… | Comando | ¿Modifica código? |
 |---|---|---|
@@ -108,68 +193,76 @@ Los comandos siguen disponibles si quieres forzar un flujo (en **Codex** se usan
 | **Refactorizar** sin cambiar el comportamiento | `/sdd-refactor <objetivo>` | ✅ tras tu aprobación |
 | **Revisar** código, una rama o los cambios sin commit | `/sdd-review [alcance]` | ❌ |
 | **Documentar** (arquitectura, API, modelo de datos) | `/sdd-doc <tema>` | Solo documentación |
-| **Navegador**: ver, inspeccionar, verificar visualmente o hacer tareas web | `/sdd-browser <qué>` | ❌ |
+| **Navegador**: ver, inspeccionar o verificar visualmente | `/sdd-browser <qué>` | ❌ |
 | **QA funcional / UAT** | `/sdd-qa <qué probar>` | ❌ |
-| **Diseño** de una pantalla (criticar, auditar, pulir, textos, adaptar) | `/sdd-ux <pedido>` | Revisiones no; mejoras con GATE |
-| **Trabajar un ticket** (Jira, Azure Boards, GitHub, GitLab, Linear) | `/sdd-ticket LAB-123` | ✅ tras tu aprobación |
+| **Diseño** de una pantalla (criticar, auditar, pulir, textos) | `/sdd-ux <pedido>` | Revisiones no; mejoras con plan |
+| **Trabajar un ticket** (Jira, Azure Boards, GitHub, GitLab, Linear) | `/sdd-ticket ABC-123` | ✅ tras tu aprobación |
 | **Prototipo** visual antes de implementar | `/sdd-prototype <pantalla o flujo>` | Solo el prototipo |
 | **Dependencias**: auditar y actualizar por lotes | `/sdd-deps [objetivo]` | ✅ lotes aprobados |
 | **Verificar un despliegue** (pods, logs, config, smoke) | `/sdd-deploy-check <servicio> <entorno>` | ❌ |
 | **Memoria** del proyecto: ver, guardar, compactar, olvidar | `/sdd-memory [acción]` | Solo `.sdd/memoria/` |
-| **Retomar** algo a medias / ver el **estado** (incluido el del harness) | `/sdd-continue` · `/sdd-status` | — |
+| **Retomar** algo a medias / ver el **estado** | `/sdd-continue` · `/sdd-status` | — |
 | **Mejorar el orquestador** con evidencia | `/sdd-improve` | Solo con tu aprobación |
 
-## 5. Harness: reglas que se cumplen por código
+</details>
 
-Las reglas en texto dependen de que el modelo las siga. El harness agrega **controles deterministas**: hooks que tu herramienta ejecuta en momentos fijos y que responden permitir, bloquear o avisar.
+## Cómo funciona el harness
+
+Tu herramienta ejecuta los hooks en momentos fijos, y cada uno responde permitir, bloquear o avisar:
 
 | Momento | Qué hace |
 |---|---|
-| Al iniciar y tras compactar | Inyecta la memoria **de este proyecto** (índice, sesión de trabajo, temas disponibles). |
-| Cada mensaje tuyo | Detecta pedidos de cambio, que abren el GATE, y tus aprobaciones (`sí`, `dale`, `apruebo`, `directo`). |
-| Antes de cada comando | **Bloquea**: escritura en git, GitHub o GitLab, comandos destructivos y lectura de secretos (`.env`, claves). **Pide confirmación** para: infraestructura (kubectl, terraform, nube, Consul, Vault), clientes de base de datos, borrar archivos, instalar dependencias y `sudo`. **Antes de que apruebes el plan**, solo deja correr lectura, tests y lint. |
-| Antes de cada herramienta MCP | Escribir en GitHub/GitLab por MCP (crear PR, merge, comentar…) se **bloquea**, igual que git. En otros servidores (bases de datos, Jira, etc.), lo que escribe o ejecuta **pide confirmación**. Los servidores del orquestador (navegador y documentación) quedan libres. |
-| Antes de cada edición | No deja editar código sin plan aprobado, ni tocar `.git`, secretos, la configuración del harness o de los hooks, ni el estado del harness. Si la memoria del proyecto trae algo con aspecto de secreto, la escritura se rechaza. |
-| Después de cada edición | Chequeo instantáneo del archivo: JSON y YAML válidos, marcadores de conflicto de merge, sintaxis de Go. Si hay error, se lo devuelve al agente. |
-| Al terminar el turno | Si cambió código, corre lint, tipos y tests relacionados **solo sobre lo modificado** y por módulo (sirve en monorepos). Si fallan, el agente debe corregir: se insiste hasta 2 veces y después solo avisa. Además actualiza un bloque automático en `.sdd/memoria/sesion.md`. |
+| Al iniciar y tras compactar | Carga la memoria **de este proyecto**: índice, sesión de trabajo y temas disponibles. |
+| Cada mensaje tuyo | Detecta pedidos de cambio, que abren el GATE, y tus aprobaciones (`sí`, `dale`, `directo`). Separa tu texto del contexto que agregan algunas herramientas (archivo abierto, navegador). |
+| Antes de cada comando | **Bloquea** escritura en git, GitHub o GitLab, comandos destructivos y lectura de secretos. **Pide confirmación** para infraestructura (kubectl, terraform, nube, Vault), clientes de base de datos, borrados, instalación de dependencias y `sudo`. Antes de aprobar el plan, solo deja correr lectura, tests y lint. |
+| Antes de cada herramienta MCP | Escribir en GitHub o GitLab por MCP se bloquea; lo que escribe en otros servidores pide confirmación. Navegador y documentación quedan libres. |
+| Antes de cada edición | Sin plan aprobado no se edita código. Tampoco se tocan `.git`, secretos ni la configuración del harness o de los hooks. |
+| Después de cada edición | Chequeo instantáneo: JSON y YAML válidos, marcadores de conflicto de merge, sintaxis de Go. |
+| Al terminar el turno | Corre lint, tipos y tests **solo de lo modificado**, por módulo (sirve en monorepos). Si fallan, el agente debe corregir; insiste hasta 2 veces y después solo avisa. Guarda el estado del trabajo en `.sdd/memoria/sesion.md`. |
 
 **Sensores detectados automáticamente:**
 
-- **Node/TS**: eslint sobre los archivos cambiados, `tsc --noEmit`, y `vitest related` o `jest --findRelatedTests`. Los modos watch se omiten.
-- **Angular**: `ng build --configuration development`, que también revisa las plantillas HTML, y Karma con `--watch=false --browsers=ChromeHeadless` (si no hay Chrome, queda omitido).
-- **Go**: `go vet` y `go test` de los paquetes tocados, y `golangci-lint` si está configurado.
-- **Android, iOS, SCSS y otros**: hay plantillas listas en `~/.sdd-orquestador/harness.json` → `sensores._ejemplos`; copia la que aplique a `sensores.comandos` del proyecto.
+- **Node/TS**: eslint sobre los archivos cambiados, `tsc --noEmit`, y `vitest related` o `jest --findRelatedTests`.
+- **Angular**: `ng build --configuration development` (también revisa las plantillas) y Karma en modo headless.
+- **Go**: `go vet`, `go test` de los paquetes tocados y `golangci-lint` si está configurado.
+- **Android, iOS, SCSS y otros**: plantillas listas en `~/.sdd-orquestador/harness.json` → `sensores._ejemplos`.
 
-### Por herramienta
+**Garantías de diseño:**
 
-| | Bloquear comandos y ediciones | Confirmación crítica | Feedback tras editar | No terminar en rojo | Memoria tras compactar |
-|---|---|---|---|---|---|
-| Claude Code (CLI, VS Code, JetBrains, desktop) | ✅ | diálogo nativo | ✅ | ✅ | ✅ |
-| Codex (CLI e IDE) | ✅ Bash, apply_patch, MCP | en el chat | ✅ | ✅ | ✅ |
-| Gemini CLI | ✅ | en el chat | ✅ | ✅ (reintento) | ✅ (en el siguiente mensaje) |
-| Cursor | ✅ | en el chat | ✅ | ✅ (mensaje de seguimiento) | la IA la relee |
-| VS Code Copilot / Copilot CLI | ✅ | diálogo nativo | ✅ | ✅ | la IA la relee |
-| OpenCode | ✅ (plugin) | en el chat | ✅ | ✅ (continúa la sesión) | ✅ |
+- **Falla abierta**: si un hook tiene un error interno no bloquea tu trabajo. `doctor` lo detecta.
+- **El agente no puede desactivar su harness**: cambiar `harness.json`, los hooks o la configuración de tu IA requiere tu confirmación, y el estado del harness vive fuera del proyecto.
+- **Sin dependencias**: solo Node.js. No hay red, ni telemetría, ni procesos en segundo plano.
 
-**Confirmación en el chat** se usa en las herramientas cuyos hooks no tienen diálogo de aprobación:
+## Ahorro de tokens
 
-1. El harness bloquea la acción.
-2. El agente te muestra el comando exacto.
-3. Respondes `sí`.
-4. El agente lo reintenta tal cual.
+Basado en las prácticas publicadas de *context engineering* (Anthropic, Manus, JetBrains Research): darle a la IA el conjunto más chico de información útil.
 
-La confirmación vale **una vez** y caduca a los 30 minutos.
+| Qué hace | Por qué ahorra |
+|---|---|
+| **Escala el esfuerzo al pedido**: trivial sin sub-agentes, pequeño con 1, mediano con 4 a 5, grande con el flujo completo | Cada sub-agente parte de cero; un sistema multi-agente puede gastar del orden de 15 veces más que un chat |
+| **Tope de sub-agentes por código** (modo ahorro: 3 por mensaje tuyo); si quiere más, te pregunta | Una tarea no escala a 10 agentes sin tu "sí" |
+| **Compacta las salidas** de tests, lint y build: errores con contexto y resumen; la salida completa queda en un archivo temporal | Las salidas de comandos suelen ser lo más pesado de una tarea |
+| **Referencias, no contenido**: rutas y líneas, y reportes de ≤ ~1.500 tokens por sub-agente | Evita copiar archivos de agente en agente |
+| **Tests relacionados** durante el trabajo y la suite completa una vez al final | No repite cientos de tests en cada vuelta |
+| **Memoria + una tarea por sesión** | El historial no se arrastra; el contexto vuelve con ~2.000 tokens |
 
-### Seguridad: por qué no es una app propia
+**Lo que te toca a ti:**
 
-- **Sin claves, sin red, sin servidor**: son scripts de Node que ejecuta tu herramienta. El modelo, la sesión y los permisos siguen siendo los de tu IA, y nada sale de tu equipo.
-- **Falla abierta**: si un hook tiene un error interno no bloquea nada, así que tu herramienta sigue funcionando. Los permisos nativos que el instalador configura en Claude Code y OpenCode, y las reglas de Codex, siguen activos de todas formas.
-- **El agente no puede desactivar su harness**: tocar `harness.json`, los hooks o la configuración de tu IA requiere tu confirmación. El estado del harness vive fuera del proyecto (`~/.sdd-orquestador/estado`) y el agente no puede escribirlo.
-- **Registro local sin contenido**: guarda qué se bloqueó y por qué, nunca el contenido de archivos ni tus mensajes.
+- Una tarea por sesión: al terminar, `/clear` o una conversación nueva.
+- `directo` para los cambios chicos.
+- Un modelo intermedio para el día a día (por ejemplo, Sonnet) y el más potente solo para diseño difícil. Los sub-agentes heredan el modelo de la sesión.
+- Un esfuerzo de razonamiento medio o alto, no el máximo, salvo que la tarea lo pida.
+- Desactiva los servidores MCP que no uses.
 
-### Configurar
+En planes que cobran por tokens (por ejemplo, los créditos de GitHub Copilot) esto pesa todavía más. Para ver en qué se fueron los tokens de la última sesión de Claude Code:
 
-Global: `~/.sdd-orquestador/harness.json`. Por proyecto: `.sdd/harness.json`, que manda sobre el global. Ejemplo:
+```bash
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" consumo
+```
+
+## Configuración
+
+Hay una configuración global en `~/.sdd-orquestador/harness.json` y otra por proyecto en `.sdd/harness.json`, que manda sobre la global. Los cambios aplican de inmediato.
 
 ```json
 {
@@ -180,165 +273,140 @@ Global: `~/.sdd-orquestador/harness.json`. Por proyecto: `.sdd/harness.json`, qu
     "timeoutSeg": 240,
     "maxBloqueos": 2
   },
-  "permisos": { "preguntar": ["node scripts/*"], "denegar": ["make deploy"], "mcpLibres": ["jira"], "mcpBloquear": ["notion"] }
+  "permisos": { "preguntar": ["node scripts/*"], "denegar": ["make deploy"], "mcpLibres": ["jira"], "mcpBloquear": ["notion"] },
+  "presupuesto": { "modo": "ahorro", "maxSubagentes": 3 }
 }
 ```
 
-`gate` acepta tres valores:
-
-- `auto` (por defecto): los pedidos de cambio requieren plan aprobado.
-- `siempre`: toda edición requiere plan aprobado.
-- `nunca`: sin GATE por código.
-
-En los comandos, `{archivos}` se reemplaza por los archivos modificados.
-
-### Diagnóstico
-
-```powershell
-node ~/.sdd-orquestador/bin/sdd-harness.js doctor     # ejecuta cada hook con un "git push" de prueba, muestra configuración y sensores
-node ~/.sdd-orquestador/bin/sdd-harness.js estado     # GATE, archivos modificados y últimos sensores de este proyecto
-node ~/.sdd-orquestador/bin/sdd-harness.js sensores   # corre ahora los sensores sobre lo modificado (git status)
-node ~/.sdd-orquestador/bin/sdd-harness.js registro   # últimas decisiones (qué se bloqueó y por qué)
-```
-
-En el chat basta con `/sdd-status` o con preguntar "¿cómo está el harness?".
-
-### Si algo no funciona
-
-- **El agente sigue bloqueado tras tu "sí"**: el harness acepta `si`/`sí` con o sin tilde, aunque la herramienta agregue contexto antes, y si su aviso no llega lo lee de la conversación guardada. Si aun así no pasa: escribe `directo` (siempre desbloquea) o, desde tu terminal, `node ~/.sdd-orquestador/bin/sdd-harness.js aprobar`. `estado` muestra en qué paso quedó el GATE y cómo leyó tu último mensaje; `registro` muestra cada mensaje y su efecto.
-- **Errores tipo "node no se reconoce" al usar la IA**: la herramienta no encuentra Node.js en el PATH. Reiníciala o vuelve a abrir la terminal después de instalar Node.
-- **Desactivar los controles por código** sin perder agentes ni skills: `node install.js --no-hooks`. Vuelves a activarlos con `node install.js`.
-- **Un sensor no aplica a tu proyecto**: ajusta `sensores.comandos` o `sensores.alTerminar` en `.sdd/harness.json`. `doctor` te muestra qué correría.
-
-## 5b. Ahorro de tokens
-
-Basado en las prácticas publicadas de *context engineering* (Anthropic, Manus, JetBrains Research): darle a la IA el conjunto más chico de información útil, no todo.
-
-| Qué hace el orquestador | Por qué ahorra |
+| Clave | Valores |
 |---|---|
-| **Escala el esfuerzo al tamaño del pedido**: trivial sin sub-agentes, pequeño con 1 implementer, mediano con 4 a 5 agentes, grande con el flujo completo | Cada sub-agente parte de cero y relee; un sistema multi-agente gasta del orden de 15 veces más que un chat |
-| **Tope de sub-agentes por código** (modo ahorro: 3 por mensaje tuyo). Si el orquestador quiere más, te pregunta | Una tarea no puede escalar a 10 agentes sin tu "sí", aunque el modelo calcule mal el tamaño |
-| **Compacta las salidas largas** de tests, lint y build: errores con contexto + resumen; la salida completa queda en un archivo temporal | Las salidas de comandos suelen ser lo más pesado de una tarea |
-| **Pasa referencias, no contenido** (rutas y líneas) y pide reportes de ≤ ~1.500 tokens a cada sub-agente | Evita copiar archivos y salidas de agente en agente |
-| **Tests relacionados durante el trabajo**, suite completa una vez al final | No repite cientos de tests en cada vuelta |
-| **Memoria + `sesion.md`** y una tarea por sesión (`/clear` al terminar) | El historial no se arrastra; el contexto vuelve con ~2.000 tokens |
+| `gate` | `auto` (por defecto: los pedidos de cambio requieren plan) · `siempre` (toda edición) · `nunca` (sin GATE por código) |
+| `sensores.comandos` | Comandos propios por sensor; `{archivos}` se reemplaza por los archivos modificados. Vacío = detección automática. |
+| `permisos` | Prefijos de comando que se suman a las reglas fijas; `*` al final es comodín. |
+| `presupuesto.modo` | `ahorro` (tope 3 sub-agentes) · `normal` (tope 6) · `libre` (sin tope). `maxSubagentes` fija un tope propio. |
 
-Lo que te toca a ti:
-
-- **Una tarea por sesión**: al terminar, `/clear` (o sesión nueva).
-- **"directo"** para cambios chicos.
-- **Modelo de la sesión**: Sonnet para el día a día y Opus solo para diseño difícil (los sub-agentes heredan el modelo de la sesión).
-- **Servidores MCP**: desactiva con `/mcp` los que no uses.
-
-**Modo de presupuesto** (`harness.json` global o del proyecto):
-
-```json
-{ "presupuesto": { "modo": "ahorro", "maxSubagentes": 3 } }
-```
-
-`ahorro` (por defecto): máximo 3 sub-agentes por mensaje y pedidos tratados como pequeños o medianos. `normal`: tope 6. `libre`: sin tope.
-
-**Ver en qué se van los tokens:**
-
-```powershell
-node "$HOME\.sdd-orquestador\bin\sdd-harness.js" consumo   # última sesión de Claude Code: caché, sub-agentes y salidas más pesadas
-```
-
-En Claude Code también tienes `/context` (qué ocupa el contexto ahora) y `/usage`.
-
-## 5c. Reglas propias y evaluaciones
-
-**Reglas propias.** Cada error que no debe repetirse se convierte en una regla que el harness revisa antes de escribir y que le dice a la IA cómo hacerlo bien. Van en `.sdd/harness.json` del proyecto:
+**Reglas propias.** Cuando corriges un error que no debe repetirse, conviértelo en regla. El harness la revisa antes de cada escritura y le dice a la IA cómo hacerlo bien:
 
 ```json
 {
   "reglas": [
     {
-      "nombre": "trusted-types",
+      "nombre": "sin-innerhtml",
       "archivos": "src/**/*.{ts,html}",
-      "prohibido": "innerHTML|outerHTML|DOMParser",
-      "mensaje": "La política Trusted Types lo bloquea: usa el componente de íconos propio.",
+      "prohibido": "innerHTML|outerHTML",
+      "mensaje": "La política Trusted Types lo bloquea: usa el componente de íconos del proyecto.",
       "excepto": "**/*.spec.ts"
     }
   ]
 }
 ```
 
-`node ~/.sdd-orquestador/bin/sdd-harness.js reglas` revisa todo el proyecto contra esas reglas.
+`sdd-harness.js reglas` revisa todo el proyecto contra esas reglas.
 
-**Evaluaciones.** Para medir si un cambio al orquestador mejora o empeora, en éxito y en tokens, define 5 a 10 tareas típicas tuyas, cada una con un comando que verifique el resultado (ver `evals/ejemplo.tareas.json`), y ejecuta:
+**Evaluaciones.** Para medir si un cambio al orquestador mejora o empeora, define 5 a 10 tareas típicas tuyas con un comando que verifique cada resultado (ver [`evals/ejemplo.tareas.json`](evals/ejemplo.tareas.json)) y ejecuta `node bin/sdd-eval.js evals/mis.tareas.json`. Trabaja sobre una copia temporal del proyecto y registra éxito, turnos, tokens y costo. Consume tokens de tu plan.
 
-```powershell
-node bin/sdd-eval.js evals/mis.tareas.json
-```
+## Memoria del proyecto
 
-Trabaja sobre una copia temporal del proyecto, así que tu carpeta no se toca. Guarda el historial para comparar con la corrida anterior. Consume tokens de tu plan, así que úsalo con pocas tareas.
-
-Qué práctica profesional implementa cada pieza, con sus fuentes: `docs/PRACTICAS.md`.
-
-## 6. Arquitectura
-
-```
-TÚ → tu IA (Claude Code, Codex, OpenCode, Gemini, Cursor, Copilot)
-       │  guías: reglas globales + skill sdd-orchestrator
-       ├─ ORQUESTADOR: clasifica el pedido, delega en paralelo, informa en el chat
-       │    ├─ Entender: sdd-explorer ∥ sdd-business-analyst
-       │    ├─ Plan: sdd-proposer → sdd-spec-writer ∥ sdd-designer → sdd-test-planner ∥ sdd-task-planner
-       │    ├─ ⏸ GATE (tu aprobación; el harness bloquea ediciones hasta tu "sí")
-       │    ├─ Construir: implementers (backend, frontend, db, mobile) ∥ sdd-test-writer
-       │    ├─ Verificar: sdd-verifier ∥ sdd-ui-reviewer (+ sensores del harness al terminar)
-       │    └─ Cerrar: sdd-memory-curator → .sdd/memoria
-       └─ HARNESS (hooks): permisos · GATE · sensores · memoria  ←  ~/.sdd-orquestador/harness
-```
-
-El contexto viaja en los mensajes entre agentes. Los sub-agentes leen el código del proyecto, no documentos intermedios. Hay otros sub-agentes para tareas puntuales: reviewer, doc-writer, devops-engineer, deps-maintainer, prototyper, qa-functional y browser-operator.
-
-**Skills por área:**
-
-- **Stack**:
-  - backend: Go, Node.js, NestJS, AdonisJS;
-  - frontend: Angular, React, Next.js, HTML/CSS, Tailwind, SCSS;
-  - bases de datos: PostgreSQL, SQL Server.
-- **Mobile**:
-  - React Native, Expo y animaciones;
-  - iOS, SwiftUI y hardware de iOS;
-  - Android, Compose y hardware de Android;
-  - diseño mobile.
-- **Diseño**: `design-quality` y 8 skills de proceso, inspiradas en Impeccable.
-- **DevOps**, una skill por plataforma:
-  - CI/CD: GitHub Actions, GitLab, Azure Pipelines, Jenkins, Bitbucket;
-  - contenedores y despliegue: Docker, Kubernetes, OpenShift, Helm, Kustomize;
-  - infraestructura y configuración: Terraform, Consul, Vault;
-  - observabilidad y verificación post-despliegue.
-- **Testing**: estrategia, unitarios, integración, BD con Testcontainers, contratos de API, e2e con Playwright, visual, accesibilidad, rendimiento y seguridad.
-- **Análisis y QA funcional, gestores de tareas, multi-repo, dependencias, prototipos y mejora continua**: una skill para cada uno.
-
-Si una IA no puede lanzar sub-agentes, el orquestador ejecuta las mismas fases en secuencia.
-
-## 7. Memoria del proyecto
-
-Cada proyecto guarda su memoria en `.sdd/memoria/`. Es recomendable versionarla para compartirla con el equipo. `sesion.md` es volátil, así que puedes ignorarlo en git.
+Cada proyecto guarda su memoria en `.sdd/memoria/`. Conviene versionarla para compartirla con el equipo; `sesion.md` es volátil y puedes ignorarlo en git.
 
 | Archivo | Se lee | Contiene |
 |---|---|---|
-| `MEMORIA.md` | Siempre (lo inyecta el harness) | Índice: qué es, stack, mapa de módulos, convenciones, comandos, temas |
-| `sesion.md` | Al iniciar y tras compactar | Trabajo en curso + bloque automático del harness (plan, archivos modificados, sensores) |
+| `MEMORIA.md` | Siempre (lo carga el harness) | Índice: qué es, stack, módulos, convenciones, comandos, temas |
+| `sesion.md` | Al iniciar y tras compactar | Trabajo en curso y bloque automático del harness (plan, archivos, sensores) |
 | `temas/*.md` | Solo si el índice dice que aplica | Conocimiento por área |
 | `decisiones.md` | Al diseñar | Decisiones con motivo y estado |
 | `pendientes.md` | Al planificar | Deuda técnica, riesgos, preguntas abiertas |
 | `historial.md` | Rara vez | Una línea por cambio cerrado |
 
-- **Compactación sin pérdida**: la herramienta compacta sola cerca del límite y el harness reinyecta la memoria. El bloque automático de `sesion.md` asegura que el estado del trabajo sobreviva aunque el modelo olvide actualizarlo.
-- **Aislada por proyecto**: cada proyecto usa solo su `.sdd/memoria/`. La de un workspace multi-repo se usa solo si ese workspace incluye el repo.
-- Nunca guarda secretos, valores de configuración ni datos personales; el harness rechaza escrituras con aspecto de secreto.
+- **Sin pérdida al compactar**: el harness recarga la memoria, y el bloque automático de `sesion.md` conserva el estado aunque el modelo olvide actualizarlo.
+- **Aislada**: cada proyecto usa solo su memoria. La de un workspace multi-repo se usa solo si ese workspace incluye el repo.
+- **Sin secretos**: el harness rechaza escrituras con aspecto de clave o contraseña.
 
-## 8. Mejora continua
+## Arquitectura
 
-- Solo se registran incidentes reales en `mejora/registro.md` de este repo: una regla violada, una corrección tuya, un gate fallido evitable o reintentos agotados.
-- `/sdd-improve` propone cambios **solo con evidencia** (≥ 2 ocurrencias, o 1 grave), máximo 3. Prefiere reforzar o editar lo existente antes que crear skills.
-- Nada se aplica sin tu aprobación.
+```text
+TÚ → tu IA (Claude Code, Codex, Copilot, Cursor, Gemini CLI, OpenCode)
+       │  guías: reglas globales + skill sdd-orchestrator
+       ├─ ORQUESTADOR: clasifica el pedido, delega en paralelo, informa en el chat
+       │    ├─ Entender:  sdd-explorer ∥ sdd-business-analyst
+       │    ├─ Plan:      sdd-proposer → sdd-spec-writer ∥ sdd-designer → sdd-test-planner ∥ sdd-task-planner
+       │    ├─ ⏸ GATE:    tu aprobación (el harness bloquea ediciones hasta tu "sí")
+       │    ├─ Construir: implementers (backend, frontend, db, mobile) ∥ sdd-test-writer
+       │    ├─ Verificar: sdd-verifier ∥ sdd-ui-reviewer (+ sensores del harness)
+       │    └─ Cerrar:    sdd-memory-curator → .sdd/memoria
+       └─ HARNESS (hooks): permisos · GATE · sensores · memoria · presupuesto
+```
 
-## 9. Personalizar
+Si una IA no puede lanzar sub-agentes, el orquestador ejecuta las mismas fases en secuencia.
+
+<details>
+<summary><b>Skills por área (104)</b></summary>
+
+- **Backend**: Go, Node.js, NestJS, AdonisJS.
+- **Frontend**: Angular, React, Next.js, HTML/CSS, Tailwind, SCSS.
+- **Bases de datos**: PostgreSQL, SQL Server.
+- **Mobile**: React Native y Expo, iOS y SwiftUI, Android y Compose, hardware de cada plataforma, diseño mobile.
+- **Diseño**: `design-quality` y 8 skills de proceso, inspiradas en Impeccable.
+- **DevOps** (una skill por plataforma): GitHub Actions, GitLab, Azure Pipelines, Jenkins, Bitbucket, Docker, Kubernetes, OpenShift, Helm, Kustomize, Terraform, Consul, Vault, observabilidad y verificación post-despliegue.
+- **Testing**: estrategia, unitarios, integración, BD con Testcontainers, contratos de API, e2e con Playwright, visual, accesibilidad, rendimiento y seguridad.
+- **Además**: análisis de requerimientos, QA funcional, gestores de tareas, multi-repo, dependencias, prototipos y mejora continua.
+
+</details>
+
+Qué práctica profesional implementa cada pieza, con fuentes: [`docs/PRACTICAS.md`](docs/PRACTICAS.md).
+
+## Diagnóstico y problemas frecuentes
+
+```bash
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" doctor     # prueba en vivo de cada hook, configuración y sensores
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" estado     # GATE, archivos modificados y sensores de este proyecto
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" registro   # últimas decisiones: qué se bloqueó y por qué
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" sensores   # corre ahora los sensores sobre lo modificado
+```
+
+En el chat basta con `/sdd-status`.
+
+| Problema | Solución |
+|---|---|
+| El agente sigue bloqueado tras tu "sí" | El harness acepta `si` o `sí`, aunque la herramienta agregue contexto antes, y si el aviso no le llega lo lee de la conversación guardada. Si aun así no pasa, escribe `directo` o, desde tu terminal, `node "$HOME/.sdd-orquestador/bin/sdd-harness.js" aprobar` (el agente no puede ejecutarlo). `estado` muestra cómo leyó tu último mensaje. |
+| "node no se reconoce" al usar la IA | La herramienta no encuentra Node.js. Reiníciala o abre una terminal nueva después de instalar Node. |
+| Codex no aplica nada | Aprueba los hooks con `/hooks` dentro de Codex y reinícialo. |
+| Copilot no aplica nada | Usa el modo agente con destino *Copilot* y VS Code actualizado. Con la extensión de Claude Code en VS Code aplica el harness de Claude Code. |
+| Un sensor no aplica a tu proyecto | Ajusta `sensores.comandos` o `sensores.alTerminar` en `.sdd/harness.json`. `doctor` muestra qué correría. |
+| Quieres apagar los controles | `node install.js --no-hooks` (conserva agentes y skills) o `"gate": "nunca"` en un proyecto. |
+
+## Preguntas frecuentes
+
+**¿Necesito una clave de API o pagar algo más?**
+No. Usa la herramienta y el plan que ya tienes. El harness son scripts locales.
+
+**¿Mi código sale de mi equipo?**
+No por el harness: no usa red ni telemetría. Tu herramienta de IA sigue funcionando como siempre.
+
+**¿Puede hacer commits o abrir PR?**
+No. Git es solo lectura por diseño, también por MCP. El agente te sugiere el mensaje y tú lo ejecutas.
+
+**¿Gasta más tokens que usar la IA sola?**
+En tareas chicas la diferencia es pequeña: no hay sub-agentes y los avisos del harness son breves. En tareas grandes el plan y la verificación cuestan tokens, pero evitan rehacer trabajo. El tope de sub-agentes y la compactación de salidas mantienen el consumo acotado.
+
+**¿Sirve para mi stack?**
+Las guías cubren los stacks de la lista de skills. Los controles (git, secretos, GATE, memoria) funcionan con cualquier lenguaje, y los sensores se configuran con tus propios comandos.
+
+**¿Puedo usarlo solo en algunos proyectos?**
+Sí. Con `"gate": "nunca"` y `"alTerminar": []` en el `.sdd/harness.json` de un proyecto, ahí solo quedan los permisos básicos.
+
+**¿Funciona si mi equipo usa herramientas distintas?**
+Sí. Cada persona lo instala en la suya; la memoria del proyecto (`.sdd/memoria/`) es la misma para todos.
+
+## Actualizar, personalizar y desinstalar
+
+```bash
+cd orquestador-ia
+git pull          # el hook de git reinstala solo lo que cambió
+npm run update    # alternativa en un paso, con validaciones
+```
+
+**Para tu equipo:** haz un fork, ajusta `core/` a sus convenciones y que cada persona lo instale desde ese fork.
 
 | Quiero… | Edito | Luego |
 |---|---|---|
@@ -346,54 +414,41 @@ Cada proyecto guarda su memoria en `.sdd/memoria/`. Es recomendable versionarla 
 | Agregar detalle sin agrandar la skill | `core/skills/<x>/references/<tema>.md` | `node install.js` |
 | Elegir modelo por agente | `config/models.json` | `node install.js` |
 | Agregar o quitar servidores MCP | `config/mcp.json` | `node install.js` |
-| Ajustar GATE, sensores o permisos | `~/.sdd-orquestador/harness.json` o `.sdd/harness.json` | (inmediato) |
-| Reglas de UN proyecto | `AGENTS.md` / `CLAUDE.md` en la raíz del proyecto | (tienen prioridad) |
+| Ajustar GATE, sensores o permisos | `~/.sdd-orquestador/harness.json` o `.sdd/harness.json` | inmediato |
+| Reglas de un solo proyecto | `AGENTS.md` o `CLAUDE.md` en la raíz del proyecto | tienen prioridad |
 
-No edites los archivos instalados en `~/.claude`, `~/.agents` o `~/.sdd-orquestador/harness`: se regeneran desde este repo.
+No edites los archivos instalados en `~/.claude`, `~/.agents` o `~/.sdd-orquestador/harness`: se regeneran desde el repositorio.
 
-Para probar el harness tras un cambio, ejecuta `npm test` (pruebas automáticas de permisos, GATE, sensores, adaptadores, plugin de OpenCode e instalación).
+**Desinstalar:** `node install.js --uninstall`. Quita solo lo del orquestador y conserva tu `harness.json`.
 
-## 10. GitHub y actualizaciones automáticas
-
-### Publicar (una vez)
-1. Crea un repositorio **privado** vacío en GitHub, por ejemplo `orquestador-sdd`.
-2. En PowerShell:
-```powershell
-cd C:\dev\orquestador-ia
-git init
-git add .
-git commit -m "Orquestador SDD v2.0.0"
-git branch -M main
-git remote add origin https://github.com/<tu-usuario>/orquestador-sdd.git
-git push -u origin main
-node install.js        # activa la actualización automática (hook de git)
-```
-
-### Actualizar
-```powershell
-cd C:\dev\orquestador-ia
-git pull               # el hook reinstala solo lo que corresponda (skills, agentes y harness)
-npm run update         # alternativa en un paso, con validaciones
-```
-
-### Otro equipo o compañero
-```powershell
-git clone https://github.com/<tu-usuario>/orquestador-sdd.git C:\dev\orquestador-ia
-cd C:\dev\orquestador-ia
-node install.js
-```
-
-Flujo para hacer cambios: edita `core/` o `harness/` → `npm test` → `node install.js` → commit y push. Sube la versión en `package.json` y anota el cambio en `CHANGELOG.md`.
-
-## 11. Notas
+<details>
+<summary><b>Notas por herramienta</b></summary>
 
 - OpenCode, Cursor y Copilot leen tanto `~/.claude/skills` como `~/.agents/skills`. Si ves skills duplicadas, el contenido es idéntico.
-- En VS Code, el harness que aplica depende del agente que uses:
-  - Con la extensión de Claude Code, aplica el de Claude Code.
-  - Con Copilot como destino de la sesión, aplica el de Copilot, cuyos hooks están en vista previa.
 - En Codex, si tienes `~/.codex/AGENTS.override.md`, ese archivo tiene prioridad: copia ahí el bloque `sdd-orquestador`.
-- Los hooks dependen de la versión de cada herramienta. Mantenlas actualizadas y revisa con `sdd-harness.js doctor`.
+- Los hooks dependen de la versión de cada herramienta. Mantenlas actualizadas y revisa con `doctor`.
 
-## Créditos
+</details>
 
-Las skills de diseño están inspiradas en [Impeccable](https://github.com/pbakaus/impeccable) de Paul Bakaus (Apache 2.0); ver `NOTICE`. Los conceptos de *harness engineering* (guías y sensores, controles deterministas, verificación de punta a punta) se basan en el trabajo público de OpenAI, Anthropic y Martin Fowler sobre el tema.
+## Contribuir
+
+Las contribuciones son bienvenidas: soporte para otra herramienta, sensores para otro stack, skills nuevas o correcciones. Lee [`CONTRIBUTING.md`](CONTRIBUTING.md); en resumen:
+
+```bash
+npm test                    # pruebas de permisos, GATE, sensores, adaptadores e instalación
+node install.js --dry-run   # revisa qué escribiría
+```
+
+El repositorio corre las pruebas en Windows, macOS y Linux con Node 18, 20 y 22. Los cambios se anotan en [`CHANGELOG.md`](CHANGELOG.md).
+
+**Mejora continua:** `/sdd-improve` propone ajustes al orquestador solo con evidencia de incidentes reales (`mejora/registro.md`), y nada se aplica sin tu aprobación.
+
+## Seguridad
+
+Qué hace el harness en tu equipo, qué protege y sus límites: [`SECURITY.md`](SECURITY.md). En corto: no es un sandbox. Bloquea los errores habituales de un agente, pero para código muy sensible usa además el sandbox de tu herramienta o un contenedor.
+
+## Licencia
+
+[MIT](LICENSE) © 2026 Thomas Soto ([@thomassr30](https://github.com/thomassr30)).
+
+Las skills de diseño están inspiradas en [Impeccable](https://github.com/pbakaus/impeccable) de Paul Bakaus (Apache 2.0); ver [`NOTICE`](NOTICE). Los conceptos de *harness engineering* (guías y sensores, controles deterministas, verificación de punta a punta) se basan en el trabajo público de OpenAI, Anthropic y Martin Fowler.

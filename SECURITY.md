@@ -4,7 +4,9 @@
 - Es un conjunto de scripts de Node.js que **tu herramienta de IA ejecuta** (hooks) antes y después de cada acción. No es un servicio, no abre puertos, no usa red ni claves de API.
 - Lee la entrada del hook (comando, archivo o mensaje) y responde permitir, bloquear o avisar.
 - Escribe solo en: `.sdd/memoria/sesion.md` del proyecto (bloque automático), `~/.sdd-orquestador/estado/` (estado por sesión, se borra a los 14 días) y archivos temporales con salidas de comandos compactadas.
-- El registro local (`sdd-harness.js registro`) guarda decisiones y motivos, nunca el contenido de archivos ni tus mensajes.
+- El estado de la sesión guarda el pedido en curso y el inicio de tu último mensaje (60 caracteres), para retomar el trabajo y diagnosticar el GATE.
+- El registro local (`sdd-harness.js registro`) guarda decisiones, motivos y el tipo de cada mensaje (aprobación, pedido de cambio…), nunca el contenido de archivos ni el texto de tus mensajes.
+- Para reconocer tu aprobación cuando la herramienta no avisa, el harness **lee** (nunca escribe) la conversación que tu herramienta ya guarda en tu equipo.
 
 ## Qué protege
 - Escritura en git/GitHub/GitLab (también por MCP), lectura/escritura de secretos, comandos destructivos.

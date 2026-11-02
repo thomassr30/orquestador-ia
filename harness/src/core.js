@@ -78,8 +78,8 @@ function onPrompt(ev) {
     s.herramienta = ev.host;
     estado = s.gate.estado;
   });
-  // Registro de cómo se entendió cada mensaje (para diagnosticar con `sdd-harness registro`)
-  S.log(ev.root, { herramienta: ev.host, evento: 'mensaje', decision: estado, detalle: `«${said.replace(/\s+/g, ' ').slice(0, 60)}»` });
+  // Registro de cómo se entendió cada mensaje (tipo y estado del GATE, nunca el texto)
+  S.log(ev.root, { herramienta: ev.host, evento: 'mensaje', decision: estado, detalle: gate.classify(said) });
   const parts = [];
   if (compacted && ev.reinjectOnPrompt) parts.push(memory.contextBlock(ev.root, { source: 'compact' }));
   parts.push(...notes.map(tag));

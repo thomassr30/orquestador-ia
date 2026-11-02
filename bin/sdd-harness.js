@@ -183,7 +183,7 @@ function consumo() {
 function reglas() {
   const { compile } = require(path.join(SRC, 'project-rules'));
   const rules = compile(loadConfig(root).reglas);
-  if (!rules.length) { console.log('No hay reglas propias. Agrégalas en .sdd/harness.json → "reglas" (ver README, sección Reglas propias).'); return; }
+  if (!rules.length) { console.log('No hay reglas propias. Agrégalas en .sdd/harness.json → "reglas" (ver README, sección Configuración).'); return; }
   const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.angular', 'coverage', '.next', 'vendor', 'target', '.sdd']);
   const hits = [];
   const walk = d => {

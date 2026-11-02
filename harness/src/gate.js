@@ -118,6 +118,9 @@ function onStop(state, lastMessage) {
   else if (e === 'pendiente' && withPlan) state.gate.conPlan = true;
 }
 
+/** Tipo de mensaje, para el registro (sin guardar el texto). */
+const classify = text => ESCAPE.test(text) ? 'directo' : isApproval(text) ? 'aprobación' : isChangeRequest(text) ? 'pedido de cambio' : 'otro';
+
 /** Aprobación pura: "sí", "dale", "ok, adelante"… sin pedidos nuevos (para el respaldo desde la conversación). */
 const isPureApproval = text => { const t = String(text || '').trim(); return t.length <= 60 && isApproval(t) && !isChangeRequest(t); };
 
@@ -139,4 +142,4 @@ function editBlockReason(state, cfg) {
   return null;
 }
 
-module.exports = { onPrompt, onStop, editBlockReason, approveFromTranscript, isApproval, isPureApproval, isChangeRequest, asksUser, userText, GATE_QUESTION };
+module.exports = { onPrompt, onStop, editBlockReason, approveFromTranscript, classify, isApproval, isPureApproval, isChangeRequest, asksUser, userText, GATE_QUESTION };

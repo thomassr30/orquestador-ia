@@ -17,7 +17,7 @@
 
 ## Antes de enviar un cambio
 ```bash
-npm test                      # 60+ pruebas: política, GATE, sensores, adaptadores, instalación
+npm test                      # 70+ pruebas: política, GATE, sensores, adaptadores, instalación
 node install.js --dry-run     # revisa qué escribiría
 ```
 Si cambias cómo se comporta la IA (agentes, skills, reglas), mide con `node bin/sdd-eval.js` sobre tareas reales antes y después.
