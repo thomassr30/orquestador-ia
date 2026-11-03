@@ -7,10 +7,29 @@ const { project, tmp } = require('./helpers');
 process.env.SDD_HOME = tmp('sdd-home-');
 const { plan, runSensors, summarize, quickCheck, detect } = require('../src/sensors');
 const { DEFAULTS } = require('../src/config');
+const { findProjectRoot } = require('../src/util');
 
 const IS_WIN = process.platform === 'win32';
 const bin = (dir, name) => { const f = path.join(dir, 'node_modules', '.bin', IS_WIN ? `${name}.cmd` : name); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, ''); };
 const cfg = (over = {}) => ({ ...DEFAULTS, sensores: { ...DEFAULTS.sensores, ...over } });
+
+// Disco que no distingue mayúsculas (Windows y macOS por defecto; Linux sí las distingue).
+const caseInsensitiveFs = (() => { const d = tmp('sdd-Caso-'); return fs.existsSync(d.replace(/sdd-Caso-/, 'SDD-cASO-')); })();
+
+test('los sensores corren con las mayúsculas reales de la ruta aunque el hook entregue otras ("c:\\…")', { skip: !caseInsensitiveFs && 'el disco distingue mayúsculas' }, () => {
+  const base = project({});
+  const real = path.join(base, 'Proyecto');
+  fs.mkdirSync(path.join(real, '.git'), { recursive: true });
+  fs.mkdirSync(path.join(real, 'Src'));
+  fs.writeFileSync(path.join(real, 'package.json'), JSON.stringify({ scripts: { test: 'vitest' } }));
+  fs.writeFileSync(path.join(real, 'Src', 'a.ts'), '');
+  const mangled = path.join(base, 'pROYECTO').replace(/^[A-Z]:/, d => d.toLowerCase());
+  const root = findProjectRoot(path.join(mangled, 'src'));
+  assert.strictEqual(root, real);
+  const steps = plan(root, ['Src/a.ts'], cfg({ alTerminar: ['tests'] }));
+  assert.strictEqual(steps.length, 1);
+  assert.strictEqual(steps[0].cwd, real);
+});
 
 test('detecta eslint, tsc y vitest de un proyecto Node (solo sobre lo cambiado)', () => {
   const dir = project({ 'package.json': JSON.stringify({ scripts: { test: 'vitest' } }), 'eslint.config.js': '', 'tsconfig.json': '{}', 'src/a.ts': '' });

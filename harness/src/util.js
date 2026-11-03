@@ -17,8 +17,28 @@ function truncateMiddle(text, max = 30000) {
 }
 
 /** Raíz del proyecto: el directorio con .git más cercano; si no hay git, el directorio de inicio. */
+/**
+ * Ruta con las mayúsculas reales del disco (Windows y macOS no las distinguen, pero Vite/Vitest sí:
+ * con "c:\…" no encuentra su runner). Solo corrige mayúsculas: conserva enlaces y nombres cortos.
+ */
+function canonicalCase(p) {
+  const abs = path.resolve(p);
+  if (!IS_WIN && process.platform !== 'darwin') return abs;
+  const { root } = path.parse(abs);
+  let out = root.replace(/^[a-z](?=:)/, l => l.toUpperCase());
+  for (const seg of abs.slice(root.length).split(path.sep).filter(Boolean)) {
+    let name = seg;
+    try {
+      const names = fs.readdirSync(out);
+      if (!names.includes(seg)) name = names.find(n => n.toLowerCase() === seg.toLowerCase()) || seg;
+    } catch { /* sin acceso o no existe: el tramo queda tal cual */ }
+    out = path.join(out, name);
+  }
+  return out;
+}
+
 function findProjectRoot(start) {
-  let d = path.resolve(start);
+  let d = canonicalCase(start);
   const first = d;
   while (true) {
     if (fs.existsSync(path.join(d, '.git'))) return d;
@@ -47,4 +67,4 @@ function shortHash(s) {
   return crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 10);
 }
 
-module.exports = { IS_WIN, truncateMiddle, findProjectRoot, isInside, relPosix, shortHash };
+module.exports = { IS_WIN, truncateMiddle, findProjectRoot, canonicalCase, isInside, relPosix, shortHash };
