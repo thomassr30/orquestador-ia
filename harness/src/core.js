@@ -4,7 +4,7 @@
 //   { decision: 'deny'|'ask'|null, reason, context, feedback, block, notice }
 const fs = require('fs');
 const path = require('path');
-const { Policy } = require('./policy');
+const { Policy, mayWrite } = require('./policy');
 const { loadConfig, rulesFor } = require('./config');
 const S = require('./state');
 const gate = require('./gate');
@@ -192,8 +192,9 @@ function onPre(ev) {
       // Git con aprobación nativa de la herramienta (Codex: reglas "prompt"; OpenCode: permiso "ask"): la pide ella, sin doble confirmación.
       out = r.gitRule && ev.nativeGitAsk ? null : criticalDecision(ev, st, t.command.trim(), r.reason);
     } else {
-      const g = r.decision !== 'allow' && gateBlock();
-      if (g) out = deny(`${g} Antes de la aprobación solo se permiten comandos de lectura, tests y lint.`);
+      // Antes de la aprobación se explora libremente: solo se frenan los comandos que pueden escribir archivos
+      const g = r.decision !== 'allow' && mayWrite(t.command) && gateBlock();
+      if (g) out = deny(`${g} Mientras tanto puedes leer, buscar, inspeccionar y correr tests o lint; lo que se frena es modificar archivos.`);
     }
     if (out) S.log(ev.root, { herramienta: ev.host, evento: 'comando', decision: out.decision, detalle: `${firstWord(t.command)}: ${out.reason}` });
     // Un comando que puede modificar archivos y va a correr (o espera tu confirmación): antes, punto de restauración.

@@ -101,3 +101,13 @@ test('un error interno nunca bloquea (falla abierta) y la salida es solo JSON', 
   const u = spawnSync(process.execPath, [HOOK, 'desconocida', 'X'], { input: '{}', encoding: 'utf8', env: { ...process.env, SDD_HOME } });
   assert.strictEqual(u.status, 0);
 });
+
+test('con el plan pendiente, la IA puede explorar con cualquier comando de lectura (Codex)', () => {
+  const dir = project({ 'a.ts': '' });
+  const base = { session_id: 'expl', cwd: dir };
+  hook('codex', 'UserPromptSubmit', { ...base, prompt: 'agrega un filtro por fecha' });
+  const bash = command => hook('codex', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command } }).json;
+  assert.strictEqual(bash('jq .name package.json'), null);
+  assert.strictEqual(bash('Get-ChildItem -Recurse src | Select-String "fecha"'), null);
+  assert.strictEqual(bash("sed -i 's/a/b/' a.ts").hookSpecificOutput.permissionDecision, 'deny');
+});

@@ -175,6 +175,48 @@ function classifySegment(seg, extra) {
   return { decision: extra.fallback, reason: 'comando no reconocido como seguro' };
 }
 
+// ---------- ¿El comando puede escribir archivos? (lo que el GATE frena antes de la aprobación) ----------
+// Antes de aprobar el plan, la IA debe poder EXPLORAR libremente (leer, buscar, listar, inspeccionar, correr tests):
+// solo se frenan los comandos que pueden modificar archivos del proyecto.
+const WRITE_TOOLS = new Set(['cp', 'mv', 'mkdir', 'touch', 'tee', 'ln', 'chmod', 'chown', 'truncate', 'install', 'patch', 'dd', 'unzip', 'rsync',
+  'set-content', 'add-content', 'out-file', 'new-item', 'copy-item', 'move-item', 'rename-item', 'expand-archive', 'ni', 'sc', 'ac', 'cpi', 'mi', 'rni', 'copy', 'move', 'ren', 'rename', 'xcopy', 'robocopy', 'mklink',
+  'vim', 'vi', 'nano', 'code', 'notepad', 'emacs']);
+const RUNNERS = new Set(['npm', 'npx', 'pnpm', 'yarn', 'bun', 'bunx', 'make', 'gradle', 'gradlew', './gradlew', 'gradlew.bat', 'mvn', './mvnw', 'mvnw', 'dotnet', 'cargo', 'go', 'ng', 'nest', 'composer', 'flutter', 'dart', 'pod', 'swift', 'deno']);
+const INTERPRETERS = new Set(['node', 'python', 'python3', 'py', 'ruby', 'perl', 'php', 'bash', 'sh', 'zsh', 'pwsh', 'powershell', 'cmd', 'osascript', 'deno', 'bun', 'tsx', 'ts-node']);
+
+function segmentMayWrite(seg, extra) {
+  const n = normalizeSegment(seg);
+  if (n.inner) return mayWrite(n.inner, extra);
+  const toks = n.tokens.map(t => String(t).toLowerCase());
+  if (!toks.length) return false;
+  const redirect = seg.replace(/"[^"]*"|'[^']*'/g, '').replace(/\d?>&\d|\d?>>?\s*(\/dev\/null|nul|\$null)\b/gi, '');
+  if (/>/.test(redirect)) return true;
+  // xargs / find -exec ejecutan otro comando: se evalúa ese
+  const xi = toks.findIndex(t => t === 'xargs' || t === '-exec' || t === '-execdir' || t === '-ok');
+  if (xi >= 0 && toks.slice(xi + 1).some(t => WRITE_TOOLS.has(t) || INTERPRETERS.has(t) || /^(sed|perl|rm|del)$/.test(t))) return true;
+  const exe = toks[0].replace(/^.*[\\/]/, '').replace(/\.(exe|cmd|bat)$/, '');
+  // Linters y tests que corrigen o reescriben archivos (eslint --fix, prettier --write, jest -u…)
+  if (toks.some(t => /^(--fix|--write|-w|--fix-type|-u|--updatesnapshot|--update-snapshots?|--update)$/.test(t))) return true;
+  if (matchesAny(n.norm, R.SAFE_COMMANDS) || readOnlyVariant(n.norm, n.tokens) || ownScript(n.tokens)) return false;
+  if (WRITE_TOOLS.has(exe)) return true;
+  if (exe === 'sed') return toks.some(t => /^(-i|--in-place)/.test(t));
+  if (/^g?awk$/.test(exe)) return toks.some(t => /inplace/.test(t));
+  if (exe === 'git' || /^(gh|glab)$/.test(exe)) return !matchesAny(n.norm.slice(exe.length + 1), R.GIT_READ) && !matchesAny(n.norm, R.FORGE_READ);
+  if (RUNNERS.has(exe) || RUNNERS.has(toks[0])) {
+    // Versiones, listados e información: lectura. El resto (scripts, generadores, formateadores) puede escribir.
+    return !toks.slice(1).every(t => /^(-v|--version|version|-version|--help|-h|help|list|ls|outdated|view|info|why|env|doctor|config|get|show|tree|--info)$/.test(t) || t.startsWith('-'));
+  }
+  if (INTERPRETERS.has(exe)) return !toks.slice(1).every(t => /^(-v|--version|-V|version|--help|-h)$/.test(t));
+  return false; // lectura, búsqueda e inspección (jq, awk, fd, tree, file, du, ps, Get-Item, Test-Path…)
+}
+
+/** ¿Puede el comando modificar archivos? (para el GATE: antes de aprobar, explorar sí, escribir no) */
+function mayWrite(cmd, extra = {}) {
+  const raw = String(cmd || '');
+  if (/\$\(|`/.test(raw)) return true;
+  return splitSegments(raw).some(seg => segmentMayWrite(seg, extra));
+}
+
 /** Clasifica un comando completo (posiblemente compuesto). El peor segmento decide. */
 function classifyCommand(cmd, extra) {
   const raw = String(cmd || '');
@@ -275,4 +317,4 @@ class Policy {
   }
 }
 
-module.exports = { Policy, splitSegments, normalizeSegment, classifyCommand, matchPattern, tokenize, secretReference };
+module.exports = { Policy, splitSegments, normalizeSegment, classifyCommand, matchPattern, tokenize, secretReference, mayWrite };

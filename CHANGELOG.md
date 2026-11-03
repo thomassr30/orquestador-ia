@@ -1,5 +1,10 @@
 # Cambios
 
+## 2.8.1 — El GATE entiende cómo apruebas y no frena la exploración
+- **Aprobación en lenguaje natural**: además de "sí", "dale", "ok" o "apruebo", ahora aprueban el plan "desarrolla", "desarrollar", "impleméntalo", "implementa todo", "procede con el plan", "hazlo", "avanza", "manos a la obra", "ya po", "bueno, desarrolla"… (con o sin tilde). Antes, "desarrollar" se tomaba como un pedido nuevo y volvía a bloquear. Lo que no aprueba: negar o pedir esperar ("todavía no", "espera", "pero antes…"), preguntar, o pedir algo nuevo ("desarrolla el módulo de pagos").
+- **Explorar antes de aprobar**: el GATE ya no frena comandos de lectura que no estaban en la lista (jq, fd, tree, `Get-ChildItem | Select-String`, `xargs grep`…). Solo frena lo que puede escribir archivos: redirecciones, `sed -i`, copiar o mover, scripts e intérpretes, generadores y formateadores (`--fix`, `--write`, `-u`).
+- La IA ya no le pide al usuario una palabra exacta para aprobar.
+
 ## 2.8.0 — Carpetas con varios proyectos y workspaces: la IA no pierde el hilo
 - **Espacio de trabajo**: el harness detecta los proyectos dentro de lo que abriste (una carpeta con varios repos o subproyectos, un monorepo, un workspace multi-raíz de VS Code o un `.sdd/workspace.json`) por sus marcadores (`.git`, `package.json`, `angular.json`, `go.mod`, `pom.xml`, `build.gradle`, `.csproj`/`.sln`, `pyproject.toml`, `pubspec.yaml`, Xcode, Helm, Terraform…), hasta 3 niveles, con su stack y si tiene memoria.
 - **Mapa al iniciar y tras compactar**: una línea por proyecto y la instrucción de buscar en todos los involucrados antes de concluir. El orquestador lo pasa a cada sub-agente y lanza un explorer por proyecto.

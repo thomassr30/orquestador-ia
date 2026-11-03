@@ -144,3 +144,25 @@ test('el contexto antepuesto no dispara "directo" ni pedidos de cambio, ni entra
   assert.strictEqual(c.objetivo, 'agrega un filtro por fecha');
   assert.ok(gate.editBlockReason(c, cfg).includes('«agrega un filtro por fecha»'), 'el bloqueo muestra qué leyó el harness');
 });
+
+test('aprobación en lenguaje natural: avanzar con el plan sí, pedidos nuevos o esperas no', () => {
+  const yes = ['desarrollar', 'desarrolla', 'Desarróllalo', 'implementa', 'impleméntalo tal cual', 'implementa todo', 'desarrolla lo propuesto', 'procede con el plan',
+    'dale, desarrolla', 'ok, implementa', 'ya po', 'ya, dale', 'ya', 'bueno, desarrolla', 'entonces implementa', 'hazlo', 'hágalo', 'manos a la obra', 'perfecto, procede',
+    'avanza', 'continúa', 'si puedes, desarrolla', 'por favor implementa', 'ejecuta el plan', 'aplica los cambios', 'empieza', 'go ahead', 'bacán', 'ya, implementa no más'];
+  const no = ['no desarrolles todavía', 'todavía no', 'espera', 'desarrolla el módulo de pagos', 'implementa un filtro por fecha', '¿implementas también el login?',
+    'sigue con lo que falta en el reporte de ventas', 'ok pero antes explícame el cambio en el servicio', 'antes de implementar revisa el modelo', 'aún no implementes',
+    'primero explica por qué', 'ya está listo el deploy en qa', 'bien raro lo que pasa', 'si puedes agrega un botón'];
+  for (const t of yes) assert.ok(gate.isApproval(t), t);
+  for (const t of no) assert.ok(!gate.isApproval(t), t);
+});
+
+test('caso real: el usuario responde "desarrollar" al plan → aprobado (no se reabre como pedido nuevo)', () => {
+  const s = st();
+  s.conMensajes = true;
+  gate.onPrompt(s, 'agrega el catálogo de actos con su e2e', cfg);
+  gate.onStop(s, 'Plan…\n¿Apruebo la implementación? (sí / no / ajustes)');
+  gate.onPrompt(s, 'desarrollar', cfg);
+  assert.strictEqual(s.gate.estado, 'aprobado');
+  assert.strictEqual(gate.editBlockReason(s, cfg), null);
+  assert.ok(gate.isPureApproval('desarrollar'), 'también sirve para el respaldo desde la conversación');
+});

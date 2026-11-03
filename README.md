@@ -178,7 +178,7 @@ revisa los cambios antes de subir                → [SDD] Flujo: review
 muéstrame cómo se ve /clientes en móvil          → [SDD] Flujo: browser
 ```
 
-- **Pedido de cambio → plan → tu "sí"**: el agente explora y te muestra el plan en el chat. Aprueba con `sí` (con o sin tilde), `dale`, `ok` o `apruebo`; también vale `sí, pero…`.
+- **Pedido de cambio → plan → tu "sí"**: el agente explora y te muestra el plan en el chat. Apruébalo como te salga: `sí`, `dale`, `ok`, `ya`, `desarrolla`, `impleméntalo`, `procede con el plan`, `sí, pero…` (con o sin tilde). Antes de tu aprobación la IA puede leer, buscar y correr tests; lo que se frena es modificar archivos.
 - **"directo"** para cambios triviales: edita sin plan y pasa igual por los sensores. Vale para ese mensaje.
 - **"sin sdd"** apaga el orquestador **para el resto de la conversación**: la IA trabaja como asistente normal, sin flujos, sub-agentes ni plan. **"con sdd"** lo vuelve a encender. Las reglas de git y secretos siguen activas.
 - **Al terminar**, el harness revisa lint, tipos y tests de lo modificado. Si algo falla, el agente corrige o te explica por qué no corresponde.

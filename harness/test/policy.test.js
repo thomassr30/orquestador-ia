@@ -103,3 +103,11 @@ test('separación de comandos compuestos respeta comillas y 2>&1', () => {
   assert.deepStrictEqual(splitSegments('echo "a && b" && c'), ['echo "a && b"', 'c']);
   assert.deepStrictEqual(splitSegments('npm test 2>&1'), ['npm test 2>&1']);
 });
+
+test('GATE: antes de aprobar se explora libremente; solo se frena lo que puede escribir archivos', () => {
+  const { mayWrite } = require('../src/policy');
+  for (const c of ['jq .scripts package.json', 'fd component src', 'tree -L 2', 'Get-ChildItem -Recurse src | Select-String HttpClient', 'Test-Path src/app',
+    'find . -name "*.ts" | xargs grep -l HttpClient', 'npm ls react', 'node --version', 'du -sh src', 'npx eslint src', 'npx prettier --check .']) assert.ok(!mayWrite(c), c);
+  for (const c of ['sed -i s/a/b/ x', 'echo x > a.ts', 'cp a b', 'npx prettier --write .', 'npx eslint --fix .', 'npm run format', 'node scripts/gen.js', 'sh .githooks/pre-push',
+    'ng generate component x', 'go mod tidy', 'find . -name "*.orig" | xargs rm', 'Set-Content a.txt x', 'npx vitest run -u']) assert.ok(mayWrite(c), c);
+});
