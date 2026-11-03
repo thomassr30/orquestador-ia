@@ -24,7 +24,10 @@ test('Claude Code: GATE, permisos, sensores al terminar y checkpoint de sesión'
 
   assert.match(hook('claude', 'UserPromptSubmit', { ...base, prompt: 'agrega un contador de visitas' }).json.hookSpecificOutput.additionalContext, /Pedido de cambio/);
   assert.strictEqual(hook('claude', 'PreToolUse', edit).json.hookSpecificOutput.permissionDecision, 'deny', 'sin plan aprobado no se edita');
-  assert.notStrictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'npm test' } }).json.hookSpecificOutput.permissionDecision, 'deny', 'los tests sí se pueden correr (con salida compactada)');
+  // HOME y política de la organización temporales: sin reglas de Claude del equipo (como en CI), el harness no opina
+  const home = tmp('sdd-home-claude-');
+  const claudeEnv = { HOME: home, USERPROFILE: home, SDD_CLAUDE_MANAGED_DIR: tmp('sdd-managed-') };
+  assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'npm test' } }, claudeEnv).json, null, 'los tests sí se pueden correr con el plan pendiente');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: `node "${require('os').homedir().replace(/\\/g, '/')}/.sdd-orquestador/bin/sdd-harness.js" estado` } }).json, null, '/sdd-status funciona con el plan pendiente');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'git commit -am x' } }).json.hookSpecificOutput.permissionDecision, 'deny');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'kubectl apply -f k8s/' } }).json.hookSpecificOutput.permissionDecision, 'ask');
