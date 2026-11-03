@@ -25,6 +25,7 @@ JavaScript CommonJS en Node.js ≥18, sin dependencias; comandos y pruebas en pa
 - Los tests no deben escribir credenciales literales (el propio harness lo bloquea): armarlas en tiempo de ejecución.
 - `claude` real está en C:\nodejs junto a node.exe: los tests de sdd-eval usan SDD_EVAL_CLAUDE_BIN y un PATH sin esa carpeta.
 - En Codex/OpenCode el git no destructivo se delega a reglas nativas (nativeGitAsk): usar Gemini/Cursor en pruebas de aprobación por chat de git.
+- Leer stdin en scripts: como stream hasta «end», nunca fs.readFileSync(0) después de tocar process.stdin (en Linux/macOS queda no bloqueante y falla con EAGAIN si la entrada llega tarde; en Windows no se ve).
 - Tests de hooks de Claude que pasan por la compactación dependen de ~/.claude/settings.json del equipo (claude-permisos.js): en CI no existe. Usar HOME/USERPROFILE y SDD_CLAUDE_MANAGED_DIR temporales (claudeEnv en hook.e2e.test.js). Para simular CI en local: HOME vacío fuera de %TEMP% y ruta de TEMP con las mayúsculas reales (si no, fallan sensors/corpus por artefacto).
 
 ## Contexto relevante

@@ -5,7 +5,8 @@ Resuelto en 3.0.0 (2026-11-03): resultado de evaluaciones, fallo que persiste tr
 Abierto:
 - [x] Compactador en Claude (claude.js:25): resuelto 2026-11-03 con la opción a (adapters/claude-permisos.js). Límite: no ve políticas por registro, perfil de macOS, servidor ni --allowedTools/--disallowedTools.
 - [ ] Integración real por cliente (doctor nivel d) sin confirmar: requiere instalar 3.0.0 y usar cada cliente; Cursor no instalado en este equipo.
-- [ ] Ejecutar CI en macOS/Linux (solo se probó en Windows localmente).
+- [ ] Ejecutar CI en macOS/Linux (solo se probó en Windows localmente). 2026-11-03: corregidos el test que dependía de ~/.claude/settings.json y la lectura de stdin (EAGAIN); falta ver el CI en verde.
+- [ ] «sin sdd» se detecta dentro de contenido pegado (un log con el nombre del test 143 apagó el orquestador): la detección debería ignorar el texto pegado, como ya se hace con el contexto antepuesto.
 - [ ] sdd-eval: cliente Codex pendiente (no instalado); modo «flujo» y formato JSON de Claude solo probados con binario falso. No se ejecutaron evaluaciones con modelos.
 - [ ] Si el módulo del harness no carga (instalación dañada), el hook falla abierto; queda en ultimo-error.json.
 - [ ] Detección de escrituras por Bash es de mejor esfuerzo (intérpretes y scripts pueden escribir sin destino reconocible). No es un sandbox.

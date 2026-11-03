@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const { project, tmp, REPO } = require('./helpers');
 
 const SDD_HOME = tmp('sdd-home-');
@@ -112,6 +112,21 @@ test('un error interno nunca bloquea (falla abierta) y la salida es solo JSON', 
   assert.strictEqual(r.stdout, '');
   const u = spawnSync(process.execPath, [HOOK, 'desconocida', 'X'], { input: '{}', encoding: 'utf8', env: { ...process.env, SDD_HOME } });
   assert.strictEqual(u.status, 0);
+});
+
+test('la entrada que llega tarde por stdin se espera (antes, en Linux/macOS se leía vacía y la acción pasaba sin control)', async () => {
+  const dir = project({ 'a.js': '' });
+  const input = { session_id: 'tarde', cwd: dir, tool_name: 'Bash', tool_input: { command: 'git commit -am x' } };
+  const out = await new Promise((resolve, reject) => {
+    const k = spawn(process.execPath, [HOOK, 'claude', 'PreToolUse'], { env: { ...process.env, SDD_HOME } });
+    let s = '';
+    k.stdout.on('data', x => { s += x; });
+    k.on('error', reject);
+    k.on('close', () => resolve(s.trim()));
+    setTimeout(() => k.stdin.end(JSON.stringify(input)), 500);
+  });
+  assert.ok(out, 'el hook respondió vacío: leyó stdin antes de que llegara la entrada');
+  assert.strictEqual(JSON.parse(out).hookSpecificOutput.permissionDecision, 'deny');
 });
 
 test('con el plan pendiente, la IA puede explorar con cualquier comando de lectura (Codex)', () => {

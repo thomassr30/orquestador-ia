@@ -6,18 +6,23 @@
 // Sin red, sin claves y sin dependencias. Ante un error interno antes de una acción, lo crítico no pasa sin
 // confirmación (falla cerrada, como core.failSafe); lo demás sigue y el error queda en ultimo-error.json para doctor.
 'use strict';
-const fs = require('fs');
 const path = require('path');
 
 const SRC = path.join(__dirname, '..', 'harness', 'src');
 const [host, native] = process.argv.slice(2);
 
+// Se lee como stream hasta que el cliente cierra la entrada. Con fs.readFileSync(0), en Linux/macOS el descriptor queda
+// no bloqueante al tocar process.stdin: si el JSON aún no llegaba, fallaba (EAGAIN) y el hook respondía vacío.
 function readInput() {
-  try {
-    if (process.stdin.isTTY) return {};
-    const raw = fs.readFileSync(0, 'utf8');
-    return raw.trim() ? JSON.parse(raw) : {};
-  } catch { return {}; }
+  return new Promise(resolve => {
+    const stdin = process.stdin;
+    if (stdin.isTTY) { resolve({}); return; }
+    let raw = '';
+    stdin.setEncoding('utf8');
+    stdin.on('data', c => { raw += c; });
+    stdin.on('end', () => { try { resolve(raw.trim() ? JSON.parse(raw) : {}); } catch { resolve({}); } });
+    stdin.on('error', () => resolve({}));
+  });
 }
 
 // Evento real recibido del cliente (sin contenido; las pruebas de doctor con SDD_DOCTOR=1 no cuentan).
@@ -55,7 +60,7 @@ function failClosed(adapter, input, e) {
     adapter = require(path.join(SRC, 'adapters'))[host];
     if (adapter) {
       observe(adapter);
-      input = readInput();
+      input = await readInput();
       const ev = adapter.parse(native, input, process.env);
       if (ev) out = adapter.format(native, (await require(path.join(SRC, 'core')).handle(ev)) || {}, ev) || {};
     }
