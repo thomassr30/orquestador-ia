@@ -1,0 +1,33 @@
+{
+  "descripcion": "PostToolUse: el aviso va como additionalContext",
+  "eventoNativo": "PostToolUse",
+  "entrada": {
+    "session_id": "x1",
+    "cwd": "/tmp/proyecto-sdd",
+    "tool_name": "Write",
+    "tool_input": {
+      "file_path": "b.js",
+      "content": "x"
+    }
+  },
+  "normalizado": {
+    "event": "post",
+    "tool": {
+      "kind": "edit",
+      "paths": [
+        "b.js"
+      ]
+    }
+  },
+  "resultado": {
+    "feedback": "f"
+  },
+  "salida": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "f"
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "tema": "argumentos-cambiados",
+  "nombre": "lo aprobado no vale si cambian los argumentos o el contenido",
+  "pasos": [
+    { "evento": "pre", "herramienta": { "kind": "mcp", "name": "mcp__notion__notion-update-page", "server": "notion", "tool": "notion-update-page", "args": { "page": "A" } }, "espera": { "decision": "deny" } },
+    { "evento": "prompt", "texto": "sí" },
+    { "evento": "pre", "herramienta": { "kind": "mcp", "name": "mcp__notion__notion-update-page", "server": "notion", "tool": "notion-update-page", "args": { "page": "B", "borrar": true } }, "nota": "otros argumentos", "espera": { "decision": "deny" } },
+    { "evento": "pre", "herramienta": { "kind": "mcp", "name": "mcp__notion__notion-update-page", "server": "notion", "tool": "notion-update-page", "args": { "page": "A" } }, "espera": { "decision": "permitido" } },
+    { "evento": "pre", "herramienta": { "kind": "edit", "name": "Write", "paths": [".sdd/harness.json"], "contents": ["{\"gate\":\"auto\"}"] }, "espera": { "decision": "deny", "motivo": "configuración del harness" } },
+    { "evento": "prompt", "texto": "sí" },
+    { "evento": "pre", "herramienta": { "kind": "edit", "name": "Write", "paths": [".sdd/harness.json"], "contents": ["{\"gate\":\"nunca\"}"] }, "nota": "otro contenido", "espera": { "decision": "deny" } }
+  ]
+}

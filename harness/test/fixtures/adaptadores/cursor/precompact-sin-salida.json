@@ -1,0 +1,19 @@
+{
+  "descripcion": "preCompact: sin salida (no hay reinyección de contexto)",
+  "eventoNativo": "preCompact",
+  "entrada": {
+    "conversation_id": "c1",
+    "workspace_roots": [
+      "/tmp/proyecto-sdd"
+    ]
+  },
+  "normalizado": {
+    "event": "compact"
+  },
+  "resultado": {
+    "context": "c"
+  },
+  "salida": {
+    "stdout": null
+  }
+}

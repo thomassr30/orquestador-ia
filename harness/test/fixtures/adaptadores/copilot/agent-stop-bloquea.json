@@ -1,0 +1,22 @@
+{
+  "descripcion": "agentStop: decision block",
+  "eventoNativo": "agentStop",
+  "entrada": {
+    "sessionId": "p1",
+    "cwd": "/tmp/proyecto-sdd",
+    "lastAssistantMessage": "Listo."
+  },
+  "normalizado": {
+    "event": "stop",
+    "lastMessage": "Listo."
+  },
+  "resultado": {
+    "block": "b"
+  },
+  "salida": {
+    "stdout": {
+      "decision": "block",
+      "reason": "b"
+    }
+  }
+}

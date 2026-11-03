@@ -1,0 +1,24 @@
+{
+  "descripcion": "SessionStart tras compactar: el contexto vuelve como additionalContext",
+  "eventoNativo": "SessionStart",
+  "entrada": {
+    "session_id": "s1",
+    "cwd": "/tmp/proyecto-sdd",
+    "source": "compact"
+  },
+  "normalizado": {
+    "event": "session",
+    "source": "compact"
+  },
+  "resultado": {
+    "context": "c"
+  },
+  "salida": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "SessionStart",
+        "additionalContext": "c"
+      }
+    }
+  }
+}

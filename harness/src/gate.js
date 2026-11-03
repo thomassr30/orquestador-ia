@@ -4,6 +4,9 @@
 //   inicial ──(pedido de cambio)──► requerido ──(el agente pregunta)──► pendiente ──(usuario: "sí")──► aprobado
 //   cualquier estado ──("directo" / "sin plan")──► libre
 
+const A = require('./aprobaciones');
+const { redact } = require('./secrets');
+
 // Límites de palabra que entienden tildes y ñ (\b de JavaScript solo considera ASCII).
 const W = '[\\p{L}\\p{N}_]';
 const words = (list, flags = 'iu') => new RegExp(`(?<!${W})(?:${list})(?!${W})`, flags);
@@ -105,22 +108,16 @@ function asksUser(lastMessage) {
  */
 function onPrompt(state, prompt, cfg) {
   const text = userText(prompt);
-  state.mensajeUsuario = text.replace(/\s+/g, ' ').slice(0, 60);
+  state.mensajeUsuario = redact(text.replace(/\s+/g, ' ')).slice(0, 60);
   const notes = [];
   const g = state.gate;
   const approval = isApproval(text);
   const now = new Date().toISOString();
 
-  // Comandos críticos que esperaban confirmación en el chat
-  const commandsPending = state.aprobaciones.pendientes.length > 0;
-  if (approval && commandsPending) {
-    const recent = state.aprobaciones.pendientes.filter(p => Date.now() - Date.parse(p.en) < 30 * 60000);
-    state.aprobaciones.aprobadas = [...state.aprobaciones.aprobadas, ...recent.map(p => ({ clave: p.clave, en: now }))].slice(-10);
-    state.aprobaciones.pendientes = [];
-    if (recent.length) notes.push(`El usuario aprobó: ${recent.map(p => p.clave).join(' · ')}. Puedes ejecutarlo tal cual (una vez).`);
-  } else if (!approval && commandsPending) {
-    state.aprobaciones.pendientes = [];
-  }
+  // Acciones críticas que esperaban confirmación en el chat (ligadas a la acción exacta; ver aprobaciones.js)
+  const reply = A.onUserReply(state, text, approval, { vigenciaMin: Number((cfg.aprobaciones || {}).vigenciaMin) || 30 });
+  const commandsPending = reply.habia;
+  notes.push(...reply.notas);
 
   // Orquestador apagado por el usuario para esta conversación: sin GATE ni flujos hasta que diga «con sdd».
   const wasOff = state.sdd === 'off';
@@ -144,14 +141,14 @@ function onPrompt(state, prompt, cfg) {
   const approvesPlan = approval && ((g.estado === 'pendiente' && (g.conPlan || !commandsPending)) || (g.estado === 'requerido' && !commandsPending && !state.conMensajes));
   if (ESCAPE.test(text)) {
     state.gate = { estado: 'libre', desde: now };
-    state.objetivo = text.replace(/\s+/g, ' ').trim().slice(0, 300);
+    state.objetivo = redact(text.replace(/\s+/g, ' ').trim()).slice(0, 300);
     notes.push('Pedido marcado como directo: puedes editar sin presentar plan (igual valida con tests/lint).');
   } else if (approvesPlan) {
     state.gate = { estado: 'aprobado', desde: now };
     notes.push('Plan aprobado por el usuario: puedes implementar. Los sensores revisarán el código al terminar.');
   } else if (isChangeRequest(text) && !(approval && (g.estado === 'aprobado' || commandsPending)) && !(g.estado === 'aprobado' && CONTINUE.test(text))) {
     state.gate = { estado: 'requerido', desde: now };
-    state.objetivo = text.replace(/\s+/g, ' ').trim().slice(0, 300);
+    state.objetivo = redact(text.replace(/\s+/g, ' ').trim()).slice(0, 300);
     notes.push('Pedido de cambio: las ediciones de código quedan bloqueadas hasta que presentes el plan y el usuario lo apruebe («¿Apruebo la implementación? (sí / no / ajustes)»); explorar, leer y correr tests sí puedes. Si es trivial, pregunta si lo aplicas directo.');
   }
   return notes;

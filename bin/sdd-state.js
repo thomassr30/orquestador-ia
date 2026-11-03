@@ -4,10 +4,13 @@
 //   node sdd-state.js <id> --phase <fase> --status <pending|running|done|failed|skipped> [--note "texto"]
 //   node sdd-state.js <id> --approve | --retry | --close | --show
 //   node sdd-state.js <id> --accept-exception "gate: motivo"   (solo con aprobación explícita del usuario)
+// OBSOLETO desde 3.0.0: el estado verificable del trabajo vive en «sdd-harness.js trabajo» (fuera del repo, con
+// evidencias del harness). --approve y --accept-exception solo los ejecuta el usuario (la política se los niega al agente).
 'use strict';
 const fs = require('fs');
 const path = require('path');
 
+console.error('[obsoleto] sdd-state.js se mantiene por compatibilidad. Usa: node sdd-harness.js trabajo (estado verificable con evidencias).');
 const args = process.argv.slice(2);
 const id = args[0];
 if (!id || id.startsWith('--')) { console.error('Uso: node sdd-state.js <id> [--phase f --status s] [--note t] [--approve|--retry|--close|--show]'); process.exit(1); }

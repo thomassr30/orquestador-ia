@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "tema": "recuperacion-de-checkpoint",
+  "nombre": "el punto de restauración previo a la edición devuelve el archivo a su contenido original",
+  "archivos": { "src/a.js": "original" },
+  "commit": true,
+  "pasos": [
+    { "evento": "prompt", "texto": "arregla a.js, directo" },
+    { "evento": "pre", "herramienta": { "kind": "edit", "name": "Write", "paths": ["src/a.js"], "contents": ["modificado"] }, "espera": { "decision": "permitido" } },
+    { "accion": "escribir", "archivo": "src/a.js", "contenido": "modificado" },
+    { "accion": "cli", "args": ["deshacer", "--confirmar"], "espera": { "codigo": 0, "salida": "restaurado" } },
+    { "accion": "archivo", "archivo": "src/a.js", "contenido": "original" }
+  ]
+}

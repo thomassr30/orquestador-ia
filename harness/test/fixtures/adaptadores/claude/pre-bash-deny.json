@@ -1,0 +1,36 @@
+{
+  "descripcion": "PreToolUse de Bash: el núcleo deniega y Claude Code recibe permissionDecision deny",
+  "eventoNativo": "PreToolUse",
+  "entrada": {
+    "session_id": "s1",
+    "cwd": "/tmp/proyecto-sdd",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git commit -m x"
+    }
+  },
+  "normalizado": {
+    "host": "claude",
+    "event": "pre",
+    "nativeAsk": true,
+    "sessionId": "s1",
+    "tool": {
+      "kind": "shell",
+      "command": "git commit -m x"
+    }
+  },
+  "resultado": {
+    "decision": "deny",
+    "reason": "[harness] no"
+  },
+  "salida": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "[harness] no"
+      }
+    }
+  }
+}

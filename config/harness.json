@@ -2,19 +2,26 @@
   "_comentario": "Configuración global del harness SDD. Cada proyecto puede sobrescribirla con .sdd/harness.json (mismas claves). El agente no puede modificar estos archivos sin tu permiso.",
   "_gate": "auto: un pedido de cambio bloquea las ediciones hasta que apruebas el plan en el chat · siempre: toda edición requiere plan aprobado · nunca: sin GATE por código",
   "gate": "auto",
+  "_modo": "normal: ante un error interno del harness, falla cerrada solo para acciones críticas (git que escribe, dependencias, infraestructura, MCP que escribe, rutas protegidas); lo demás sigue y queda registrado. estricto: falla cerrada para todo salvo lecturas, las herramientas que el harness no reconoce piden confirmación y los comandos no reconocidos como seguros también. Ninguno de los dos es un sandbox: el aislamiento de archivos, procesos y red depende del cliente.",
+  "modo": "normal",
   "sensores": {
     "_alEditar": "chequeo instantáneo de cada archivo editado: JSON/YAML válidos, conflictos de merge, sintaxis Go",
     "alEditar": true,
-    "_alTerminar": "al terminar cada turno con código modificado se ejecutan estos sensores sobre lo cambiado; si fallan, el agente debe corregir antes de terminar",
+    "_alTerminar": "al terminar cada turno con código modificado (también por comandos de shell, detectado con git) se ejecutan estos sensores sobre lo cambiado. Resultado: aprobado · fallido · no verificado (timeout, herramienta ausente, sin tiempo o errores fuera de lo modificado sin línea base) · excepción autorizada. Lo omitido nunca cuenta como aprobado.",
     "alTerminar": [
       "lint",
       "tipos",
+      "tests"
+    ],
+    "_obligatorios": "si el proyecto tiene estos controles, deben correr y pasar: si fallan o no se pueden verificar, el agente no puede dar el cambio por verificado. Tras maxBloqueos el harness deja de insistir, pero el cambio sigue pendiente hasta corregirlo o hasta que tú autorices una excepción («sí» en el chat o sdd-harness.js excepcion --motivo …), que vale solo para ese contenido.",
+    "obligatorios": [
       "tests"
     ],
     "_comandos": "vacío = detección automática por stack (eslint/tsc/vitest/jest, go vet/go test). Ejemplo: {\"tipos\": \"npx tsc --noEmit -p tsconfig.app.json\", \"tests\": \"npx vitest related --run {archivos}\"}",
     "comandos": {},
     "timeoutSeg": 240,
     "presupuestoSeg": 600,
+    "_maxBloqueos": "veces seguidas que se impide terminar el turno con controles fallidos u obligatorios sin verificar. Agotarlas NO aprueba nada. Para afirmar que un error ya existía, toma la línea base sobre el último commit sin cambios: sdd-harness.js linea-base.",
     "maxBloqueos": 2,
     "_ejemplos": {
       "android": {
@@ -39,12 +46,31 @@
     "denegar": [],
     "_mcp": "mcpLibres: servidores MCP que no piden confirmación (además de playwright, chrome-devtools y context7). mcpBloquear: servidor o servidor__herramienta a bloquear siempre.",
     "mcpLibres": [],
-    "mcpBloquear": []
+    "mcpBloquear": [],
+    "_porDefecto": "qué hacer con un comando que el harness no reconoce como seguro: ask (lo decide el cliente con sus propios permisos; en modo estricto, confirmación) o deny (bloquearlo).",
+    "porDefecto": "ask",
+    "_permitirSecretos": "true desactiva el bloqueo de lectura/escritura de archivos con secretos (.env, claves). No recomendado.",
+    "permitirSecretos": false
   },
-  "_presupuesto": "modo ahorro: pedidos tratados como pequeños/medianos y máximo maxSubagentes sub-agentes por mensaje tuyo; si el orquestador quiere más, te pregunta. normal: tope 6. libre: sin tope.",
+  "_aprobaciones": "Confirmaciones en el chat (Codex, Gemini, Cursor, OpenCode; Claude y Copilot usan su diálogo nativo): cada una vale para la acción EXACTA (mismo comando, argumentos o contenido), una sola vez y durante vigenciaMin minutos. Con varias pendientes, responde «sí 1,3» o «sí a todas»; un «sí» solo no aprueba ninguna.",
+  "aprobaciones": {
+    "vigenciaMin": 30
+  },
+  "_presupuesto": "modo ahorro: pedidos tratados como pequeños/medianos y máximo maxSubagentes sub-agentes por mensaje tuyo; si el orquestador quiere más, te pregunta. normal: tope 6. libre: sin tope. maxMinutosPorPedido: al superarse, el harness deja de exigir correcciones en ese turno (lo pendiente sigue sin verificar). maxTokensSesion: solo donde el cliente expone el consumo (hoy Claude Code, por su transcript); al agotarse se frenan escrituras y sub-agentes hasta que confirmes otro tramo. null = desactivado. El costo por sesión no lo informa ningún cliente: solo sdd-eval lo limita (--max-costo-usd).",
   "presupuesto": {
     "modo": "ahorro",
-    "maxSubagentes": 3
+    "maxSubagentes": 3,
+    "maxMinutosPorPedido": null,
+    "maxTokensSesion": null
+  },
+  "_trabajo": "Modelo de trabajo verificable (sdd-harness.js trabajo): una tarea que repite el mismo resultado fallido maxIntentosSinProgreso veces seguidas queda bloqueada «sin progreso».",
+  "trabajo": {
+    "maxIntentosSinProgreso": 3
+  },
+  "_salida": "compactar: las salidas largas de tests, lint y build llegan a la IA como errores + resumen (máximo maxCaracteres).",
+  "salida": {
+    "compactar": true,
+    "maxCaracteres": 4000
   },
   "_reglas": "Reglas propias del proyecto (van en .sdd/harness.json → reglas). Tipos: prohibido (regex), noImportar (capas), nombreArchivo (regex del nombre al crear), maxLineas. El mensaje le enseña a la IA cómo hacerlo bien. Copia y adapta un ejemplo de _ejemplosReglas.",
   "_ejemplosReglas": [
@@ -109,7 +135,7 @@
     "maxPuntos": 30,
     "excluir": []
   },
-  "_seguridad": "contenidoExterno: tras leer una web, un MCP externo o una descarga, los comandos que pueden enviar datos afuera piden confirmación (defensa contra instrucciones inyectadas). secretosEnCodigo: bloquea claves y tokens escritos en el código.",
+  "_seguridad": "contenidoExterno: tras leer una web, un MCP externo o una descarga, los comandos reconocidos que pueden enviar datos afuera piden confirmación (defensa contra instrucciones inyectadas; detección por patrones, no exhaustiva). secretosEnCodigo: bloquea claves y tokens con formato conocido escritos en el código, por ediciones o por comandos que escriben archivos.",
   "seguridad": {
     "contenidoExterno": true,
     "secretosEnCodigo": true

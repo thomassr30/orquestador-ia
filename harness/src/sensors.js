@@ -7,7 +7,9 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { runShell, hasCommand } = require('./proc');
-const { isInside, relPosix, IS_WIN, truncateMiddle } = require('./util');
+const { isInside, relPosix, IS_WIN, truncateMiddle, shortHash } = require('./util');
+const { combinar, verificado, SIMBOLO, ETIQUETA } = require('./resultado');
+const S = require('./state');
 
 const CODE_EXT = /\.(m?[jt]sx?|cjs|cts|mts|vue|svelte|go|java|kt|kts|swift|scss|sass|css|less|html|json|ya?ml|sql|graphql|gql|prisma)$/i;
 const JS_EXT = /\.(m?[jt]sx?|cjs|cts|mts|vue|svelte)$/i;
@@ -129,23 +131,89 @@ function plan(root, changed, cfg) {
 const MISSING_TOOL = /(No binary for ChromeHeadless|Cannot start ChromeHeadless|CHROME_BIN|could not determine executable to run|is not recognized as an internal or external command|no se reconoce como un comando interno o externo|command not found|: not found|npm ERR! missing script|npm error missing script|Oops! Something went wrong!.*ESLint|Cannot find module '(?:eslint|typescript|vitest|jest)')/is;
 const mentionsAny = (output, files = []) => { const o = String(output || '').replace(/\\/g, '/'); return files.some(f => o.includes(f)); };
 
-/** Ejecuta los sensores en secuencia respetando el presupuesto de tiempo. */
+// ---------- Línea base: errores que ya existían en el último commit, para no culpar al cambio sin evidencia ----------
+const ERROR_LINE = /(error|✗|×|✖|FAIL|failed|panic:|undefined:|cannot |\.(?:[jt]sx?|go|vue|html|scss|css)[:(]\d+)/i;
+/** Huellas de las líneas de error, sin posiciones ni tiempos (mover código no las cambia). Solo hashes: nada de contenido. */
+function errorLines(output, root) {
+  const base = String(root || '').replace(/\\/g, '/');
+  return [...new Set(String(output || '').replace(/\\/g, '/').split('\n')
+    .filter(l => ERROR_LINE.test(l))
+    .map(l => l.split(base).join('').replace(/\(\d+,\d+\)|:\d+(?::\d+)?|\b\d+(?:\.\d+)?\s*m?s\b/g, '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .map(l => shortHash(l)))];
+}
+/** Firma de un fallo (para detectar intentos sin progreso): mismas líneas de error → misma firma. */
+const failureSignature = (output, root) => shortHash(errorLines(output, root).sort().join('|'));
+
+const baselineFile = root => path.join(S.projectDir(root), 'linea-base.json');
+const headOf = root => { const r = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 10000 }); return r.status === 0 ? r.stdout.trim() : null; };
+/** Línea base vigente (tomada sobre el commit actual) o null con el motivo. */
+function validBaseline(root) {
+  const lb = readJson(baselineFile(root));
+  if (!lb) return { lb: null, motivo: 'sin línea base (sdd-harness linea-base)' };
+  const head = headOf(root);
+  if (!head || head !== lb.commit) return { lb: null, motivo: `la línea base es del commit ${String(lb.commit || '?').slice(0, 8)} y el actual es ${String(head || '?').slice(0, 8)} (vuelve a tomarla)` };
+  return { lb, motivo: '' };
+}
+function saveBaseline(root, data) {
+  fs.mkdirSync(path.dirname(baselineFile(root)), { recursive: true });
+  fs.writeFileSync(baselineFile(root), JSON.stringify(data, null, 1));
+}
+
+/**
+ * Ejecuta los sensores en secuencia respetando el presupuesto de tiempo. Cada resultado lleva su estado del contrato
+ * (resultado.js): lo que no corrió o no se pudo atribuir queda «no_verificado» con su motivo, nunca aprobado.
+ * @returns {Promise<{ran:boolean, estado:string, motivo:string, ok:boolean, results:object[]}>}
+ */
 async function runSensors(root, changed, cfg) {
   const steps = plan(root, changed, cfg);
+  const required = new Set(cfg.sensores.obligatorios || []);
   const results = [];
+  const deadline = Date.now() + cfg.sensores.presupuestoSeg * 1000;
+  let base = null;
+  const push = (s, estado, extra = {}) => results.push({ ...s, obligatorio: required.has(s.nombre), estado, ok: verificado(estado), ...extra });
+  for (const s of steps) {
+    const left = deadline - Date.now();
+    if (left < 5000) { push(s, 'no_verificado', { motivo: 'sin tiempo: se agotó el presupuesto de los sensores' }); continue; }
+    const r = await runShell(s.cmd, { cwd: s.cwd, timeoutMs: Math.min(cfg.sensores.timeoutSeg * 1000, left) });
+    if (r.code !== 0 && MISSING_TOOL.test(r.output.slice(0, 2000))) push(s, 'no_verificado', { motivo: 'herramienta no instalada o sin configurar', ms: r.ms });
+    else if (r.timedOut) push(s, 'no_verificado', { motivo: `excedió ${Math.round(r.ms / 1000)} s`, ms: r.ms });
+    else if (r.code !== 0 && !s.scoped && !mentionsAny(r.output, s.files)) {
+      // Chequeo de todo el proyecto con errores solo en archivos no tocados: se compara con la línea base del commit.
+      base = base || validBaseline(root);
+      const known = base.lb && base.lb.controles && base.lb.controles[`${s.modulo}:${s.nombre}`];
+      const fresh = known ? errorLines(r.output, s.cwd).filter(h => !known.lineas.includes(h)) : null;
+      if (!known) push(s, 'no_verificado', { motivo: `errores en archivos no modificados; ${base.lb ? 'la línea base no tiene este control' : base.motivo}`, ms: r.ms, code: r.code, output: r.output });
+      else if (!fresh.length) push(s, 'aprobado', { motivo: `sin errores nuevos respecto de la línea base (${String(base.lb.en).slice(0, 10)})`, ms: r.ms });
+      else push(s, 'fallido', { motivo: `${fresh.length} error(es) nuevo(s) respecto de la línea base`, ms: r.ms, code: r.code, output: r.output, firma: failureSignature(r.output, s.cwd) });
+    } else if (r.code === 0) push(s, 'aprobado', { code: 0, ms: r.ms });
+    else push(s, 'fallido', { code: r.code, ms: r.ms, output: r.output, firma: failureSignature(r.output, s.cwd) });
+  }
+  if (!steps.length) return { ran: false, estado: 'no_verificado', motivo: 'no hay controles aplicables a los archivos modificados', ok: false, results };
+  const c = combinar(results);
+  return { ran: true, estado: c.estado, motivo: c.motivo, ok: verificado(c.estado), results };
+}
+
+/**
+ * Toma la línea base sobre el commit actual (árbol sin cambios en archivos de código): ejecuta los chequeos de
+ * proyecto completo y guarda las huellas de sus errores. Así, después, un error «previo» se afirma con evidencia.
+ */
+async function takeBaseline(root, cfg, codeFiles) {
+  const head = headOf(root);
+  if (!head) return { ok: false, motivo: 'no es un repositorio git con commits' };
+  const steps = plan(root, codeFiles.slice(0, 2000), cfg).filter(s => !s.scoped);
+  const controles = {};
   const deadline = Date.now() + cfg.sensores.presupuestoSeg * 1000;
   for (const s of steps) {
     const left = deadline - Date.now();
-    if (left < 5000) { results.push({ ...s, omitido: true, ok: true, motivo: 'sin tiempo' }); continue; }
+    if (left < 5000) break;
     const r = await runShell(s.cmd, { cwd: s.cwd, timeoutMs: Math.min(cfg.sensores.timeoutSeg * 1000, left) });
-    if (r.code !== 0 && MISSING_TOOL.test(r.output.slice(0, 2000))) results.push({ ...s, omitido: true, ok: true, motivo: 'herramienta no instalada o sin configurar', ms: r.ms });
-    else if (r.timedOut) results.push({ ...s, ok: true, omitido: true, motivo: `excedió ${Math.round(r.ms / 1000)} s`, ms: r.ms });
-    else if (r.code !== 0 && !s.scoped && !mentionsAny(r.output, s.files)) {
-      // Chequeo de todo el proyecto con errores solo en archivos que no se tocaron: no es culpa de este cambio.
-      results.push({ ...s, ok: true, omitido: true, motivo: 'hay errores previos en archivos no modificados', ms: r.ms });
-    } else results.push({ ...s, ok: r.code === 0, code: r.code, ms: r.ms, output: r.output });
+    if (r.timedOut || (r.code !== 0 && MISSING_TOOL.test(r.output.slice(0, 2000)))) continue;
+    controles[`${s.modulo}:${s.nombre}`] = { lineas: r.code === 0 ? [] : errorLines(r.output, s.cwd), code: r.code };
   }
-  return { ran: steps.length > 0, ok: results.every(r => r.ok), results };
+  const data = { v: 1, commit: head, en: new Date().toISOString(), controles };
+  saveBaseline(root, data);
+  return { ok: true, data, pasos: steps.length };
 }
 
 /** Extrae las líneas útiles de una salida de error. */
@@ -159,12 +227,14 @@ function relevantLines(output, maxChars = 3500) {
 
 /** Resumen para el agente (motivo de bloqueo) o para el usuario. */
 function summarize(run, nFiles) {
-  const out = [`Sensores del harness sobre lo que modificaste (${nFiles} archivo(s)):`];
+  const out = [`Sensores del harness sobre lo que modificaste (${nFiles} archivo(s)) — resultado: ${ETIQUETA[run.estado] || run.estado}${run.motivo ? ` (${run.motivo})` : ''}`];
   for (const r of run.results) {
     const where = r.modulo && r.modulo !== '.' ? ` [${r.modulo}]` : '';
-    if (r.omitido) out.push(`• ${r.nombre}${where}: omitido (${r.motivo})`);
-    else if (r.ok) out.push(`✓ ${r.nombre}${where} (${Math.round(r.ms / 1000)} s)`);
-    else out.push(`✗ ${r.nombre}${where} — ${r.cmd} (código ${r.code}, ${Math.round(r.ms / 1000)} s)\n${relevantLines(r.output).split('\n').map(l => `  ${l}`).join('\n')}`);
+    const req = r.obligatorio ? ' [obligatorio]' : '';
+    const secs = r.ms !== undefined ? `, ${Math.round(r.ms / 1000)} s` : '';
+    if (r.estado === 'fallido') {
+      out.push(`✗ ${r.nombre}${where}${req} — ${r.cmd} (código ${r.code}${secs})${r.motivo ? ` · ${r.motivo}` : ''}\n${relevantLines(r.output).split('\n').map(l => `  ${l}`).join('\n')}`);
+    } else out.push(`${SIMBOLO[r.estado] || '•'} ${r.nombre}${where}${req}: ${ETIQUETA[r.estado] || r.estado}${r.motivo ? ` (${r.motivo})` : ''}${r.estado === 'aprobado' ? ` (${Math.round((r.ms || 0) / 1000)} s)` : ''}`);
   }
   return out.join('\n');
 }
@@ -214,4 +284,4 @@ function quickCheck(abs) {
   return issues.length ? issues : null;
 }
 
-module.exports = { runSensors, summarize, quickCheck, plan, detect, moduleRootFor, CODE_EXT, relevantLines };
+module.exports = { runSensors, takeBaseline, validBaseline, errorLines, failureSignature, summarize, quickCheck, plan, detect, moduleRootFor, CODE_EXT, relevantLines };

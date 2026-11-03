@@ -1,9 +1,13 @@
 ﻿# Pendientes (deuda, riesgos, preguntas abiertas)
 
-Propuestas de la revisión del 2026-11-02, sin aprobación de implementación:
-- [ ] Fortalecer el resultado de evaluaciones: éxito exige salida válida y proceso correcto, además del verificador; hoy `ok` no exige exit=0/JSON válido. Fuente: bin/sdd-eval.js:39.
-- [ ] Mantener fallo de calidad hasta resolución o excepción autorizada; hoy se libera el bloqueo tras maxBloqueos. Fuente: harness/src/core.js:369.
-- [ ] Vincular requisitos, tareas, evidencias de aceptación y cierre en el estado persistido. Fuente: harness/src/state.js:15 y bin/sdd-state.js.
-- [ ] Endurecer aprobaciones MCP ligándolas a argumentos; revisar aprobación conjunta de pendientes. Fuente: harness/src/core.js:252 y harness/src/gate.js:117.
-- [ ] Evaluar modo estricto ante fallas internas y recuperación segura de concurrencia. Fuente: harness/src/core.js:403 y harness/src/state.js:39.
-- [ ] Ampliar evaluaciones reproducibles más allá de Claude CLI. Fuente: bin/sdd-eval.js:39.
+Resuelto en 3.0.0 (2026-11-03): resultado de evaluaciones, fallo que persiste tras reintentos, vínculo requisitos-evidencias, aprobaciones MCP exactas y conjuntas, modo estricto y concurrencia del estado.
+
+Abierto:
+- [x] Compactador en Claude (claude.js:25): resuelto 2026-11-03 con la opción a (adapters/claude-permisos.js). Límite: no ve políticas por registro, perfil de macOS, servidor ni --allowedTools/--disallowedTools.
+- [ ] Integración real por cliente (doctor nivel d) sin confirmar: requiere instalar 3.0.0 y usar cada cliente; Cursor no instalado en este equipo.
+- [ ] Ejecutar CI en macOS/Linux (solo se probó en Windows localmente).
+- [ ] sdd-eval: cliente Codex pendiente (no instalado); modo «flujo» y formato JSON de Claude solo probados con binario falso. No se ejecutaron evaluaciones con modelos.
+- [ ] Si el módulo del harness no carga (instalación dañada), el hook falla abierto; queda en ultimo-error.json.
+- [ ] Detección de escrituras por Bash es de mejor esfuerzo (intérpretes y scripts pueden escribir sin destino reconocible). No es un sandbox.
+- [ ] Límites de eventos (1 MB × 5, 30 días) fijos en código; no configurables.
+- [ ] Soporte de «ask» en hooks de Copilot (vista previa) sin verificar en el host.

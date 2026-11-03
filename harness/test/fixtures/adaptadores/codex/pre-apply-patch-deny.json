@@ -1,0 +1,38 @@
+{
+  "descripcion": "apply_patch: rutas del parche y deny",
+  "eventoNativo": "PreToolUse",
+  "entrada": {
+    "session_id": "x1",
+    "cwd": "/tmp/proyecto-sdd",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Update File: a.js\n+b\n*** End Patch"
+    }
+  },
+  "normalizado": {
+    "host": "codex",
+    "event": "pre",
+    "nativeAsk": false,
+    "nativeGitAsk": true,
+    "sessionId": "x1",
+    "tool": {
+      "kind": "edit",
+      "paths": [
+        "a.js"
+      ]
+    }
+  },
+  "resultado": {
+    "decision": "deny",
+    "reason": "[harness] no"
+  },
+  "salida": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "[harness] no"
+      }
+    }
+  }
+}

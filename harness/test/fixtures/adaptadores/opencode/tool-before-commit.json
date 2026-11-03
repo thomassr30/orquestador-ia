@@ -1,0 +1,17 @@
+{
+  "descripcion": "tool.execute.before con git commit: el plugin lanza el error con el motivo",
+  "hook": "tool.execute.before",
+  "input": {
+    "tool": "bash",
+    "sessionID": "o1",
+    "callID": "1"
+  },
+  "output": {
+    "args": {
+      "command": "git commit -m x"
+    }
+  },
+  "esperado": {
+    "rechaza": "commits los hace el usuario"
+  }
+}

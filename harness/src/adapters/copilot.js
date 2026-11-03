@@ -1,7 +1,7 @@
 'use strict';
 // GitHub Copilot (modo agente de VS Code y Copilot CLI): hooks en ~/.copilot/hooks/*.json.
 // Formato camelCase: entrada toolName/toolArgs; salida permissionDecision, additionalContext, decision.
-const { resolveRoot, toText, lastFromTranscript, normalizeTool, json, first } = require('./common');
+const { resolveRoot, toText, lastFromTranscript, normalizeTool, json, first, registrados } = require('./common');
 
 const EVENTS = { sessionStart: 'session', userPromptSubmitted: 'prompt', preToolUse: 'pre', postToolUse: 'post', agentStop: 'stop', preCompact: 'compact' };
 
@@ -30,4 +30,21 @@ function format(native, r) {
   return {};
 }
 
-module.exports = { parse, format, EVENTS };
+// Capacidades que declara este adaptador según su código (contrato en capacidades.js). Que el cliente real las respete
+// no se comprueba aquí: doctor las cruza con la prueba sintética y con los eventos reales observados.
+const capacidades = {
+  hooks: registrados('copilot'),
+  bloqueoPrevio: 'si', aprobacion: 'nativa', finDeTurno: 'bloquea', compactacion: 'aviso-previo', resultados: 'todas', sesion: 'si', consumo: 'no_disponible', aislamiento: 'desconocido',
+  notas: {
+    bloqueoPrevio: 'preToolUse → permissionDecision (copilot.js:26) para todas las herramientas (hooks-config.js:76); los hooks de Copilot están en vista previa (install.js:369)',
+    aprobacion: 'pasa "ask" tal cual (copilot.js:13 nativeAsk, copilot.js:26); que el host muestre el diálogo no está verificado',
+    finDeTurno: 'agentStop → decision block (copilot.js:28); los avisos sin bloqueo no tienen salida',
+    compactacion: 'preCompact sin salida (copilot.js:30): el núcleo guarda la sesión, pero el contexto solo se entrega al iniciar (copilot.js:29)',
+    resultados: 'postToolUse sin matcher → additionalContext (hooks-config.js:77, copilot.js:27)',
+    sesion: 'sessionId del payload (copilot.js:15)',
+    consumo: 'usage.js solo entiende el transcript de Claude Code (usage.js:2)',
+    aislamiento: 'los hooks no aíslan; su sandbox no se verificó en documentación',
+  },
+};
+
+module.exports = { parse, format, EVENTS, capacidades };

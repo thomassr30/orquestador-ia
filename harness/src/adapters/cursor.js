@@ -1,7 +1,7 @@
 'use strict';
 // Cursor (editor y CLI): hooks en ~/.cursor/hooks.json. Claves de salida en snake_case.
 // "ask" no es confiable en Cursor: las decisiones críticas se confirman en el chat.
-const { resolveRoot, normalizeTool, json, first } = require('./common');
+const { resolveRoot, normalizeTool, json, first, registrados } = require('./common');
 
 const EVENTS = { sessionStart: 'session', beforeSubmitPrompt: 'prompt', beforeShellExecution: 'pre', beforeReadFile: 'pre', beforeMCPExecution: 'pre', preToolUse: 'pre',
   postToolUse: 'post', afterFileEdit: 'post', afterAgentResponse: 'response', stop: 'stop', preCompact: 'compact' };
@@ -52,4 +52,21 @@ function format(native, r) {
   return {};
 }
 
-module.exports = { parse, format, EVENTS };
+// Capacidades que declara este adaptador según su código (contrato en capacidades.js). Que el cliente real las respete
+// no se comprueba aquí: doctor las cruza con la prueba sintética y con los eventos reales observados.
+const capacidades = {
+  hooks: registrados('cursor'),
+  bloqueoPrevio: 'si', aprobacion: 'chat', finDeTurno: 'reintenta', compactacion: 'aviso-previo', resultados: 'ediciones', sesion: 'si', consumo: 'no_disponible', aislamiento: 'desconocido',
+  notas: {
+    bloqueoPrevio: 'permission deny + salida 2 en beforeShellExecution, beforeReadFile, beforeMCPExecution y preToolUse (cursor.js:45-46); preToolUse solo evalúa ediciones, task y web (cursor.js:20-22)',
+    aprobacion: '"ask" no es confiable en Cursor: deny + confirmación en el chat (cursor.js:3, cursor.js:33)',
+    finDeTurno: 'stop → followup_message: un mensaje nuevo al agente, no un bloqueo (cursor.js:50), máx. 3 veces (hooks-config.js:63)',
+    compactacion: 'preCompact sin salida (cursor.js:52): el núcleo guarda la sesión antes de compactar, pero no reinyecta contexto',
+    resultados: 'postToolUse y afterFileEdit solo para ediciones (cursor.js:18, cursor.js:22, hooks-config.js:60-61)',
+    sesion: 'conversation_id del payload (cursor.js:35)',
+    consumo: 'usage.js solo entiende el transcript de Claude Code (usage.js:2)',
+    aislamiento: 'los hooks no aíslan; su sandbox no se verificó en documentación',
+  },
+};
+
+module.exports = { parse, format, EVENTS, capacidades };

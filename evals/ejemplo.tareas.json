@@ -1,20 +1,31 @@
 {
-  "_comentario": "Copia este archivo, apunta 'proyecto' a un repo tuyo y define 5 a 10 tareas típicas con un comando que verifique el resultado. Ejecuta: node bin/sdd-eval.js evals/mis.tareas.json — trabaja sobre una copia temporal (tu carpeta no se toca) y consume tokens de tu plan.",
+  "_comentario": "Copia este archivo, apunta 'proyecto' a un repo tuyo y define 5 a 10 tareas típicas, cada una con un criterio de aceptación que el agente no pueda tocar ('aceptacion.archivos' se restauran antes de verificar; 'aceptacion.dir', fuera del proyecto, se copia recién cuando el agente terminó). Revisa con: node bin/sdd-eval.js evals/mis.tareas.json --validar. Sin --confirmar solo muestra qué correría; con --confirmar trabaja sobre una copia temporal de lo commiteado (tu carpeta no se toca) y consume tokens de tu plan. Agrega --linea-base para fijar la referencia contra la que se detectan regresiones. modo: 'sin-gate' (GATE apagado en la copia) o 'flujo' (el evaluador responde «sí» una vez a la pregunta del GATE).",
+  "version": "1",
   "proyecto": "C:/dev/mi-proyecto",
-  "preparar": "npm ci",
+  "cliente": "claude",
   "modelo": "sonnet",
+  "modo": "sin-gate",
+  "preparar": "npm ci",
+  "umbrales": { "maxRegresiones": 0 },
   "tareas": [
     {
       "nombre": "fix-chico",
       "pedido": "En el formulario de registro el botón Guardar no se deshabilita mientras se envía. Corrígelo, directo.",
-      "verificar": "npx vitest run src/app/registro",
-      "maxTurnos": 25
+      "maxTurnos": 25,
+      "timeoutMin": 20,
+      "aceptacion": {
+        "comando": "npx vitest run src/app/registro",
+        "archivos": ["src/app/registro/registro.component.spec.ts"]
+      }
     },
     {
       "nombre": "feature-mediana",
       "pedido": "Agrega un filtro por fecha al listado de muestras, con su test.",
-      "verificar": "npx vitest run src/app/muestras",
-      "maxTurnos": 50
+      "maxTurnos": 50,
+      "timeoutMin": 30,
+      "aceptacion": {
+        "comando": "npx vitest run src/app/muestras"
+      }
     }
   ]
 }

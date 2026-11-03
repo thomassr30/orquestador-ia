@@ -1,0 +1,23 @@
+{
+  "descripcion": "stop: un bloqueo se traduce en followup_message (mensaje nuevo, no bloqueo)",
+  "eventoNativo": "stop",
+  "entrada": {
+    "conversation_id": "c1",
+    "workspace_roots": [
+      "/tmp/proyecto-sdd"
+    ],
+    "status": "completed"
+  },
+  "normalizado": {
+    "event": "stop",
+    "aborted": false
+  },
+  "resultado": {
+    "block": "b"
+  },
+  "salida": {
+    "stdout": {
+      "followup_message": "b"
+    }
+  }
+}

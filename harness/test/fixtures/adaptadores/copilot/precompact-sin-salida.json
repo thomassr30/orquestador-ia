@@ -1,0 +1,17 @@
+{
+  "descripcion": "preCompact: sin salida (el contexto solo se entrega al iniciar)",
+  "eventoNativo": "preCompact",
+  "entrada": {
+    "sessionId": "p1",
+    "cwd": "/tmp/proyecto-sdd"
+  },
+  "normalizado": {
+    "event": "compact"
+  },
+  "resultado": {
+    "context": "c"
+  },
+  "salida": {
+    "stdout": null
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "tema": "correccion-con-regresion",
+  "nombre": "GATE antes de editar; el test de regresión bloquea hasta corregir",
+  "archivos": { "src/a.js": "ok" },
+  "config": { "sensores": { "alTerminar": ["tests"], "comandos": { "tests": "\"{node}\" -e \"process.exit(require('fs').readFileSync('src/a.js','utf8').includes('bug')?1:0)\"" } } },
+  "pasos": [
+    { "evento": "prompt", "texto": "corrige el cálculo del total", "espera": { "estado": { "gate.estado": "requerido" } } },
+    { "evento": "pre", "herramienta": { "kind": "edit", "name": "Write", "paths": ["src/a.js"], "contents": ["x"] }, "espera": { "decision": "deny", "motivo": "GATE del harness" } },
+    { "evento": "stop", "ultimoMensaje": "Plan: …\n¿Apruebo la implementación? (sí / no / ajustes)", "espera": { "estado": { "gate.estado": "pendiente" } } },
+    { "evento": "prompt", "texto": "sí", "espera": { "estado": { "gate.estado": "aprobado" } } },
+    { "evento": "pre", "herramienta": { "kind": "edit", "name": "Write", "paths": ["src/a.js"], "contents": ["x"] }, "espera": { "decision": "permitido" } },
+    { "accion": "escribir", "archivo": "src/a.js", "contenido": "con bug" },
+    { "evento": "post", "herramienta": { "kind": "edit", "name": "Write", "paths": ["src/a.js"], "contents": ["con bug"] } },
+    { "evento": "stop", "ultimoMensaje": "Listo.", "nota": "el test de regresión falla", "espera": { "bloquea": true, "bloqueo": "Corrige estos errores" } },
+    { "accion": "escribir", "archivo": "src/a.js", "contenido": "corregido" },
+    { "evento": "post", "herramienta": { "kind": "edit", "name": "Write", "paths": ["src/a.js"], "contents": ["corregido"] } },
+    { "evento": "stop", "ultimoMensaje": "Listo.", "espera": { "bloquea": false, "aviso": "Verificado", "estado": { "sucio": false } } }
+  ]
+}

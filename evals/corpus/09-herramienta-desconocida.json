@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "tema": "herramienta-desconocida",
+  "nombre": "modo normal: la decide el cliente; modo estricto: requiere confirmación",
+  "pasos": [
+    { "evento": "pre", "herramienta": { "kind": "other", "name": "herramienta_nueva", "args": { "x": 1 } }, "espera": { "decision": "permitido" } },
+    { "accion": "escribir", "archivo": ".sdd/harness.json", "contenido": "{\"modo\":\"estricto\"}" },
+    { "evento": "pre", "herramienta": { "kind": "other", "name": "herramienta_nueva", "args": { "x": 1 } }, "espera": { "decision": "deny", "motivo": "herramienta desconocida" } },
+    { "evento": "pre", "cliente": "claude", "sesion": "c", "herramienta": { "kind": "other", "name": "herramienta_nueva", "args": { "x": 1 } }, "espera": { "decision": "ask" } },
+    { "evento": "pre", "herramienta": { "kind": "read", "name": "Read", "paths": ["README.md"] }, "espera": { "decision": "permitido" } }
+  ]
+}

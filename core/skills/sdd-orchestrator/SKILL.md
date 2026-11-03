@@ -66,13 +66,15 @@ Si el harness entregó un **Espacio de trabajo** (varios proyectos en la carpeta
 ## GATE (única pausa obligatoria antes de tocar código)
 Muestra en el chat el **plan completo y entendible**: qué se hará y por qué, causa (si es bug), cambios por capa y archivos, contrato de API, tests previstos, riesgos, supuestos y decisiones que afecten calidad (con alternativa). Pregunta: `¿Apruebo la implementación? (sí / no / ajustes)`.
 Si hay preguntas que bloquean (alcance, reglas, datos), pregúntalas antes del GATE.
+En pedidos medianos y grandes, **registra antes el plan verificable**: `node "{{SDD_HOME}}/bin/sdd-harness.js" trabajo plan --json '{"objetivo":…,"requisitos":[{"id":"REQ-01","texto":…,"criterios":[{"id":"CA-01","texto":…,"control":"tests"}]}],"tareas":[{"id":"T-01","titulo":…,"requisitos":["REQ-01"],"archivos":[…],"depende":[]}]}'`. Cada criterio lleva exactamente uno de `control` (lint/tipos/tests), `comando` (aceptación) o `manual: true` (lo acepta el usuario). El «sí» del usuario lo congela; un plan nuevo queda como propuesta hasta la siguiente aprobación.
 Con el harness instalado el GATE se aplica por código: las ediciones de código se desbloquean solo cuando el usuario responde que sí (o pidió el cambio "directo"). No delegues implementación antes de esa respuesta.
 
 ## Construir y verificar (pipeline)
 - Lanza en paralelo las tareas sin dependencia (ej. BD y frontend con contrato cerrado; test-writer junto al implementer de la misma tarea).
 - Al terminar cada tarea, lanza su verificación de inmediato mientras otras siguen construyéndose.
-- Falla de verificación → re-delega la corrección con el detalle del fallo; máximo 2 reintentos por tarea, luego explica el bloqueo.
-- Los **sensores del harness** (lint, tipos y tests de lo modificado) corren al terminar cada turno: un bloqueo `[harness]` es un fallo de verificación más; corrígelo o explica por qué no corresponde, sin ocultarlo.
+- Con trabajo registrado: al empezar una tarea, `trabajo iniciar <tarea> --responsable <agente>`; al terminarla, `trabajo verificar <tarea>`. Solo ese resultado (evidencia del harness sobre el contenido actual) la da por hecha; si sus archivos cambian después, vuelve a «por reverificar». `trabajo` muestra qué falta y por qué (úsalo también al retomar o tras compactar).
+- Falla de verificación → re-delega la corrección con el detalle del fallo; máximo 2 reintentos por tarea, luego explica el bloqueo. El harness también bloquea una tarea que repite el mismo error («sin progreso»): detente y consulta al usuario.
+- Los **sensores del harness** (lint, tipos, tests y reglas propias de lo modificado) corren al terminar cada turno: un bloqueo `[harness]` es un fallo de verificación más; corrígelo o explica por qué no corresponde, sin ocultarlo. «No verificado» no es verde: dilo así en el informe.
 - **Nunca anules un rechazo** del verifier o del ui-reviewer: presenta la opción para cumplirlo y la de aceptar la excepción con su riesgo; decide el usuario.
 
 ## Informar al usuario (estilo)
@@ -82,4 +84,4 @@ Con el harness instalado el GATE se aplica por código: las ediciones de código
 - Al cerrar: qué cambió (archivos), resultado de tests y verificaciones, lo que no se pudo medir y por qué, pendientes, lo que se recordó en memoria y sugerencia de mensaje de commit (texto). Si hubo incidentes del propio orquestador (regla incumplida, reintentos agotados), menciónalos en una línea.
 
 ## Modo registro (solo si el usuario lo pide)
-Crear carpeta del cambio y artefactos: `node "{{SDD_HOME}}/bin/new-change.js" --type <tipo> "<título>"` y escribir los documentos pedidos en `changes/<id>/`. Registro de mejora: skill `sdd-improve`.
+Crear carpeta del cambio y artefactos: `node "{{SDD_HOME}}/bin/new-change.js" --type <tipo> "<título>"` y escribir los documentos pedidos en `changes/<id>/`. Esos documentos son narrativos: el estado verificable (requisitos, tareas, evidencias) vive en `sdd-harness.js trabajo`; `sdd-state.js` queda obsoleto. Registro de mejora: skill `sdd-improve`.

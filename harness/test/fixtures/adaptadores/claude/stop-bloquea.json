@@ -1,0 +1,24 @@
+{
+  "descripcion": "Stop: el núcleo bloquea el fin de turno",
+  "eventoNativo": "Stop",
+  "entrada": {
+    "session_id": "s1",
+    "cwd": "/tmp/proyecto-sdd",
+    "last_assistant_message": "Listo.",
+    "stop_hook_active": false
+  },
+  "normalizado": {
+    "event": "stop",
+    "lastMessage": "Listo.",
+    "stopActive": false
+  },
+  "resultado": {
+    "block": "b"
+  },
+  "salida": {
+    "stdout": {
+      "decision": "block",
+      "reason": "b"
+    }
+  }
+}

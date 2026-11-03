@@ -87,4 +87,7 @@ function normalizeTool(name, rawInput, opts = {}) {
 
 const json = obj => `${JSON.stringify(obj)}\n`;
 
-module.exports = { first, resolveRoot, toText, lastFromTranscript, parsePatch, normalizeTool, json };
+/** Eventos nativos que el instalador registra para la herramienta (hooks-config.js). */
+const registrados = host => { const h = require('../hooks-config')[host](''); return Object.keys(host === 'copilot' ? h.hooks : h); };
+
+module.exports = { first, resolveRoot, toText, lastFromTranscript, parsePatch, normalizeTool, json, registrados };

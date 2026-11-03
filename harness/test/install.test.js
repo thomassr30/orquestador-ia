@@ -48,15 +48,20 @@ test('instala el harness en las 6 herramientas', () => {
 
 test('el hook instalado funciona desde ~/.sdd-orquestador (sin el repositorio)', () => {
   const dir = project({ 'a.js': '' });
+  // Payload simulado: SDD_DOCTOR=1 para que no cuente como evento real del cliente
   const r = spawnSync(process.execPath, [path.join(HOME, '.sdd-orquestador/bin/sdd-hook.js'), 'claude', 'PreToolUse'],
-    { input: JSON.stringify({ session_id: 'i', cwd: dir, tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }), encoding: 'utf8', env });
+    { input: JSON.stringify({ session_id: 'i', cwd: dir, tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }), encoding: 'utf8', env: { ...env, SDD_DOCTOR: '1' } });
   assert.strictEqual(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, 'deny');
 });
 
-test('doctor ejecuta los hooks registrados y confirma que bloquean', () => {
+test('doctor: prueba sintética en los 6 clientes, sin llamarla integración confirmada', () => {
   const r = spawnSync(process.execPath, [path.join(HOME, '.sdd-orquestador/bin/sdd-harness.js'), 'doctor', project({ 'a.js': '' })], { env, encoding: 'utf8' });
   assert.strictEqual(r.status, 0, r.stdout + r.stderr);
-  assert.strictEqual((r.stdout.match(/prueba en vivo OK/g) || []).length, 5, r.stdout);
+  assert.strictEqual((r.stdout.match(/\(c\) ✓ prueba sintética aprobada/g) || []).length, 6, r.stdout);
+  assert.strictEqual((r.stdout.match(/sin eventos reales todavía/g) || []).length, 6, r.stdout);
+  assert.doesNotMatch(r.stdout, /integración confirmada en el cliente real/);
+  assert.match(r.stdout, /los hooks no son un sandbox/);
+  assert.ok(!fs.existsSync(path.join(HOME, '.sdd-orquestador/observado.json')), 'las pruebas de doctor no registran eventos reales');
 });
 
 test('reinstalar no duplica hooks', () => {

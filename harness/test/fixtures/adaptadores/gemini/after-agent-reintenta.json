@@ -1,0 +1,22 @@
+{
+  "descripcion": "AfterAgent: un bloqueo se traduce en deny (el agente reintenta)",
+  "eventoNativo": "AfterAgent",
+  "entrada": {
+    "session_id": "g1",
+    "cwd": "/tmp/proyecto-sdd",
+    "prompt_response": "Listo."
+  },
+  "normalizado": {
+    "event": "stop",
+    "lastMessage": "Listo."
+  },
+  "resultado": {
+    "block": "b"
+  },
+  "salida": {
+    "stdout": {
+      "decision": "deny",
+      "reason": "b"
+    }
+  }
+}

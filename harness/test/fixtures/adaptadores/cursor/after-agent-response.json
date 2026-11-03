@@ -1,0 +1,19 @@
+{
+  "descripcion": "afterAgentResponse: guarda el último mensaje (sin salida)",
+  "eventoNativo": "afterAgentResponse",
+  "entrada": {
+    "conversation_id": "c1",
+    "workspace_roots": [
+      "/tmp/proyecto-sdd"
+    ],
+    "text": "Listo."
+  },
+  "normalizado": {
+    "event": "response",
+    "lastMessage": "Listo."
+  },
+  "resultado": {},
+  "salida": {
+    "stdout": null
+  }
+}

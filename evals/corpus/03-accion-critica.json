@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "tema": "accion-critica",
+  "nombre": "acción crítica rechazada y luego autorizada (una vez); con diálogo nativo se pregunta al cliente",
+  "cliente": "gemini",
+  "pasos": [
+    { "evento": "pre", "herramienta": { "kind": "shell", "name": "Bash", "command": "git push origin main" }, "espera": { "decision": "deny", "motivo": "Requiere confirmación del usuario" } },
+    { "evento": "prompt", "texto": "no, todavía no", "espera": { "estado": { "aprobaciones.pendientes": [] } } },
+    { "evento": "pre", "herramienta": { "kind": "shell", "name": "Bash", "command": "git push origin main" }, "nota": "rechazada: sigue sin permiso", "espera": { "decision": "deny" } },
+    { "evento": "prompt", "texto": "sí", "espera": { "contexto": "aprobó \\(una vez" } },
+    { "evento": "pre", "herramienta": { "kind": "shell", "name": "Bash", "command": "git push origin main" }, "espera": { "decision": "permitido" } },
+    { "evento": "pre", "herramienta": { "kind": "shell", "name": "Bash", "command": "git push origin main" }, "nota": "un solo uso", "espera": { "decision": "deny" } },
+    { "evento": "pre", "cliente": "claude", "sesion": "c", "herramienta": { "kind": "shell", "name": "Bash", "command": "git push origin main" }, "espera": { "decision": "ask" } },
+    { "evento": "pre", "cliente": "codex", "sesion": "x", "herramienta": { "kind": "shell", "name": "Bash", "command": "git push origin main" }, "nota": "Codex: git no destructivo lo confirma su regla nativa (delegado al cliente)", "espera": { "decision": "permitido" } },
+    { "evento": "pre", "cliente": "codex", "sesion": "x", "herramienta": { "kind": "shell", "name": "Bash", "command": "git push --force origin main" }, "nota": "lo destructivo no se delega", "espera": { "decision": "deny" } }
+  ]
+}

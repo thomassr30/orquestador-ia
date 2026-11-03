@@ -113,6 +113,6 @@ test('al terminar, los sensores corren en cada proyecto con su propia configurac
   hook('claude', 'PostToolUse', { ...base, tool_name: 'Write', tool_input: { file_path: path.join(c, 'api/src/x.ts'), content: '' } });
   hook('claude', 'Stop', { ...base, last_assistant_message: 'Listo.' });
   const estado = cli(c, 'estado', c).stdout;
-  assert.match(estado, /Sensores: en verde/);
-  assert.match(fs.readFileSync(path.join(SDD_HOME, 'estado', fs.readdirSync(path.join(SDD_HOME, 'estado')).find(d => fs.existsSync(path.join(SDD_HOME, 'estado', d, 'registro.log')) && fs.readFileSync(path.join(SDD_HOME, 'estado', d, 'registro.log'), 'utf8').includes('sensores')), 'registro.log'), 'utf8'), /tests:ok/);
+  assert.match(estado, /Verificación: aprobado — ✓ tests@api/);
+  assert.match(cli(c, 'registro', '200').stdout, /sensores · aprobado · tests@api:aprobado/);
 });

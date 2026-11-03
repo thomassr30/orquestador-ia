@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "tema": "fallo-de-hook",
+  "nombre": "error interno del harness: lo crítico no pasa; lo demás sigue",
+  "cliente": "gemini",
+  "pasos": [
+    { "accion": "falla-interna", "valor": "pre" },
+    { "evento": "pre", "herramienta": { "kind": "shell", "name": "Bash", "command": "git push origin main" }, "espera": { "decision": "deny", "motivo": "error interno del harness" } },
+    { "evento": "pre", "cliente": "claude", "herramienta": { "kind": "shell", "name": "Bash", "command": "git push origin main" }, "espera": { "decision": "ask" } },
+    { "evento": "pre", "herramienta": { "kind": "shell", "name": "Bash", "command": "npm test" }, "espera": { "decision": "permitido" } },
+    { "evento": "pre", "herramienta": { "kind": "read", "name": "Read", "paths": ["a.js"] }, "espera": { "decision": "permitido" } },
+    { "accion": "falla-interna" },
+    { "evento": "pre", "herramienta": { "kind": "shell", "name": "Bash", "command": "git push origin main" }, "nota": "sin falla: camino normal", "espera": { "decision": "deny", "motivo": "Requiere confirmación" } }
+  ]
+}

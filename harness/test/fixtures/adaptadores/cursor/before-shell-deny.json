@@ -1,0 +1,34 @@
+{
+  "descripcion": "beforeShellExecution: permission deny, motivo por stderr y salida 2",
+  "eventoNativo": "beforeShellExecution",
+  "entrada": {
+    "conversation_id": "c1",
+    "workspace_roots": [
+      "/tmp/proyecto-sdd"
+    ],
+    "command": "git commit -m x"
+  },
+  "normalizado": {
+    "host": "cursor",
+    "event": "pre",
+    "nativeAsk": false,
+    "sessionId": "c1",
+    "tool": {
+      "kind": "shell",
+      "command": "git commit -m x"
+    }
+  },
+  "resultado": {
+    "decision": "deny",
+    "reason": "[harness] no"
+  },
+  "salida": {
+    "stdout": {
+      "permission": "deny",
+      "user_message": "[harness] no",
+      "agent_message": "[harness] no"
+    },
+    "stderr": "[harness] no\n",
+    "code": 2
+  }
+}

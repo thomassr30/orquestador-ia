@@ -25,7 +25,7 @@ test('Claude Code: GATE, permisos, sensores al terminar y checkpoint de sesión'
   assert.match(hook('claude', 'UserPromptSubmit', { ...base, prompt: 'agrega un contador de visitas' }).json.hookSpecificOutput.additionalContext, /Pedido de cambio/);
   assert.strictEqual(hook('claude', 'PreToolUse', edit).json.hookSpecificOutput.permissionDecision, 'deny', 'sin plan aprobado no se edita');
   assert.notStrictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'npm test' } }).json.hookSpecificOutput.permissionDecision, 'deny', 'los tests sí se pueden correr (con salida compactada)');
-  assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'node "C:/Users/Usuario Siigsa/.sdd-orquestador/bin/sdd-harness.js" estado' } }).json, null, '/sdd-status funciona con el plan pendiente');
+  assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: `node "${require('os').homedir().replace(/\\/g, '/')}/.sdd-orquestador/bin/sdd-harness.js" estado` } }).json, null, '/sdd-status funciona con el plan pendiente');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'git commit -am x' } }).json.hookSpecificOutput.permissionDecision, 'deny');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'kubectl apply -f k8s/' } }).json.hookSpecificOutput.permissionDecision, 'ask');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Read', tool_input: { file_path: path.join(dir, '.env') } }).json.hookSpecificOutput.permissionDecision, 'deny');
@@ -58,7 +58,7 @@ test('Codex: confirmación crítica en el chat (sin "ask" nativo), de un solo us
   const base = { session_id: 'cx', cwd: dir };
   const rm = { ...base, tool_name: 'Bash', tool_input: { command: 'rm -rf dist' } };
   assert.match(hook('codex', 'PreToolUse', rm).json.hookSpecificOutput.permissionDecisionReason, /Requiere confirmación/);
-  assert.match(hook('codex', 'UserPromptSubmit', { ...base, prompt: 'sí' }).json.hookSpecificOutput.additionalContext, /aprobó: rm -rf dist/);
+  assert.match(hook('codex', 'UserPromptSubmit', { ...base, prompt: 'sí' }).json.hookSpecificOutput.additionalContext, /aprobó \(una vez, vence en 30 min\): comando rm/);
   assert.strictEqual(hook('codex', 'PreToolUse', rm).json, null);
   assert.strictEqual(hook('codex', 'PreToolUse', rm).json.hookSpecificOutput.permissionDecision, 'deny', 'la confirmación vale una sola vez');
 });
@@ -85,11 +85,20 @@ test('MCP: escribir en GitHub se bloquea y una base de datos pide confirmación'
 test('comandos de verificación ruidosos se envuelven para compactar su salida', () => {
   const dir = project({ 'a.js': '' });
   const base = { session_id: 'out', cwd: dir };
-  const c = hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'npm test', description: 'tests' } }).json.hookSpecificOutput;
+  // Claude: HOME y política de la organización temporales (no depender de la configuración real del equipo)
+  const home = tmp('sdd-home-claude-');
+  const claudeEnv = { HOME: home, USERPROFILE: home, SDD_CLAUDE_MANAGED_DIR: tmp('sdd-managed-') };
+  const npmTest = { ...base, tool_name: 'Bash', tool_input: { command: 'npm test', description: 'tests' } };
+  assert.strictEqual(hook('claude', 'PreToolUse', npmTest, claudeEnv).json, null, 'sin una regla tuya que lo permita, no se compacta (el harness no concede el permiso)');
+  fs.mkdirSync(path.join(dir, '.claude'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: ['Bash(npm test:*)'] } }));
+  const c = hook('claude', 'PreToolUse', npmTest, claudeEnv).json.hookSpecificOutput;
   assert.strictEqual(c.permissionDecision, 'allow');
   assert.match(c.updatedInput.command, /sdd-salida\.js" bnBtIHRlc3Q= \d+$/);
   assert.strictEqual(c.updatedInput.description, 'tests', 'conserva los demás campos');
-  assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'npm test', run_in_background: true } }).json, null, 'en segundo plano no se envuelve');
+  assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'npm test', run_in_background: true } }, claudeEnv).json, null, 'en segundo plano no se envuelve');
+  fs.writeFileSync(path.join(dir, '.claude', 'settings.local.json'), JSON.stringify({ permissions: { ask: ['Bash(npm test *)'] } }));
+  assert.strictEqual(hook('claude', 'PreToolUse', npmTest, claudeEnv).json, null, 'una regla tuya de preguntar sigue aplicando: no se compacta');
   assert.match(hook('gemini', 'BeforeTool', { ...base, tool_name: 'run_shell_command', tool_input: { command: 'go test ./...' } }).json.hookSpecificOutput.tool_input.command, /sdd-salida/);
   assert.strictEqual(hook('copilot', 'preToolUse', { sessionId: 'o', cwd: dir, toolName: 'bash', toolArgs: { command: 'npm test' } }).json, null, 'Copilot: sin reescritura');
 });

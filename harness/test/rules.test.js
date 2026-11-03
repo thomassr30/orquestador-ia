@@ -44,21 +44,4 @@ test('el pedido en curso queda en la memoria para retomar tras /clear', () => {
   const ses = fs.readFileSync(path.join(dir, '.sdd/memoria/sesion.md'), 'utf8');
   assert.match(ses, /Pedido en curso: agrega la base de íconos lucide y los tooltips del panel/);
 });
-
-test('sdd-eval: corre tareas en una copia temporal, verifica y guarda el historial', { skip: process.platform === 'win32' }, () => {
-  const proj = project({ 'a.txt': 'hola' });
-  spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'x', '--allow-empty'], { cwd: proj });
-  spawnSync('git', ['add', '.'], { cwd: proj });
-  spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base'], { cwd: proj });
-  const bin = tmp('sdd-fakebin-');
-  fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\ncat > /dev/null\necho listo > hecho.txt\necho \'{"result":"ok","num_turns":3,"total_cost_usd":0.01,"usage":{"input_tokens":10,"cache_read_input_tokens":900,"output_tokens":90}}\'\n');
-  fs.chmodSync(path.join(bin, 'claude'), 0o755);
-  const tasks = path.join(tmp('sdd-evals-'), 'tareas.json');
-  fs.writeFileSync(tasks, JSON.stringify({ proyecto: proj, tareas: [{ nombre: 'crea-archivo', pedido: 'crea hecho.txt', verificar: 'test -f hecho.txt' }] }));
-  const r = spawnSync(process.execPath, [path.join(REPO, 'bin', 'sdd-eval.js'), tasks], { encoding: 'utf8', env: { ...env, PATH: `${bin}:${process.env.PATH}` } });
-  assert.strictEqual(r.status, 0, r.stderr);
-  assert.match(r.stdout, /Éxito: 100% · tokens promedio: 1\.000/);
-  assert.ok(!fs.existsSync(path.join(proj, 'hecho.txt')), 'tu carpeta no se toca');
-  const hist = JSON.parse(fs.readFileSync(tasks.replace('.json', '.resultados.json'), 'utf8'));
-  assert.strictEqual(hist.length, 1);
-});
+// Las pruebas del evaluador (bin/sdd-eval.js) están en eval.test.js.

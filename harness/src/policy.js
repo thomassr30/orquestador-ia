@@ -1,6 +1,8 @@
 'use strict';
 // Política de permisos aplicada POR CÓDIGO (no por instrucciones al modelo).
 // Precedencia: deny > ask > allow. "critical" marca las decisiones que el usuario siempre debe confirmar.
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const R = require('./rules');
 const { HOME, SDD_HOME } = require('./paths');
@@ -114,7 +116,14 @@ function secretReference(raw) {
 // Scripts propios del orquestador (estado, memoria, diagnóstico): siempre permitidos, también antes del GATE.
 const OWN_SCRIPT = /(^|\/)\.sdd-orquestador\/bin\/(sdd-harness|sdd-status|sdd-memory|sdd-context|sdd-workspace|sdd-improve|to-md|new-change|sdd-state)\.js$/;
 const ownScript = tokens => (tokens[0] || '').toLowerCase() === 'node' && OWN_SCRIPT.test(String(tokens[1] || '').replace(/\\/g, '/').toLowerCase());
-const approvesGate = tokens => /sdd-harness\.js$/i.test(String(tokens[1] || '')) && /^(aprobar|directo|liberar)$/i.test(String(tokens[2] || ''));
+// Decisiones que solo toma el usuario (desde su terminal o en el chat): aprobar el plan, autorizar excepciones,
+// aceptar el trabajo. El agente no puede ejecutarlas por él.
+const approvesGate = tokens => {
+  const script = String(tokens[1] || '');
+  const sub = String(tokens[2] || '').toLowerCase();
+  if (/sdd-harness\.js$/i.test(script)) return /^(aprobar|directo|liberar|excepcion|excepción)$/.test(sub) || (sub === 'trabajo' && /^(aceptar|descartar)$/i.test(String(tokens[3] || '')));
+  return /sdd-state\.js$/i.test(script) && tokens.some(t => /^--(approve|accept-exception)$/i.test(String(t)));
+};
 
 /** sed y find solo son de lectura en ciertas formas. */
 function readOnlyVariant(norm, tokens) {
@@ -141,7 +150,7 @@ function classifySegment(seg, extra) {
   if (/sdd-harness\.js$/i.test(String(n.tokens[1] || '')) && /^workspace$/i.test(String(n.tokens[2] || '')) && n.tokens.some(t => /^--aplicar$/i.test(t))) {
     return { decision: 'ask', critical: true, reason: 'cambia la configuración de la herramienta de IA (carpetas con acceso): decisión del usuario' };
   }
-  if (approvesGate(n.tokens)) return { decision: 'deny', reason: 'solo el usuario aprueba el plan (en el chat o desde su terminal); el agente no puede hacerlo' };
+  if (approvesGate(n.tokens)) return { decision: 'deny', reason: 'solo el usuario aprueba el plan, autoriza excepciones o acepta el trabajo (en el chat o desde su terminal); el agente no puede hacerlo' };
   const isGit = norm.startsWith('git ');
   const gitSub = isGit ? norm.slice(4) : '';
   if (isGit && matchesAny(gitSub, R.GIT_NEVER)) {
@@ -210,6 +219,71 @@ function segmentMayWrite(seg, extra) {
   return false; // lectura, búsqueda e inspección (jq, awk, fd, tree, file, du, ps, Get-Item, Test-Path…)
 }
 
+/** Destinos de redirecciones (> y >>) fuera de comillas, sin descartes (/dev/null, nul) ni duplicaciones (>&2). */
+function redirectTargets(seg) {
+  const out = [];
+  let q = null;
+  for (let i = 0; i < seg.length; i++) {
+    const ch = seg[i];
+    if (q) { if (ch === q) q = null; continue; }
+    if (ch === '"' || ch === "'") { q = ch; continue; }
+    if (ch !== '>') continue;
+    if (seg[i + 1] === '&') { i++; continue; }
+    if (seg[i + 1] === '>') i++;
+    let j = i + 1;
+    while (seg[j] === ' ' || seg[j] === '\t') j++;
+    let t = '';
+    if (seg[j] === '"' || seg[j] === "'") { const e = seg.indexOf(seg[j], j + 1); t = seg.slice(j + 1, e < 0 ? undefined : e); i = e < 0 ? seg.length : e; } else {
+      const m = /^[^\s;&|<>]+/.exec(seg.slice(j)); t = m ? m[0] : ''; i = j + t.length - 1;
+    }
+    if (t && !/^(\/dev\/null|nul|\$null)$/i.test(t)) out.push(t);
+  }
+  return out;
+}
+
+const PS_PATH_FLAG = /^-(path|literalpath|filepath|destination)$/i;
+/**
+ * Rutas que un comando escribe de forma reconocible: redirecciones, sed/perl -i, cp/mv/install/ln, tee/touch/truncate,
+ * dd of=, cmdlets de PowerShell. Es de mejor esfuerzo (no es un sandbox): sirve para que Bash no se salte las
+ * protecciones que sí tienen las ediciones (.git, configuración del harness y de los hooks, fuera del proyecto).
+ */
+function writeTargets(cmd) {
+  const out = [];
+  for (const seg of splitSegments(String(cmd || ''))) {
+    const n = normalizeSegment(seg);
+    if (n.inner) { out.push(...writeTargets(n.inner)); continue; }
+    out.push(...redirectTargets(seg));
+    // Los argumentos de la herramienta, sin las redirecciones (ya contadas arriba)
+    const bare = normalizeSegment(seg.replace(/\d?>&\d|\d?>>?\s*("[^"]*"|'[^']*'|[^\s;&|<>]+)/g, ' '));
+    const toks = bare.tokens || [];
+    const exe = String(toks[0] || '').toLowerCase();
+    const args = toks.slice(1);
+    const plain = args.filter(t => !/^-/.test(t));
+    if ((exe === 'sed' || exe === 'perl') && args.some(t => /^(--in-place|-[a-zA-Z]*i)/.test(t))) {
+      // Archivos = argumentos sueltos, salvo el script (el primero, si no vino con -e/-f) y los valores de -e/-f
+      let script = !args.some(t => /^(-e|--expression|-f|--file)$/.test(t));
+      for (let i = 0; i < args.length; i++) {
+        if (/^(-e|--expression|-f|--file)$/.test(args[i])) { i++; continue; }
+        if (/^-/.test(args[i])) continue;
+        if (script) { script = false; continue; }
+        out.push(args[i]);
+      }
+    } else if (['cp', 'mv', 'install', 'ln', 'rsync', 'copy', 'move', 'xcopy', 'copy-item', 'move-item', 'cpi', 'mi', 'rename-item', 'rni', 'ren', 'rename'].includes(exe)) {
+      const flagged = args.findIndex(t => PS_PATH_FLAG.test(t) && /destination/i.test(t));
+      if (flagged >= 0 && args[flagged + 1]) out.push(args[flagged + 1]);
+      else if (plain.length) out.push(plain[plain.length - 1]);
+    } else if (['tee', 'touch', 'truncate', 'mkdir'].includes(exe)) out.push(...plain);
+    else if (exe === 'robocopy' && plain[1]) out.push(plain[1]);
+    else if (exe === 'dd') out.push(...args.filter(t => /^of=/.test(t)).map(t => t.slice(3)));
+    else if (['set-content', 'add-content', 'out-file', 'new-item', 'sc', 'ac', 'ni'].includes(exe)) {
+      const flagged = args.findIndex(t => PS_PATH_FLAG.test(t));
+      if (flagged >= 0 && args[flagged + 1]) out.push(args[flagged + 1]);
+      else if (plain.length) out.push(plain[0]);
+    }
+  }
+  return [...new Set(out.filter(Boolean))];
+}
+
 /** ¿Puede el comando modificar archivos? (para el GATE: antes de aprobar, explorar sí, escribir no) */
 function mayWrite(cmd, extra = {}) {
   const raw = String(cmd || '');
@@ -242,6 +316,18 @@ function classifyCommand(cmd, extra) {
   if (hasSubst && result.decision === 'allow') return { decision: 'ask', reason: 'contiene sustitución de comandos' };
   return result;
 }
+
+// Carpeta temporal del sistema en sus distintas formas (en Windows puede venir con nombre corto 8.3; en macOS, /private).
+const TMP_DIRS = (() => {
+  const base = [os.tmpdir(), process.env.TEMP, process.env.TMP, process.env.TMPDIR].filter(Boolean);
+  const out = [];
+  for (const d of base) {
+    out.push(path.resolve(d));
+    try { out.push(fs.realpathSync(d)); } catch { /* no existe */ }
+    try { out.push(fs.realpathSync.native(d)); } catch { /* no existe */ }
+  }
+  return [...new Set(out)];
+})();
 
 // Configuración que protege al propio agente: cambiarla es decisión del usuario.
 const AGENT_CONFIG_FILES = ['.claude/settings.json', '.claude/settings.local.json', '.codex/hooks.json', '.codex/config.toml',
@@ -288,7 +374,18 @@ class Policy {
    * @returns {{decision:'allow'|'ask'|'deny', reason?:string, critical?:boolean}}
    */
   checkCommand(command) {
-    return classifyCommand(command, this.extra);
+    const r = classifyCommand(command, this.extra);
+    if (r.decision === 'deny') return r;
+    // Lo que el comando escribe de forma reconocible pasa por las mismas protecciones que una edición
+    for (const target of writeTargets(command)) {
+      if (/[$`*?%]/.test(target)) continue; // variables o comodines: no se pueden resolver aquí
+      const p = this.checkPath(target, 'write');
+      if (p.decision === 'deny') return { decision: 'deny', reason: `${p.reason} (tampoco por comandos)` };
+      if (p.decision === 'ask' && p.critical && !(r.decision === 'ask' && r.critical)) {
+        return { decision: 'ask', critical: true, reason: `${p.reason} — el comando escribe ${p.inside ? p.rel : p.abs}` };
+      }
+    }
+    return r;
   }
 
   /**
@@ -312,9 +409,13 @@ class Policy {
     if (inside && /(^|\/)\.git(\/|$)/.test(rel)) return { decision: 'deny', abs, rel, inside, reason: 'no se edita .git a mano: usa comandos git (piden confirmación)' };
     // La configuración del harness de CUALQUIER proyecto del espacio (no solo la de la raíz)
     if (inside && /(^|\/)\.sdd\/harness\.json$/.test(rel)) return { decision: 'ask', critical: true, abs, rel, inside, reason: 'modifica la configuración del harness de un proyecto (el agente no cambia sus propias protecciones sin permiso del usuario)' };
-    if (!inside) return { decision: 'ask', abs, rel, inside, reason: 'escritura fuera del proyecto' };
+    if (!inside) {
+      // Archivos temporales del sistema (borradores, salidas de pruebas): libres. El resto, decisión del usuario.
+      if (TMP_DIRS.some(d => isInside(d, abs))) return { decision: 'allow', abs, rel, inside, temporal: true };
+      return { decision: 'ask', critical: true, abs, rel, inside, reason: 'escribe fuera del proyecto (decisión del usuario). Muéstrale la ruta exacta' };
+    }
     return { decision: 'allow', abs, rel, inside };
   }
 }
 
-module.exports = { Policy, splitSegments, normalizeSegment, classifyCommand, matchPattern, tokenize, secretReference, mayWrite };
+module.exports = { Policy, splitSegments, normalizeSegment, classifyCommand, matchPattern, tokenize, secretReference, mayWrite, writeTargets };

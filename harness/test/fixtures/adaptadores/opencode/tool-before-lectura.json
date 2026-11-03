@@ -1,0 +1,21 @@
+{
+  "descripcion": "tool.execute.before con git status: sigue sin cambios",
+  "hook": "tool.execute.before",
+  "input": {
+    "tool": "bash",
+    "sessionID": "o1",
+    "callID": "2"
+  },
+  "output": {
+    "args": {
+      "command": "git status"
+    }
+  },
+  "esperado": {
+    "salida": {
+      "args": {
+        "command": "git status"
+      }
+    }
+  }
+}

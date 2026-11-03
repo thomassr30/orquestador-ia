@@ -1,11 +1,15 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
+const { tmp } = require('./helpers');
+process.env.SDD_HOME = tmp('sdd-home-');
 const gate = require('../src/gate');
+const A = require('../src/aprobaciones');
 const { emptyState } = require('../src/state');
 
 const cfg = { gate: 'auto' };
 const st = () => emptyState('/tmp/p', 's');
+const pend = (s, cmd) => A.request(s, A.identity({ tipo: 'comando', args: cmd, root: '/tmp/p', sesion: 's', etiqueta: `comando ${cmd}` }));
 
 test('reconoce aprobaciones (con tildes) y descarta el "si" condicional', () => {
   for (const t of ['sí', 'Sí, dale', '¡Sí!', 'ok', 'dale', 'apruebo', 'Perfecto, adelante', 'listo']) assert.ok(gate.isApproval(t), t);
@@ -51,7 +55,7 @@ test('"directo" libera; gate "nunca" y "siempre"', () => {
 test('un "sí" a un comando crítico no aprueba el plan si no se mostró la pregunta del GATE', () => {
   const s = st();
   gate.onPrompt(s, 'agrega exportación a PDF', cfg);
-  s.aprobaciones.pendientes.push({ clave: 'npm install pdfkit', en: new Date().toISOString() });
+  pend(s, 'npm install pdfkit');
   gate.onStop(s, '¿Apruebas instalar pdfkit?');
   gate.onPrompt(s, 'sí', cfg);
   assert.strictEqual(s.aprobaciones.aprobadas.length, 1);
@@ -63,16 +67,24 @@ test('un "sí" a un comando crítico no aprueba el plan si no se mostró la preg
 
 test('las aprobaciones de comandos críticos son de un solo uso y caducan', () => {
   const s = st();
-  s.aprobaciones.pendientes.push({ clave: 'rm -rf build', en: new Date().toISOString() });
+  const p = pend(s, 'rm -rf build');
   const notes = gate.onPrompt(s, 'sí', cfg);
-  assert.ok(notes.some(n => n.includes('rm -rf build')));
+  assert.ok(notes.some(n => n.includes('comando rm -rf build')));
   assert.strictEqual(s.aprobaciones.aprobadas.length, 1);
+  assert.ok(A.consume(s, p.huella), 'la aprobación vale para esa acción');
+  assert.strictEqual(A.consume(s, p.huella), null, 'y una sola vez');
   const v = st();
-  v.aprobaciones.pendientes.push({ clave: 'kubectl delete pod x', en: new Date(Date.now() - 3600000).toISOString() });
+  pend(v, 'kubectl delete pod x');
+  v.aprobaciones.pendientes[0].vence = new Date(Date.now() - 1000).toISOString();
   gate.onPrompt(v, 'sí', cfg);
-  assert.strictEqual(v.aprobaciones.aprobadas.length, 0, 'una confirmación de hace una hora no vale');
+  assert.strictEqual(v.aprobaciones.aprobadas.length, 0, 'una solicitud vencida no se puede aprobar');
+  const u = st();
+  const q = pend(u, 'git push');
+  gate.onPrompt(u, 'sí', cfg);
+  u.aprobaciones.aprobadas[0].vence = new Date(Date.now() - 1000).toISOString();
+  assert.strictEqual(A.consume(u, q.huella), null, 'una aprobación vencida no se consume');
   const w = st();
-  w.aprobaciones.pendientes.push({ clave: 'rm x', en: new Date().toISOString() });
+  pend(w, 'rm x');
   gate.onPrompt(w, 'mejor no', cfg);
   assert.strictEqual(w.aprobaciones.pendientes.length, 0);
 });

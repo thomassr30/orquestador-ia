@@ -1,0 +1,33 @@
+{
+  "descripcion": "Sin \"ask\" nativo: una decisión ask se responde como deny (la confirmación va en el chat)",
+  "eventoNativo": "PreToolUse",
+  "entrada": {
+    "session_id": "x1",
+    "cwd": "/tmp/proyecto-sdd",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "kubectl apply -f k8s/"
+    }
+  },
+  "normalizado": {
+    "event": "pre",
+    "nativeAsk": false,
+    "tool": {
+      "kind": "shell",
+      "command": "kubectl apply -f k8s/"
+    }
+  },
+  "resultado": {
+    "decision": "ask",
+    "reason": "[harness] Requiere confirmación"
+  },
+  "salida": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "[harness] Requiere confirmación"
+      }
+    }
+  }
+}

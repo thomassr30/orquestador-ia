@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "tema": "compactacion-y-reanudacion",
+  "nombre": "tras compactar o en otra sesión se sabe qué está aprobado y qué falta",
+  "archivos": { "src/pdf.js": "v1" },
+  "config": { "sensores": { "alTerminar": ["tests"], "comandos": { "tests": "\"{node}\" -e \"process.exit(0)\"" } } },
+  "pasos": [
+    { "evento": "prompt", "texto": "agrega exportación a PDF" },
+    { "accion": "trabajo-plan", "plan": {
+      "objetivo": "exportar a PDF",
+      "requisitos": [{ "id": "REQ-01", "texto": "el listado se exporta", "criterios": [{ "id": "CA-01", "texto": "tests", "control": "tests" }] }],
+      "tareas": [{ "id": "T-01", "titulo": "exportador", "requisitos": ["REQ-01"], "archivos": ["src/pdf.js"] }]
+    } },
+    { "evento": "stop", "ultimoMensaje": "Plan…\n¿Apruebo la implementación? (sí / no / ajustes)" },
+    { "evento": "prompt", "texto": "sí" },
+    { "evento": "compact", "espera": { "contexto": "Trabajo en curso: exportar a PDF[\\s\\S]*plan del cambio en curso está aprobado" } },
+    { "evento": "session", "sesion": "otra", "origen": "startup", "espera": { "contexto": "Falta: .*REQ-01/CA-01: sin evidencia" } },
+    { "accion": "trabajo-verificar", "tarea": "T-01", "espera": { "estado": "verificada" } },
+    { "accion": "cli", "args": ["trabajo"], "espera": { "codigo": 0, "salida": "técnicamente completo" } }
+  ]
+}

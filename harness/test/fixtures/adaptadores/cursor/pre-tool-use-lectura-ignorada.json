@@ -1,0 +1,15 @@
+{
+  "descripcion": "preToolUse de Read: lo atiende beforeReadFile, el adaptador lo ignora",
+  "eventoNativo": "preToolUse",
+  "entrada": {
+    "conversation_id": "c1",
+    "workspace_roots": [
+      "/tmp/proyecto-sdd"
+    ],
+    "tool_name": "Read",
+    "tool_input": {
+      "file_path": "a.js"
+    }
+  },
+  "normalizado": null
+}

@@ -1,0 +1,30 @@
+{
+  "descripcion": "postToolUse: el aviso va como additionalContext",
+  "eventoNativo": "postToolUse",
+  "entrada": {
+    "sessionId": "p1",
+    "cwd": "/tmp/proyecto-sdd",
+    "toolName": "edit",
+    "toolArgs": {
+      "path": "a.js",
+      "new_str": "x"
+    }
+  },
+  "normalizado": {
+    "event": "post",
+    "tool": {
+      "kind": "edit",
+      "paths": [
+        "a.js"
+      ]
+    }
+  },
+  "resultado": {
+    "feedback": "f"
+  },
+  "salida": {
+    "stdout": {
+      "additionalContext": "f"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "orquestador-sdd",
-  "version": "2.8.1",
+  "version": "3.0.0",
   "description": "Orquestador de agentes SDD con harness por código (hooks) para Claude Code, Codex, OpenCode, Gemini CLI, Cursor y VS Code Copilot",
   "license": "MIT",
   "author": "Thomas Soto (https://github.com/thomassr30)",

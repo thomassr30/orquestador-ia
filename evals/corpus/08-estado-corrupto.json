@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "tema": "estado-corrupto",
+  "nombre": "un estado dañado no concede permisos y se avisa",
+  "archivos": { "src/a.js": "" },
+  "pasos": [
+    { "evento": "prompt", "texto": "agrega un botón de exportar" },
+    { "evento": "stop", "ultimoMensaje": "Plan…\n¿Apruebo la implementación? (sí / no / ajustes)" },
+    { "evento": "prompt", "texto": "sí" },
+    { "evento": "pre", "herramienta": { "kind": "edit", "name": "Write", "paths": ["src/a.js"], "contents": ["x"] }, "espera": { "decision": "permitido" } },
+    { "accion": "corromper-estado" },
+    { "evento": "pre", "herramienta": { "kind": "edit", "name": "Write", "paths": ["src/a.js"], "contents": ["x"] }, "espera": { "decision": "deny" } },
+    { "evento": "prompt", "texto": "¿qué pasó?", "espera": { "contexto": "estaba dañado", "estado": { "gate.estado": "requerido", "aprobaciones.aprobadas": [] } } }
+  ]
+}

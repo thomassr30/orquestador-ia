@@ -60,4 +60,11 @@ function findSecret(text) {
   return null;
 }
 
-module.exports = { findSecret, findCodeSecret, SECRET_CONTENT };
+/** Texto con los secretos reemplazados por «[secreto omitido]» (para memoria, registros y evidencias). */
+function redact(text) {
+  let s = String(text ?? '');
+  for (const re of [...SECRET_CONTENT, ...CODE_SECRETS]) s = s.replace(new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`), '[secreto omitido]');
+  return s;
+}
+
+module.exports = { findSecret, findCodeSecret, redact, SECRET_CONTENT };

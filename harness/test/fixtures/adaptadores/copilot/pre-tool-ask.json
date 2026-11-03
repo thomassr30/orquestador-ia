@@ -1,0 +1,32 @@
+{
+  "descripcion": "preToolUse: \"ask\" pasa tal cual (soporte del host sin verificar)",
+  "eventoNativo": "preToolUse",
+  "entrada": {
+    "sessionId": "p1",
+    "cwd": "/tmp/proyecto-sdd",
+    "toolName": "bash",
+    "toolArgs": {
+      "command": "kubectl apply -f k8s/"
+    }
+  },
+  "normalizado": {
+    "host": "copilot",
+    "event": "pre",
+    "nativeAsk": true,
+    "sessionId": "p1",
+    "tool": {
+      "kind": "shell",
+      "command": "kubectl apply -f k8s/"
+    }
+  },
+  "resultado": {
+    "decision": "ask",
+    "reason": "[harness] r"
+  },
+  "salida": {
+    "stdout": {
+      "permissionDecision": "ask",
+      "permissionDecisionReason": "[harness] r"
+    }
+  }
+}

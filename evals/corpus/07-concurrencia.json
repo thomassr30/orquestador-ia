@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "tema": "concurrencia",
+  "nombre": "dos procesos a la vez no consumen la misma aprobación",
+  "cliente": "gemini",
+  "pasos": [
+    { "evento": "pre", "herramienta": { "kind": "shell", "name": "Bash", "command": "git push origin main" }, "espera": { "decision": "deny" } },
+    { "evento": "prompt", "texto": "sí" },
+    { "accion": "concurrente", "procesos": 2, "paso": { "evento": "pre", "herramienta": { "kind": "shell", "name": "Bash", "command": "git push origin main" } }, "espera": { "permitidos": 1 } },
+    { "evento": "pre", "herramienta": { "kind": "shell", "name": "Bash", "command": "git push origin main" }, "espera": { "decision": "deny" } }
+  ]
+}

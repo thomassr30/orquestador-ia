@@ -1,0 +1,32 @@
+{
+  "descripcion": "PostToolUse de Edit con problemas: decision block con el motivo",
+  "eventoNativo": "PostToolUse",
+  "entrada": {
+    "session_id": "s1",
+    "cwd": "/tmp/proyecto-sdd",
+    "tool_name": "Edit",
+    "tool_input": {
+      "file_path": "src/a.js",
+      "old_string": "a",
+      "new_string": "b"
+    }
+  },
+  "normalizado": {
+    "event": "post",
+    "tool": {
+      "kind": "edit",
+      "paths": [
+        "src/a.js"
+      ]
+    }
+  },
+  "resultado": {
+    "feedback": "f"
+  },
+  "salida": {
+    "stdout": {
+      "decision": "block",
+      "reason": "f"
+    }
+  }
+}

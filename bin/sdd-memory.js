@@ -8,7 +8,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const DIR = path.join(process.cwd(), '.sdd', 'memoria');
+const { findProjectRoot } = require(path.join(__dirname, '..', 'harness', 'src', 'util'));
+
+// Siempre la memoria del proyecto que contiene la carpeta actual (raíz con .git), no la de una subcarpeta ni otra
+const DIR = path.join(findProjectRoot(process.cwd()), '.sdd', 'memoria');
 const BUDGET = { 'MEMORIA.md': 60, 'decisiones.md': 300, 'pendientes.md': 80, 'historial.md': 200, 'sesion.md': 40, tema: 150 };
 const today = () => new Date().toISOString().slice(0, 10);
 const lines = f => fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split(/\r?\n/).length : 0;

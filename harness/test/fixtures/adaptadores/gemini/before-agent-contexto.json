@@ -1,0 +1,23 @@
+{
+  "descripcion": "BeforeAgent: el contexto (también tras comprimir) va como additionalContext",
+  "eventoNativo": "BeforeAgent",
+  "entrada": {
+    "session_id": "g1",
+    "cwd": "/tmp/proyecto-sdd",
+    "prompt": "hola"
+  },
+  "normalizado": {
+    "event": "prompt",
+    "prompt": "hola"
+  },
+  "resultado": {
+    "context": "c"
+  },
+  "salida": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "additionalContext": "c"
+      }
+    }
+  }
+}

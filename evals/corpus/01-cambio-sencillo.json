@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "tema": "cambio-sencillo",
+  "nombre": "pedido directo, edición y verificación aprobada",
+  "archivos": { "src/a.js": "module.exports = 1" },
+  "config": { "sensores": { "alTerminar": ["tests"], "comandos": { "tests": "\"{node}\" -e \"process.exit(0)\"" } } },
+  "pasos": [
+    { "evento": "prompt", "texto": "cambia el valor exportado a 2, directo", "espera": { "contexto": "directo", "estado": { "gate.estado": "libre" } } },
+    { "evento": "pre", "herramienta": { "kind": "edit", "name": "Write", "paths": ["src/a.js"], "contents": ["module.exports = 2"] }, "espera": { "decision": "permitido" } },
+    { "accion": "escribir", "archivo": "src/a.js", "contenido": "module.exports = 2" },
+    { "evento": "post", "herramienta": { "kind": "edit", "name": "Write", "paths": ["src/a.js"], "contents": ["module.exports = 2"] } },
+    { "evento": "stop", "ultimoMensaje": "Listo.", "espera": { "aviso": "Verificado: ✓ tests", "estado": { "sucio": false, "sensores.estado": "aprobado" } } }
+  ]
+}

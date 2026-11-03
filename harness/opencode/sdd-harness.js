@@ -15,6 +15,9 @@ try {
 } catch (e) {
   console.error(`[sdd-harness] no se pudo cargar el núcleo en ${SDD_HOME}: ${e.message}`);
 }
+let observado = null; // eventos reales recibidos (para doctor); si falta, el plugin funciona igual
+try { observado = require(`${SDD_HOME}/harness/src/observado.js`); } catch { /* versión anterior del harness */ }
+const seen = name => { try { if (observado) observado.record('opencode', name); } catch { /* nunca rompe el plugin */ } };
 
 export const SddHarness = async ({ client, directory, worktree }) => {
   if (!core) return {};
@@ -44,6 +47,7 @@ export const SddHarness = async ({ client, directory, worktree }) => {
 
   return {
     'tool.execute.before': async (input, output) => {
+      seen('tool.execute.before');
       const args = (output && output.args) || {};
       argsByCall.set(input.callID, { tool: input.tool, args });
       if (argsByCall.size > 200) argsByCall.delete(argsByCall.keys().next().value);
@@ -53,6 +57,7 @@ export const SddHarness = async ({ client, directory, worktree }) => {
     },
 
     'tool.execute.after': async (input, output) => {
+      seen('tool.execute.after');
       const saved = argsByCall.get(input.callID);
       argsByCall.delete(input.callID);
       if (!saved) return;
@@ -61,22 +66,26 @@ export const SddHarness = async ({ client, directory, worktree }) => {
     },
 
     'chat.message': async (input, output) => {
+      seen('chat.message');
       const text = textOf(output && output.parts);
       if (text) await core.handle(ev('prompt', { sessionId: input.sessionID, prompt: text }));
     },
 
     'experimental.chat.system.transform': async (_input, output) => {
+      seen('experimental.chat.system.transform');
       const ctx = memory.contextBlock(root, {});
       if (ctx && output && Array.isArray(output.system)) output.system.push(ctx);
     },
 
     'experimental.session.compacting': async (input, output) => {
+      seen('experimental.session.compacting');
       const r = await core.handle(ev('compact', { sessionId: input.sessionID, wantsContext: true }));
       if (r && r.context && output && Array.isArray(output.context)) output.context.push(r.context);
     },
 
     event: async ({ event }) => {
       if (!event || event.type !== 'session.idle') return;
+      seen('session.idle');
       const id = event.properties && event.properties.sessionID;
       if (!id) return;
       const r = await core.handle(ev('stop', { sessionId: id, lastMessage: await lastAssistant(id) }));

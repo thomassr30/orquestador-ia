@@ -6,6 +6,8 @@
 const fs = require('fs');
 const path = require('path');
 const { fwd } = require('./paths');
+const { redact } = require('./secrets');
+const { ETIQUETA, SIMBOLO, idControl, verificado } = require('./resultado');
 
 const MAX_CHARS = 9000; // los hooks de contexto admiten ~10.000 caracteres
 const MAX_LINES = { 'MEMORIA.md': 80, 'sesion.md': 60 };
@@ -96,14 +98,15 @@ function checkpoint(root, state, host) {
   const file = path.join(mem, 'sesion.md');
   const files = state.cambios.filter(f => !f.startsWith('.sdd/'));
   const shown = files.slice(-15);
-  const sens = state.sensores
-    ? state.sensores.resumen.map(r => `${r.omitido ? '•' : r.ok ? '✓' : '✗'} ${r.nombre}`).join(' · ') + (state.sensores.ok ? '' : ' (con errores)')
-    : 'sin ejecutar';
+  const s = state.sensores;
+  const sens = !s ? 'sin ejecutar' : s.estado
+    ? `${ETIQUETA[s.estado]}${(s.resumen || []).length ? ` — ${s.resumen.map(r => `${SIMBOLO[r.estado] || '•'} ${idControl(r)}`).join(' · ')}` : ''}${verificado(s.estado) ? '' : ' (pendiente)'}`
+    : (s.resumen || []).map(r => `${r.omitido ? '•' : r.ok ? '✓' : '✗'} ${r.nombre}`).join(' · ') + (s.ok ? '' : ' (con errores)');
   const stamp = new Date().toISOString().replace('T', ' ').slice(0, 16);
   const block = [
     AUTO_START,
     `Última actividad: ${stamp} (${host || 'agente'}) · Plan: ${GATE_LABEL[state.gate.estado] || state.gate.estado}`,
-    ...(state.objetivo ? [`Pedido en curso: ${state.objetivo}`] : []),
+    ...(state.objetivo ? [`Pedido en curso: ${redact(state.objetivo)}`] : []),
     `Archivos modificados en la sesión: ${shown.length ? shown.join(', ') : '—'}${files.length > shown.length ? ` (+${files.length - shown.length} más)` : ''}`,
     `Sensores: ${sens}`,
     AUTO_END,

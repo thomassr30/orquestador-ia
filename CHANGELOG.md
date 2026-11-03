@@ -1,5 +1,53 @@
 # Cambios
 
+## 3.0.0 — Resultados verificables, aprobaciones exactas y estado resistente
+
+Para que los hooks instalados usen esta versión hay que actualizar la instalación (`npm run update` o `node install.js`). Guía en el README → *Migración a 3.0.0*.
+
+### Cambios incompatibles
+- **Lo omitido ya no es verde**: un control que excede el tiempo, cuya herramienta no está instalada, que no alcanza a correr o cuyos errores están en archivos no modificados sin línea base queda «no verificado». Antes contaba como aprobado.
+- **`tests` es obligatorio** si el proyecto lo tiene (`sensores.obligatorios`). Un obligatorio fallido o sin verificar impide dar el cambio por verificado.
+- **Agotar los reintentos no libera el cambio**: tras `sensores.maxBloqueos` el harness deja de insistir, pero el resultado sigue pendiente hasta que cambie el contenido o autorices una excepción.
+- **Aprobaciones en el chat por acción exacta**: con varias pendientes, un «sí» solo no aprueba ninguna (`sí 1,3` o `sí a todas`).
+- **Estado de sesión v2**: el v1 se migra solo y descarta las aprobaciones sin identidad (se vuelven a pedir).
+- **Registro**: `eventos.jsonl` reemplaza a `registro.log`; cambia el texto de `estado` y `registro`.
+- **`sdd-eval`**: requiere `--confirmar`; `verificar` pasa a `aceptacion.comando` (lo viejo se acepta con aviso); historial v2 (las corridas anteriores no se comparan).
+- **Estado del trabajo**: vive en `sdd-harness.js trabajo`; `changes/` y `sdd-state.js` quedan obsoletos para el estado (`sdd-state.js` avisa).
+
+### Nuevo
+- **Contrato de resultados** (`harness/src/resultado.js`): aprobado · fallido · no verificado · bloqueado · excepción, común a sensores, trabajo y evaluaciones.
+- **Excepciones del usuario**: «sí» en el chat a la solicitud o `sdd-harness.js excepcion [control…] --motivo "…"` desde tu terminal. Valen solo para ese contenido.
+- **Línea base** (`sdd-harness.js linea-base`): sobre el commit actual y sin cambios de código; permite afirmar con evidencia que un error ya existía.
+- **Cambios por shell detectados con git** al terminar el turno, y reglas propias (`prohibido`, `noImportar`) revisadas también sobre ellos, sin atribuir lo que ya estaba en el último commit.
+- **Trabajo verificable** (`sdd-harness.js trabajo`): plan con requisitos, criterios y tareas fuera del repo; la aprobación lo congela; tarea verificada solo con evidencia vigente del harness; «sin progreso» tras 3 intentos iguales; aviso si el agente dice que terminó sin evidencia; aceptar y descartar solo el usuario.
+- **Aprobaciones exactas** (`harness/src/aprobaciones.js`): HMAC con clave local de la acción exacta, un solo uso, vencimiento configurable (`aprobaciones.vigenciaMin`), consumo bajo candado.
+- **Bash pasa por las protecciones de rutas** cuando el destino es reconocible; secretos en comandos que escriben, bloqueados; escribir fuera del proyecto pide confirmación (salvo la carpeta temporal del sistema).
+- **`modo: "estricto"`**: falla cerrada salvo lecturas; herramientas y comandos no reconocidos piden confirmación. En `normal`, la falla cerrada ante errores internos cubre lo crítico, también si el error ocurre en el adaptador.
+- **Eventos estructurados** (`sdd-harness.js eventos [n] [--sesion s] [--explicar <id>] [--json]`), sin prompts, argumentos ni contenido.
+- **Presupuestos** `maxMinutosPorPedido` y `maxTokensSesion` (este último solo con medición: hoy Claude Code). Desactivados por defecto.
+- **`doctor` por niveles** para las 6 herramientas: configuración, hook ejecutable, prueba sintética, integración confirmada con eventos reales y limitaciones; aislamiento de Claude Code y Codex según su configuración; `--json` con respaldo archivo:línea.
+- **Corpus determinista** (`evals/corpus/`, 11 escenarios) y **contrato de adaptadores** con payloads simulados, en `npm test`. CI con Node 18, 20, 22 y 24 en Ubuntu, Windows y macOS.
+- **`sdd-eval`**: aceptación independiente del agente (`archivos` restaurados con detección de manipulación, `dir` oculta al agente), estados con causa, códigos de salida 0/1/2/3, límites `--max-tareas`, `--max-costo-usd`, `--max-minutos`, modos `sin-gate` y `flujo`, metadatos por corrida, `--validar` y regresiones contra `--linea-base`.
+- Configuración documentada: `modo`, `sensores.obligatorios`, `aprobaciones.vigenciaMin`, `presupuesto.maxMinutosPorPedido`, `presupuesto.maxTokensSesion`, `trabajo.maxIntentosSinProgreso`, `permisos.porDefecto`, `permisos.permitirSecretos` y `salida`.
+
+### Corregido
+Se reprodujeron 25 fallos con scripts aislados antes de corregirlos; cada grupo tiene pruebas en `harness/test/`.
+- **Evaluaciones (6)**: un agente que no arrancaba contaba como éxito si la tarea no tenía verificador; una salida no JSON con código de error contaba como éxito si el verificador pasaba; una corrida vacía terminaba con «Éxito: 0%» y código 0; `"tareas": "texto"` se recorría letra por letra como tareas «exitosas» sin lanzar al agente; con todas las tareas fallidas el código de salida era 0; un archivo de tareas no JSON terminaba en una traza de Node. Además (por inspección): timeout ignorado, temporales sin borrar en retornos tempranos, verificador sobre la copia que el agente pudo modificar y corridas comparadas sin metadatos.
+- **Sensores (7)**: timeout, herramienta ausente y presupuesto agotado contaban como aprobados; los errores previos se asumían sin evidencia; el código sin controles aplicables quedaba limpio; tras los reintentos el fallo se liberaba; lo modificado por shell no se verificaba.
+- **Aprobaciones (7)**: una aprobación MCP valía para otros argumentos; un «sí» aprobaba varias pendientes a la vez; escribir fuera del proyecto no pedía confirmación; dos procesos podían consumir la misma aprobación; Bash podía saltarse las protecciones de las ediciones y las decisiones del usuario.
+- **Estado y fallas internas (4)**: un estado corrupto podía conceder permisos; sin candado se seguía escribiendo; un `harness.json` corrupto se ignoraba en silencio; un error interno dejaba pasar acciones críticas.
+- **Memoria (1)**: un secreto en el pedido llegaba al estado y a `sesion.md`.
+- **Compactador en Claude Code**: respondía `allow` sobre el comando envuelto, así que concedía permiso aunque el usuario no lo hubiera dado y sus reglas de preguntar o denegar sobre el comando original dejaban de aplicar. Ahora solo compacta lo que las reglas del usuario ya permiten y ninguna regla de preguntar o denegar toca (`harness/src/adapters/claude-permisos.js`).
+
+### Limitaciones conocidas
+- Los hooks no son un sandbox: la detección de escrituras por shell es por patrones y un comando no reconocido en modo `normal` lo decide la herramienta.
+- El GATE depende de reconocer el pedido por su texto.
+- La integración con cada herramienta real no se prueba automáticamente; las capacidades son declaradas por el adaptador hasta el nivel (d) de `doctor`, que no comprueba que la herramienta respete cada respuesta. El nivel (d) cuenta cualquier ejecución del hook fuera de `doctor`.
+- En Claude Code, el compactador lee las reglas de permiso en archivo; no ve las políticas por registro de Windows, perfil de macOS o servidor, ni `--allowedTools`/`--disallowedTools` (si se usan para denegar comandos de test, `salida.compactar: false`).
+- Si el módulo del harness no carga (instalación dañada), el hook falla abierto.
+- `sdd-eval` solo implementa el cliente `claude` (Codex pendiente); el modo `flujo` y el formato JSON del cliente están probados con un ejecutable falso.
+- Los límites del registro de eventos (1 MB × 5 archivos, 30 días para lo rotado, aplicado al iniciar sesión) son fijos en el código: no se configuran.
+
 ## 2.8.1 — El GATE entiende cómo apruebas y no frena la exploración
 - **Aprobación en lenguaje natural**: además de "sí", "dale", "ok" o "apruebo", ahora aprueban el plan "desarrolla", "desarrollar", "impleméntalo", "implementa todo", "procede con el plan", "hazlo", "avanza", "manos a la obra", "ya po", "bueno, desarrolla"… (con o sin tilde). Antes, "desarrollar" se tomaba como un pedido nuevo y volvía a bloquear. Lo que no aprueba: negar o pedir esperar ("todavía no", "espera", "pero antes…"), preguntar, o pedir algo nuevo ("desarrolla el módulo de pagos").
 - **Explorar antes de aprobar**: el GATE ya no frena comandos de lectura que no estaban en la lista (jq, fd, tree, `Get-ChildItem | Select-String`, `xargs grep`…). Solo frena lo que puede escribir archivos: redirecciones, `sed -i`, copiar o mover, scripts e intérpretes, generadores y formateadores (`--fix`, `--write`, `-u`).

@@ -1,0 +1,22 @@
+{
+  "descripcion": "Stop: decision block",
+  "eventoNativo": "Stop",
+  "entrada": {
+    "session_id": "x1",
+    "cwd": "/tmp/proyecto-sdd",
+    "last_assistant_message": "Listo."
+  },
+  "normalizado": {
+    "event": "stop",
+    "lastMessage": "Listo."
+  },
+  "resultado": {
+    "block": "b"
+  },
+  "salida": {
+    "stdout": {
+      "decision": "block",
+      "reason": "b"
+    }
+  }
+}

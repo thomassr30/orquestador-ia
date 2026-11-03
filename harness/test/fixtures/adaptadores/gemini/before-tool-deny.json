@@ -1,0 +1,33 @@
+{
+  "descripcion": "BeforeTool: salida SOLO JSON con decision deny",
+  "eventoNativo": "BeforeTool",
+  "entrada": {
+    "session_id": "g1",
+    "cwd": "/tmp/proyecto-sdd",
+    "tool_name": "run_shell_command",
+    "tool_input": {
+      "command": "git commit -m x"
+    }
+  },
+  "normalizado": {
+    "host": "gemini",
+    "event": "pre",
+    "nativeAsk": false,
+    "reinjectOnPrompt": true,
+    "sessionId": "g1",
+    "tool": {
+      "kind": "shell",
+      "command": "git commit -m x"
+    }
+  },
+  "resultado": {
+    "decision": "deny",
+    "reason": "[harness] no"
+  },
+  "salida": {
+    "stdout": {
+      "decision": "deny",
+      "reason": "[harness] no"
+    }
+  }
+}

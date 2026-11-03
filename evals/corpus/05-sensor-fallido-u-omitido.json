@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "tema": "sensor-fallido-u-omitido",
+  "nombre": "un control obligatorio que no termina queda «no verificado» y sigue pendiente tras agotar los reintentos",
+  "archivos": { "src/a.js": "" },
+  "config": { "sensores": { "alTerminar": ["tests"], "timeoutSeg": 1, "comandos": { "tests": "\"{node}\" -e \"setTimeout(()=>{},10000)\"" } } },
+  "pasos": [
+    { "evento": "post", "herramienta": { "kind": "edit", "name": "Write", "paths": ["src/a.js"], "contents": ["x"] } },
+    { "evento": "stop", "ultimoMensaje": "Listo.", "espera": { "bloquea": true, "bloqueo": "obligatorio no se pudo verificar" } },
+    { "evento": "stop", "ultimoMensaje": "Listo.", "espera": { "bloquea": true } },
+    { "evento": "stop", "ultimoMensaje": "Listo.", "espera": { "bloquea": false, "aviso": "Sin resolver tras 2 intentos", "estado": { "sucio": true, "sensores.estado": "no_verificado" } } }
+  ]
+}

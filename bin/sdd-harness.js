@@ -2,7 +2,8 @@
 // Diagnóstico del harness SDD (solo lectura, salvo que "sensores" ejecuta los chequeos del proyecto).
 // Uso:
 //   node sdd-harness.js estado   [ruta]   GATE, archivos modificados y últimos sensores de este proyecto
-//   node sdd-harness.js doctor   [ruta]   hooks instalados por herramienta, configuración y sensores detectados
+//   node sdd-harness.js doctor   [ruta] [--json]   evidencia por cliente (configuración, hook, prueba sintética, eventos reales),
+//                                          capacidades y límites, estado del harness y sensores detectados
 //   node sdd-harness.js sensores [ruta]   ejecuta ahora los sensores sobre lo modificado (git status)
 //   node sdd-harness.js registro [n]      últimas decisiones del harness en este proyecto
 //   node sdd-harness.js aprobar  [ruta]   (tú, desde tu terminal) aprueba el plan pendiente de la última sesión
@@ -11,6 +12,9 @@
 //   node sdd-harness.js workspace [ruta] [--aplicar]   proyectos del espacio de trabajo; con --aplicar da acceso a las carpetas extra (Claude Code, Codex)
 //   node sdd-harness.js puntos            puntos de restauración del proyecto actual (uno antes de cada turno que modificó archivos)
 //   node sdd-harness.js deshacer [n|id] [--confirmar]   muestra qué volvería atrás; con --confirmar deja los archivos como en ese punto
+//   node sdd-harness.js excepcion [control…] --motivo "por qué"   (tú, desde tu terminal) acepta controles fallidos o sin verificar
+//                                                                  de la última verificación; vale solo para ese contenido
+//   node sdd-harness.js linea-base [ruta]  toma la línea base de errores sobre el último commit (sin cambios de código)
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -20,13 +24,21 @@ const SRC = path.join(__dirname, '..', 'harness', 'src');
 const { findProjectRoot, relPosix } = require(path.join(SRC, 'util'));
 const { loadConfig } = require(path.join(SRC, 'config'));
 const S = require(path.join(SRC, 'state'));
-const { plan, runSensors, summarize } = require(path.join(SRC, 'sensors'));
+const { plan, runSensors, summarize, takeBaseline, validBaseline, CODE_EXT } = require(path.join(SRC, 'sensors'));
+const V = require(path.join(SRC, 'verificacion'));
+const { ETIQUETA, SIMBOLO, idControl } = require(path.join(SRC, 'resultado'));
 const { HOME, SDD_HOME, fwd } = require(path.join(SRC, 'paths'));
 
 const argv = process.argv.slice(2);
+// Opciones con valor: --motivo "x", --json '{…}', --archivo ruta, --responsable nombre (también --opcion=valor)
+// --json lleva valor solo en «trabajo plan --json '{…}'»; en doctor es una bandera (salida para máquinas)
+const VALUED = ['--motivo', '--archivo', '--responsable', '--explicar', '--sesion', ...(argv[0] === 'trabajo' ? ['--json'] : [])];
+const opt = name => { const i = argv.indexOf(name); if (i >= 0) return argv[i + 1]; const eq = argv.find(a => a.startsWith(`${name}=`)); return eq ? eq.slice(name.length + 1) : undefined; };
+const motivo = opt('--motivo') || '';
+const positional = argv.filter((a, i) => !a.startsWith('--') && !VALUED.includes(argv[i - 1]));
 const flags = new Set(argv.filter(a => a.startsWith('--')));
-const [cmd = 'estado', arg] = argv.filter(a => !a.startsWith('--'));
-const root = findProjectRoot(['registro', 'puntos', 'deshacer'].includes(cmd) ? process.cwd() : (arg || process.cwd()));
+const [cmd = 'estado', arg] = positional;
+const root = findProjectRoot(['registro', 'eventos', 'puntos', 'deshacer', 'excepcion', 'excepción', 'trabajo'].includes(cmd) ? process.cwd() : (arg || process.cwd()));
 const spaceLine = () => {
   try {
     const W = require(path.join(SRC, 'workspace'));
@@ -49,27 +61,55 @@ function estado() {
   const sl = spaceLine(); if (sl) console.log(sl);
   if (!sessions.length) { console.log('Sin actividad registrada del harness en este proyecto.'); return; }
   const s = sessions[0];
+  if (s.danado) { console.log(`Última sesión: ${s.sesion} — estado DAÑADO (ilegible). El próximo evento lo recupera en modo restrictivo (plan por aprobar, sin confirmaciones vigentes).`); return; }
   console.log(`Última sesión: ${s.sesion} (${s.herramienta || '—'}) · actualizada ${String(s.actualizado || '').replace('T', ' ').slice(0, 16)}`);
+  if (s.recuperacion) console.log(`Estado recuperado el ${String(s.recuperacion.en).slice(0, 16).replace('T', ' ')}: ${s.recuperacion.motivo} (modo restrictivo)`);
+  const problemas = loadConfig(root).problemas || [];
+  for (const p of problemas) console.log(`Configuración con problemas: ${p}`);
   console.log(`GATE: ${GATE[s.gate.estado] || s.gate.estado}${s.sdd === 'off' ? ' · orquestador DESACTIVADO en esta conversación ("con sdd" lo reactiva)' : ''}`);
   if (s.mensajeUsuario) console.log(`Tu último mensaje, según el harness: «${s.mensajeUsuario}»${s.gate.via ? ` · aprobado desde ${s.gate.via}` : ''}`);
   const files = s.cambios.filter(f => !f.startsWith('.sdd/'));
   console.log(`Archivos modificados: ${files.length ? files.join(', ') : '—'}`);
   if (s.punto) console.log(`Último punto de restauración: ${s.punto.error ? 'no se pudo guardar (ver doctor)' : `${s.punto.id} · deshacer con: sdd-harness.js deshacer`}`);
-  console.log(`Sensores: ${s.sensores ? `${s.sensores.ok ? 'en verde' : 'con errores'} — ${s.sensores.resumen.map(r => `${r.omitido ? '•' : r.ok ? '✓' : '✗'} ${r.nombre}`).join(' · ')}` : 'sin ejecutar'}${s.sucio ? ' (hay cambios sin verificar)' : ''}`);
+  const sens = s.sensores;
+  const verdict = !sens ? 'sin ejecutar' : sens.estado
+    ? `${ETIQUETA[sens.estado]}${sens.motivo ? ` (${sens.motivo})` : ''}${sens.resumen && sens.resumen.length ? ` — ${sens.resumen.map(r => `${SIMBOLO[r.estado] || '•'} ${idControl(r)}`).join(' · ')}` : ''}`
+    : `${sens.ok ? 'en verde' : 'con errores'} (formato anterior)`;
+  console.log(`Verificación: ${verdict}${s.sucio ? ' · hay cambios sin verificar' : ''}${sens && sens.pausado ? ' · el harness dejó de insistir: sigue pendiente hasta que cambien los archivos o autorices una excepción (sdd-harness.js excepcion)' : ''}`);
+  if ((s.excepciones || []).length) console.log(`Excepciones autorizadas: ${s.excepciones.map(e => `${e.control} (${String(e.en).slice(0, 10)})`).join(' · ')}`);
+  const lb = validBaseline(root);
+  console.log(`Línea base de errores: ${lb.lb ? `commit ${lb.lb.commit.slice(0, 8)} (${String(lb.lb.en).slice(0, 10)})` : lb.motivo}`);
   if (s.subagentes) console.log(`Sub-agentes en el último pedido: ${s.subagentes.lanzados}${s.subagentes.libre ? ' (sin tope: aprobaste más)' : ''}`);
-  if (s.aprobaciones.pendientes.length) console.log(`Esperando confirmación en el chat: ${s.aprobaciones.pendientes.map(p => p.clave).join(' · ')}`);
-  if (sessions.length > 1) console.log(`Otras sesiones recientes: ${sessions.slice(1, 4).map(x => `${x.sesion} (${x.herramienta || '—'}, GATE ${x.gate.estado})`).join(', ')}`);
+  if (s.aprobaciones.pendientes.length) console.log(`Esperando confirmación en el chat: ${s.aprobaciones.pendientes.map((p, i) => `${i + 1}) ${p.etiqueta || p.clave}`).join(' · ')}`);
+  if (s.aprobaciones.aprobadas.length) console.log(`Confirmaciones vigentes (un uso): ${s.aprobaciones.aprobadas.map(p => `${p.etiqueta || p.clave}${p.vence ? ` hasta ${p.vence.slice(11, 16)}` : ''}`).join(' · ')}`);
+  if (sessions.length > 1) console.log(`Otras sesiones recientes: ${sessions.slice(1, 4).map(x => `${x.sesion} (${x.danado ? 'estado dañado' : `${x.herramienta || '—'}, GATE ${x.gate.estado}`})`).join(', ')}`);
 }
 
-// Prueba en vivo: ejecuta el comando EXACTO registrado en cada herramienta con un "git commit" simulado
-// y comprueba que el hook lo bloquee (valida Node en el PATH, comillas de la ruta y el adaptador).
-const LIVE = {
-  'Claude Code': { ev: 'PreToolUse', input: d => ({ session_id: 'doctor', cwd: d, tool_name: 'Bash', tool_input: { command: 'git commit -m prueba' } }), denied: o => /"permissionDecision":"deny"/.test(o) },
-  Codex: { ev: 'PreToolUse', input: d => ({ session_id: 'doctor', cwd: d, tool_name: 'Bash', tool_input: { command: 'git commit -m prueba' } }), denied: o => /"permissionDecision":"deny"/.test(o) },
-  'Gemini CLI': { ev: 'BeforeTool', input: d => ({ session_id: 'doctor', cwd: d, tool_name: 'run_shell_command', tool_input: { command: 'git commit -m prueba' } }), denied: o => /"decision":"deny"/.test(o) },
-  Cursor: { ev: 'beforeShellExecution', input: d => ({ conversation_id: 'doctor', workspace_roots: [d], command: 'git commit -m prueba', cwd: d }), denied: o => /"permission":"deny"/.test(o) },
-  Copilot: { ev: 'preToolUse', input: d => ({ sessionId: 'doctor', cwd: d, toolName: 'bash', toolArgs: { command: 'git commit -m prueba' } }), denied: o => /"permissionDecision":"deny"/.test(o) },
+// ---------- doctor: evidencia por cliente ----------
+// Niveles: (a) configuración encontrada · (b) hook ejecutable · (c) prueba sintética aprobada · (d) eventos reales del cliente.
+// La prueba sintética ejecuta el comando EXACTO registrado en cada cliente con payloads simulados (SDD_DOCTOR=1 y estado
+// temporal: no cuenta como evento real). Valida Node en el PATH, las comillas de la ruta, el adaptador y el núcleo;
+// NO que el cliente real respete la respuesta. Solo (d) dice que el cliente real invoca los hooks (observado.json).
+const ATRIBUCION = 'Listo.\n\nCo-Authored-By: Claude <noreply@anthropic.com>';
+const HSO = o => [(o.hookSpecificOutput || {}).permissionDecision, (o.hookSpecificOutput || {}).permissionDecisionReason];
+const claudeLike = { pre: 'PreToolUse', entrada: (d, c) => ({ session_id: 'doctor', cwd: d, tool_name: 'Bash', tool_input: { command: c } }), decision: HSO, fin: [['Stop', d => ({ session_id: 'doctor', cwd: d, last_assistant_message: ATRIBUCION })]], termina: o => o.decision === 'block' };
+const PRUEBAS = {
+  claude: claudeLike,
+  codex: claudeLike,
+  gemini: { pre: 'BeforeTool', entrada: (d, c) => ({ session_id: 'doctor', cwd: d, tool_name: 'run_shell_command', tool_input: { command: c } }), decision: o => [o.decision, o.reason], fin: [['AfterAgent', d => ({ session_id: 'doctor', cwd: d, prompt_response: ATRIBUCION })]], termina: o => o.decision === 'deny' },
+  cursor: { pre: 'beforeShellExecution', entrada: (d, c) => ({ conversation_id: 'doctor', workspace_roots: [d], cwd: d, command: c }), decision: o => [o.permission, o.agent_message],
+    fin: [['afterAgentResponse', d => ({ conversation_id: 'doctor', workspace_roots: [d], text: ATRIBUCION })], ['stop', d => ({ conversation_id: 'doctor', workspace_roots: [d], status: 'completed' })]], termina: o => !!o.followup_message },
+  copilot: { pre: 'preToolUse', entrada: (d, c) => ({ sessionId: 'doctor', cwd: d, toolName: 'bash', toolArgs: { command: c } }), decision: o => [o.permissionDecision, o.permissionDecisionReason], fin: [['agentStop', d => ({ sessionId: 'doctor', cwd: d, lastAssistantMessage: ATRIBUCION })]], termina: o => o.decision === 'block' },
 };
+const FIN = { bloquea: 'bloquea al terminar', reintenta: 'pide reintentar al terminar', aviso: 'avisa al terminar' };
+const ARCHIVOS = () => [
+  ['claude', path.join(HOME, '.claude', 'settings.json')],
+  ['codex', path.join(process.env.CODEX_HOME || path.join(HOME, '.codex'), 'hooks.json')],
+  ['gemini', path.join(HOME, '.gemini', 'settings.json')],
+  ['cursor', path.join(HOME, '.cursor', 'hooks.json')],
+  ['copilot', path.join(process.env.COPILOT_HOME || path.join(HOME, '.copilot'), 'hooks', 'sdd-orquestador.json')],
+  ['opencode', path.join(HOME, '.config', 'opencode', 'plugins', 'sdd-harness.js')],
+];
 
 function findCommand(text, ev) {
   const re = /"command"\s*:\s*"((?:[^"\\]|\\.)*sdd-hook\.js(?:[^"\\]|\\.)*)"/g;
@@ -78,55 +118,178 @@ function findCommand(text, ev) {
   return null;
 }
 
-function liveTest(label, text) {
-  const t = LIVE[label];
-  const cmd = t && findCommand(text, t.ev);
-  if (!cmd) return 'sin prueba en vivo';
-  const os = require('os');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdd-doctor-'));
-  const r = spawnSync(cmd, { shell: true, input: JSON.stringify(t.input(dir)), encoding: 'utf8', timeout: 20000, windowsHide: true, env: { ...process.env, SDD_HOME: path.join(dir, '.estado') } });
-  try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* temporal */ }
-  if (r.error) return `✗ no se pudo ejecutar (${r.error.message})`;
-  if (t.denied(r.stdout || '')) return 'prueba en vivo OK (bloqueó "git commit")';
-  return `✗ la prueba en vivo no bloqueó "git commit"${r.stderr ? `: ${r.stderr.trim().split('\n')[0]}` : ''}`;
+/** Proyecto y estado temporales para las pruebas sintéticas (sin puntos de restauración ni variables del host). */
+function sandboxDoctor() {
+  const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'sdd-doctor-'));
+  const proj = path.join(dir, 'proyecto');
+  fs.mkdirSync(path.join(proj, '.sdd'), { recursive: true });
+  fs.writeFileSync(path.join(proj, '.sdd', 'harness.json'), JSON.stringify({ deshacer: { activo: false } }));
+  const env = { ...process.env, SDD_HOME: path.join(dir, '.estado'), SDD_DOCTOR: '1' };
+  for (const k of ['CLAUDE_PROJECT_DIR', 'GEMINI_PROJECT_DIR', 'GEMINI_SESSION_ID']) delete env[k];
+  return { dir, proj, env, fin: () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* temporal */ } } };
 }
 
-function hookStatus() {
-  const read = file => { try { return fs.readFileSync(file, 'utf8'); } catch { return null; } };
-  const rows = [
-    ['Claude Code', path.join(HOME, '.claude', 'settings.json')],
-    ['Codex', path.join(process.env.CODEX_HOME || path.join(HOME, '.codex'), 'hooks.json')],
-    ['Gemini CLI', path.join(HOME, '.gemini', 'settings.json')],
-    ['Cursor', path.join(HOME, '.cursor', 'hooks.json')],
-    ['Copilot', path.join(process.env.COPILOT_HOME || path.join(HOME, '.copilot'), 'hooks', 'sdd-orquestador.json')],
-    ['OpenCode', path.join(HOME, '.config', 'opencode', 'plugins', 'sdd-harness.js')],
-  ];
-  let failures = 0;
-  for (const [label, file] of rows) {
-    const text = read(file);
-    const ours = text && (label === 'OpenCode' ? text.includes('SddHarness') : text.includes('sdd-hook.js'));
-    if (text === null) { console.log(`  · ${label.padEnd(12)} no instalado`); continue; }
-    if (!ours) { console.log(`  ✗ ${label.padEnd(12)} ${fwd(file)} (sin hooks del harness)`); failures++; continue; }
-    let live = 'plugin instalado (se carga al abrir OpenCode)';
-    if (label === 'OpenCode') {
-      const m = /const SDD_HOME = '([^']+)'/.exec(text);
-      if (m && !fs.existsSync(path.join(m[1], 'harness', 'src', 'core.js'))) { live = `✗ el plugin apunta a ${m[1]}, donde no está el harness`; failures++; }
-    } else {
-      live = liveTest(label, text);
-      if (live.startsWith('✗')) failures++;
+function ejecutar(cmd, entrada, env) {
+  const t0 = Date.now();
+  const r = spawnSync(cmd, { shell: true, input: JSON.stringify(entrada), encoding: 'utf8', timeout: 20000, windowsHide: true, env });
+  const out = String(r.stdout || '').trim();
+  let json = null; try { json = out ? JSON.parse(out) : {}; } catch { json = null; }
+  const err = r.error ? r.error.message : r.status === null ? 'sin respuesta (tiempo agotado)' : json === null ? 'la salida no es JSON' : r.status !== 0 && !out ? `terminó con código ${r.status}` : '';
+  const why = err && r.stderr ? `: ${String(r.stderr).trim().split('\n')[0]}` : '';
+  return { ok: !err, json: json || {}, ms: Date.now() - t0, error: err ? `${err}${why}` : '' };
+}
+
+/** (b) y (c) para los clientes con hooks de comando. */
+function pruebaComando(id, text, CAP) {
+  const p = PRUEBAS[id];
+  const mod = CAP.CLIENTES[id].mod;
+  if (!findCommand(text, p.pre)) return { ejecutable: false, motivo: `${p.pre} no está registrado` };
+  const sb = sandboxDoctor();
+  try {
+    const run = (ev, entrada) => { const c = findCommand(text, ev); return c ? ejecutar(c, entrada, sb.env) : { ok: false, json: {}, error: `${ev} no está registrado` }; };
+    const r1 = run(p.pre, p.entrada(sb.proj, 'git commit -m prueba'));
+    if (!r1.ok) return { ejecutable: false, motivo: r1.error };
+    const deny = p.decision(r1.json)[0] === 'deny';
+    // Git de escritura con aprobación nativa del cliente (Codex): el hook no decide; se prueba con otro comando crítico
+    const critico = (mod.parse(p.pre, p.entrada(sb.proj, 'x'), {}) || {}).nativeGitAsk ? 'kubectl apply -f k8s/' : 'git push origin main';
+    const r2 = run(p.pre, p.entrada(sb.proj, critico));
+    const [d2, why2] = p.decision(r2.json);
+    const nativa = mod.capacidades.aprobacion === 'nativa';
+    const critica = r2.ok && (nativa ? d2 === 'ask' : d2 === 'deny' && /Requiere confirmación/.test(String(why2 || '')));
+    let fin = true;
+    if (mod.capacidades.finDeTurno !== 'no') {
+      let r3 = null;
+      for (const [ev, f] of p.fin) { r3 = run(ev, f(sb.proj)); if (!r3.ok) break; }
+      fin = !!(r3 && r3.ok && p.termina(r3.json));
     }
-    console.log(`  ${live.startsWith('✗') ? '✗' : '✓'} ${label.padEnd(12)} ${fwd(file)} — ${live.replace(/^✗ /, '')}`);
+    return { ejecutable: true, ms: r1.ms, sintetica: { ok: deny && critica && fin, deny, critica, fin, critico, aprobacion: mod.capacidades.aprobacion, finDeTurno: mod.capacidades.finDeTurno } };
+  } finally { sb.fin(); }
+}
+
+// OpenCode: el plugin se carga con Node y un cliente falso (como opencode.test.js), en un proceso aparte.
+const OC_PRUEBA = `
+const out = { carga: false };
+const prompts = [];
+const client = { session: { messages: async () => ({ data: [{ info: { role: 'assistant' }, parts: [{ type: 'text', text: ${JSON.stringify(ATRIBUCION)} }] }] }), prompt: async x => { prompts.push(x); } } };
+try {
+  const { pathToFileURL } = await import('node:url');
+  const { SddHarness } = await import(pathToFileURL(process.env.SDD_DOCTOR_PLUGIN).href);
+  const d = process.env.SDD_DOCTOR_DIR;
+  const h = await SddHarness({ client, directory: d, worktree: d });
+  out.carga = !!h && typeof h['tool.execute.before'] === 'function';
+  if (out.carga) {
+    const rej = async (c, id) => { try { await h['tool.execute.before']({ tool: 'bash', sessionID: 'doctor', callID: id }, { args: { command: c } }); return ''; } catch (e) { return String((e && e.message) || e); } };
+    out.deny = await rej('git commit -m prueba', '1');
+    out.critica = await rej('kubectl apply -f k8s/', '2');
+    await h.event({ event: { type: 'session.idle', properties: { sessionID: 'doctor' } } });
+    await new Promise(r => setTimeout(r, 100));
+    out.fin = prompts.length > 0;
   }
-  return failures;
+} catch (e) { out.error = String((e && e.message) || e); }
+console.log(JSON.stringify(out));`;
+
+function pruebaOpenCode(text) {
+  const sb = sandboxDoctor();
+  try {
+    const file = path.join(sb.dir, 'sdd-harness.mjs');
+    fs.writeFileSync(file, text);
+    const t0 = Date.now();
+    const r = spawnSync(process.execPath, ['--input-type=module', '-e', OC_PRUEBA], { encoding: 'utf8', timeout: 20000, windowsHide: true, env: { ...sb.env, SDD_DOCTOR_PLUGIN: file, SDD_DOCTOR_DIR: sb.proj } });
+    let o = null; try { o = JSON.parse(String(r.stdout || '').trim().split('\n').pop()); } catch { o = null; }
+    if (!o || !o.carga) return { ejecutable: false, motivo: (o && o.error) || (r.error && r.error.message) || String(r.stderr || '').trim().split('\n')[0] || 'el plugin no cargó' };
+    const deny = /\[harness\]/.test(o.deny || ''); const critica = /Requiere confirmación/.test(o.critica || ''); const fin = !!o.fin;
+    return { ejecutable: true, ms: Date.now() - t0, sintetica: { ok: deny && critica && fin, deny, critica, fin, critico: 'kubectl apply -f k8s/', aprobacion: 'chat', finDeTurno: 'reintenta' } };
+  } finally { sb.fin(); }
+}
+
+/** (a) Configuración del cliente: hooks del harness registrados según el contrato del adaptador. */
+function configuracion(id, text, CAP) {
+  const hooks = CAP.CLIENTES[id].mod.capacidades.hooks;
+  if (id === 'opencode') {
+    if (!text.includes('SddHarness')) return { nuestro: false, ok: false, registrados: [], faltan: hooks, motivo: 'sin el plugin del harness' };
+    const m = /const SDD_HOME = '([^']+)'/.exec(text);
+    if (m && !fs.existsSync(path.join(m[1], 'harness', 'src', 'core.js'))) return { nuestro: true, ok: false, registrados: [], faltan: [], motivo: `el plugin apunta a ${m[1]}, donde no está el harness` };
+    return { nuestro: true, ok: true, registrados: hooks, faltan: [], motivo: '' };
+  }
+  if (!text.includes('sdd-hook.js')) return { nuestro: false, ok: false, registrados: [], faltan: hooks, motivo: 'sin hooks del harness' };
+  const faltan = hooks.filter(ev => !findCommand(text, ev));
+  return { nuestro: true, ok: !faltan.length, registrados: hooks.filter(ev => !faltan.includes(ev)), faltan, motivo: faltan.length ? `faltan ${faltan.join(', ')}` : '' };
+}
+
+/** Evidencia por cliente, combinada con las capacidades declaradas (capacidades.js). */
+function clientes() {
+  const CAP = require(path.join(SRC, 'capacidades'));
+  const obs = require(path.join(SRC, 'observado')).read();
+  const read = file => { try { return fs.readFileSync(file, 'utf8'); } catch { return null; } };
+  return ARCHIVOS().map(([id, file]) => {
+    const text = read(file);
+    const base = { id, nombre: CAP.CLIENTES[id].nombre, archivo: fwd(file), instalado: text !== null };
+    if (text === null) return { ...base, falla: false, evaluacion: CAP.evaluar(id, {}, { observado: obs }) };
+    const conf = configuracion(id, text, CAP);
+    const prueba = conf.nuestro && !(id === 'opencode' && !conf.ok) ? (id === 'opencode' ? pruebaOpenCode(text) : pruebaComando(id, text, CAP)) : null;
+    const evaluacion = CAP.evaluar(id, { configuracion: conf.ok, ejecutable: !!(prueba && prueba.ejecutable), sintetica: prueba && prueba.sintetica }, { observado: obs });
+    return { ...base, configuracion: conf, prueba, evaluacion, falla: !conf.ok || !prueba || !prueba.ejecutable || !prueba.sintetica.ok };
+  });
+}
+
+function imprimirClientes(rows) {
+  const ok = b => (b ? '✓' : '✗');
+  console.log('Clientes — evidencia: (a) configuración · (b) hook ejecutable · (c) prueba sintética · (d) eventos reales del cliente · (e) limitaciones');
+  for (const r of rows) {
+    const e = r.evaluacion;
+    if (!r.instalado) { console.log(`  · ${r.nombre.padEnd(12)} no instalado`); continue; }
+    console.log(`  ${r.falla ? '✗' : '✓'} ${r.nombre.padEnd(12)} ${e.nivelTexto} — ${r.archivo}`);
+    const c = r.configuracion;
+    console.log(`      (a) ${c.nuestro && c.registrados.length ? `${ok(c.ok)} ${c.registrados.length}/${e.hooks.length} hooks registrados${c.faltan.length ? ` (faltan: ${c.faltan.join(', ')})` : ''}` : `✗ ${c.motivo}`}`);
+    const p = r.prueba;
+    if (p) console.log(`      (b) ${p.ejecutable ? `✓ ${r.id === 'opencode' ? 'el plugin carga (con Node y un cliente simulado) y' : 'el hook'} responde (${p.ms} ms)` : `✗ ${p.motivo}`}`);
+    if (p && p.ejecutable) {
+      const s = p.sintetica;
+      const partes = [`${ok(s.deny)} bloquea «git commit»`, `${ok(s.critica)} ${s.aprobacion === 'nativa' ? 'pide confirmación nativa' : 'pide confirmación en el chat'} para «${s.critico}»`];
+      if (FIN[s.finDeTurno]) partes.push(`${ok(s.fin)} ${FIN[s.finDeTurno]}`);
+      console.log(`      (c) ${ok(s.ok)} prueba sintética ${s.ok ? 'aprobada' : 'fallida'}: ${partes.join(' · ')}`);
+    }
+    const vistos = e.observado ? Object.keys(e.observado.eventos) : [];
+    console.log(`      (d) ${e.confirmacion ? `✓ ${e.confirmacion} (${vistos.slice(0, 6).join(', ')}${vistos.length > 6 ? '…' : ''})` : `— sin eventos reales todavía: ${p && p.ejecutable ? 'lo anterior es una prueba sintética, no una integración confirmada' : 'integración sin confirmar'}${r.id === 'codex' ? ' (Codex no ejecuta hooks nuevos hasta aprobarlos con /hooks)' : ''}`}`);
+    if (e.limitaciones.length) console.log(`      (e) ${e.limitaciones.map(l => `${l.dimension}: ${l.valor}`).join(' · ')}`);
+  }
+  if (rows.some(r => r.falla)) console.log('  → Hay clientes con hooks que no responden o no pasan la prueba. Ejecuta: node install.js (y revisa que "node" funcione en una terminal nueva).');
+  console.log('  Prueba sintética = el comando registrado responde bien a payloads simulados. Solo (d) confirma que el cliente real invoca los hooks; que respete cada respuesta no se comprueba desde el hook. Detalle y respaldo archivo:línea: doctor --json');
 }
 
 function doctor() {
-  console.log(`Harness SDD · Node ${process.version} · ${fwd(SDD_HOME)}`);
-  console.log('\nHooks por herramienta (con prueba en vivo):');
-  if (hookStatus()) { console.log('  → Hay hooks que no responden. Ejecuta: node install.js (y revisa que "node" funcione en una terminal nueva).'); process.exitCode = 1; }
+  const CAP = require(path.join(SRC, 'capacidades'));
+  const O = require(path.join(SRC, 'observado'));
+  const rows = clientes();
   const cfg = loadConfig(root);
+  const sesiones = S.listSessions(root);
+  const danadas = sesiones.filter(s => s.danado).map(s => s.sesion);
+  const recuperadas = sesiones.filter(s => s.recuperacion).map(s => ({ sesion: s.sesion, en: s.recuperacion.en, motivo: s.recuperacion.motivo }));
+  const ultimoError = O.readError();
+  const clave = fs.existsSync(path.join(SDD_HOME, 'clave-aprobaciones'));
+  const lb = validBaseline(root);
+  const files = changedFiles();
+  const steps = plan(root, files.length ? files : guessSample(), cfg);
+  if (rows.some(r => r.falla)) process.exitCode = 1;
+  if (flags.has('--json')) {
+    const cliente = r => ({ nombre: r.nombre, archivo: r.archivo, instalado: r.instalado, nivel: r.evaluacion.nivel, nivelTexto: r.evaluacion.nivelTexto, niveles: r.evaluacion.niveles, confirmacion: r.evaluacion.confirmacion, configuracion: r.configuracion || null, prueba: r.prueba || null, observado: r.evaluacion.observado, capacidades: r.evaluacion.capacidades, limitaciones: r.evaluacion.limitaciones, falla: r.falla });
+    console.log(JSON.stringify({
+      node: process.version, sddHome: fwd(SDD_HOME), aviso: CAP.AVISO,
+      clientes: Object.fromEntries(rows.map(r => [r.id, cliente(r)])),
+      harness: { claveAprobaciones: clave, ultimoError },
+      proyecto: { ruta: fwd(root), modo: cfg.modo || 'normal', problemas: cfg.problemas || [], sesiones: { total: sesiones.length, danadas, recuperadas }, lineaBase: lb.lb ? { commit: lb.lb.commit, en: lb.lb.en } : { motivo: lb.motivo }, sensores: steps.map(s => ({ nombre: s.nombre, modulo: s.modulo, cmd: s.cmd })) },
+    }, null, 2));
+    return;
+  }
+  console.log(`Harness SDD · Node ${process.version} · ${fwd(SDD_HOME)}`);
+  console.log(`Aviso: ${CAP.AVISO}.\n`);
+  imprimirClientes(rows);
+  console.log(`\nClave de aprobaciones por chat: ${clave ? 'presente' : 'todavía no creada (se crea con la primera confirmación en el chat)'}`);
+  console.log(`Último error interno del hook: ${ultimoError ? `${CAP.fecha(ultimoError.en)} · ${ultimoError.cliente} ${ultimoError.evento} · ${ultimoError.mensaje}` : 'ninguno registrado'}`);
   console.log(`\nProyecto: ${fwd(root)}`);
   const sl = spaceLine(); if (sl) console.log(sl);
+  console.log(`Modo: ${cfg.modo === 'estricto' ? 'estricto (falla cerrada salvo lecturas; lo no reconocido como seguro pide aprobación)' : 'normal'}`);
+  for (const p of cfg.problemas || []) console.log(`✗ Configuración con problemas: ${p}`);
   console.log(`Configuración: GATE ${cfg.gate} · sensores al editar ${cfg.sensores.alEditar ? 'sí' : 'no'} · al terminar: ${cfg.sensores.alTerminar.join(', ') || 'ninguno'} · máx. ${cfg.sensores.maxBloqueos} bloqueos`);
   const { limitFor } = require(path.join(SRC, 'budget'));
   const C = require(path.join(SRC, 'checkpoints'));
@@ -134,9 +297,8 @@ function doctor() {
   console.log(`Presupuesto: modo ${(cfg.presupuesto || {}).modo || 'normal'} · ${limitFor(cfg) ? `máx. ${limitFor(cfg)} sub-agentes por mensaje` : 'sin tope de sub-agentes'} · salidas largas ${cfg.salida && cfg.salida.compactar ? 'compactadas' : 'completas'}`);
   const projCfg = path.join(root, '.sdd', 'harness.json');
   console.log(`Config. del proyecto: ${fs.existsSync(projCfg) ? fwd(projCfg) : 'no hay (.sdd/harness.json)'}`);
-  const files = changedFiles();
-  const sample = files.length ? files : guessSample();
-  const steps = plan(root, sample, cfg);
+  console.log(`Sesiones del harness: ${sesiones.length}${danadas.length ? ` · ✗ con estado dañado: ${danadas.join(', ')}` : ''}${recuperadas.length ? ` · recuperadas en modo restrictivo: ${recuperadas.map(x => `${x.sesion} (${CAP.fecha(x.en)}: ${x.motivo})`).join(', ')}` : ''}`);
+  console.log(`Línea base de errores: ${lb.lb ? `commit ${lb.lb.commit.slice(0, 8)} (${String(lb.lb.en).slice(0, 10)})` : lb.motivo}`);
   console.log(`\nSensores ${files.length ? `para los ${files.length} archivo(s) modificados` : '(ejemplo con un archivo del proyecto)'}:`);
   if (!steps.length) console.log('  ninguno detectado: configura sensores.comandos en .sdd/harness.json');
   for (const s of steps) console.log(`  • ${s.nombre}${s.modulo !== '.' ? ` [${s.modulo}]` : ''}: ${s.cmd}`);
@@ -156,9 +318,110 @@ async function sensores() {
   const files = changedFiles();
   if (!files.length) { console.log('No hay archivos modificados (git status) para verificar.'); return; }
   const run = await runSensors(root, files, loadConfig(root));
-  if (!run.ran) { console.log('No hay sensores aplicables a los archivos modificados.'); return; }
+  if (!run.ran) { console.log('No hay sensores aplicables a los archivos modificados: quedan sin verificar.'); process.exitCode = 1; return; }
   console.log(summarize(run, files.length));
   process.exitCode = run.ok ? 0 : 1;
+}
+
+async function lineaBase() {
+  const dirty = changedFiles().filter(f => CODE_EXT.test(f));
+  if (dirty.length) {
+    console.log(`Hay cambios sin commitear en archivos de código (${dirty.slice(0, 5).join(', ')}${dirty.length > 5 ? '…' : ''}). La línea base se toma sobre el último commit, sin cambios: así no puede incluir errores nuevos.`);
+    process.exitCode = 1; return;
+  }
+  const ls = spawnSync('git', ['-C', root, 'ls-files'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const files = ls.status === 0 ? ls.stdout.split('\n').filter(f => f && CODE_EXT.test(f)) : [];
+  const r = await takeBaseline(root, loadConfig(root), files);
+  if (!r.ok) { console.log(`No se pudo tomar la línea base: ${r.motivo}`); process.exitCode = 1; return; }
+  const entries = Object.entries(r.data.controles);
+  console.log(`Línea base del commit ${r.data.commit.slice(0, 8)}: ${entries.length ? entries.map(([k, v]) => `${k} ${v.lineas.length ? `${v.lineas.length} error(es) conocidos` : 'sin errores'}`).join(' · ') : 'no hay chequeos de proyecto completo que registrar'}. Vale mientras no cambie el commit.`);
+}
+
+/** Modelo de trabajo verificable (ver harness/src/trabajo.js). aceptar y descartar los ejecuta solo el usuario. */
+async function trabajo() {
+  const T = require(path.join(SRC, 'trabajo'));
+  const sub = positional[1] || 'estado';
+  const id = positional[2];
+  const last = S.listSessions(root).find(s => !s.danado) || {};
+  const out = r => { if (r && r.tarea) console.log(`${r.tarea.id}: ${T.ETAREA[r.tarea.estado] || r.tarea.estado}${r.tarea.motivo ? ` — ${r.tarea.motivo}` : ''}`); };
+  try {
+    if (sub === 'estado') {
+      const st = T.status(root);
+      if (!st) { console.log('No hay un trabajo registrado en este proyecto. El agente lo registra con «trabajo plan» antes de pedir la aprobación.'); return; }
+      if (st.problema) { console.log(`El trabajo guardado no se puede usar: ${st.problema}.`); process.exitCode = 1; return; }
+      const t = st.trabajo;
+      console.log(`Objetivo: ${t.objetivo}\nEstado: ${T.ETRABAJO[st.estado]}${t.congelado ? ` · plan aprobado ${String(t.congelado.en).slice(0, 16).replace('T', ' ')}` : ''}${t.propuesta ? ' · hay un plan nuevo propuesto sin aprobar' : ''}`);
+      if (t.alcance) console.log(`Alcance: ${t.alcance}`);
+      for (const r of st.requisitos) {
+        console.log(`${r.tecnico ? '✓' : '•'} ${r.id} ${r.texto}`);
+        for (const c of r.criterios) console.log(`    ${c.ok ? '✓' : c.manual ? '?' : '✗'} ${c.id} ${c.texto || ''} [${c.control ? `control ${c.control}` : c.comando ? 'comando' : 'manual'}] — ${c.motivo}`);
+      }
+      for (const x of st.tareas) console.log(`${x.estado === 'verificada' ? '✓' : x.estado === 'bloqueada' ? '⏸' : '•'} ${x.id} ${x.titulo} — ${T.ETAREA[x.estado]}${x.responsable ? ` (${x.responsable})` : ''}${x.motivo ? `: ${x.motivo}` : ''}${(x.intentos || []).length ? ` · ${x.intentos.length} intento(s)` : ''}`);
+      if ((t.decisiones || []).length) console.log(`Decisiones: ${t.decisiones.map(d => `${d.texto} (${d.motivo})`).join(' · ')}`);
+      if (st.faltan.length) console.log(`\nFalta:\n${st.faltan.map(f => `  - ${f}`).join('\n')}`);
+      process.exitCode = st.tecnico ? 0 : 1;
+      return;
+    }
+    if (sub === 'plan') {
+      const src = opt('--json') || (opt('--archivo') ? fs.readFileSync(path.resolve(opt('--archivo')), 'utf8') : (id === '-' ? fs.readFileSync(0, 'utf8') : ''));
+      if (!src) { console.log('Uso: trabajo plan --json \'{"objetivo":…,"requisitos":[…],"tareas":[…]}\' | --archivo plan.json | - (stdin)'); process.exitCode = 2; return; }
+      let raw; try { raw = JSON.parse(src); } catch (e) { console.log(`El plan no es JSON válido: ${e.message}`); process.exitCode = 2; return; }
+      const r = T.setPlan(root, raw, { sesion: last.sesion });
+      if (!r.ok) { console.log(`Plan rechazado:\n${r.errores.map(e => `  - ${e}`).join('\n')}`); process.exitCode = 2; return; }
+      console.log(r.propuesta ? 'El plan aprobado no se modifica: el nuevo quedó como PROPUESTA y se aplicará cuando el usuario lo apruebe (GATE).' : 'Plan registrado. Preséntalo al usuario: su aprobación lo congela.');
+      return;
+    }
+    if (sub === 'iniciar') { out(T.startTask(root, id, { responsable: opt('--responsable'), tomar: flags.has('--tomar') })); return; }
+    if (sub === 'bloquear') { out(T.blockTask(root, id, motivo)); return; }
+    if (sub === 'decision' || sub === 'decisión') { T.addDecision(root, positional[2], motivo); console.log('Decisión registrada.'); return; }
+    if (sub === 'verificar') {
+      if (!id) { console.log('Uso: trabajo verificar <tarea>'); process.exitCode = 2; return; }
+      const r = await T.verifyTask(root, id, { cfg: loadConfig(root), sesion: last.sesion, excepciones: last.excepciones || [], cambios: last.cambios || [] });
+      for (const c of r.controles) console.log(`${SIMBOLO[c.estado] || '•'} ${c.nombre}${c.modulo && c.modulo !== '.' ? ` [${c.modulo}]` : ''}: ${ETIQUETA[c.estado]}${c.motivo ? ` (${c.motivo})` : ''}`);
+      out(r);
+      if (r.sinProgreso) console.log('La tarea quedó bloqueada por falta de progreso: detente y consulta al usuario.');
+      process.exitCode = verificadoEstado(r.resultado.estado) ? 0 : 1;
+      return;
+    }
+    if (sub === 'aceptar') { T.accept(root, { motivo }); console.log('Trabajo aceptado por el usuario (aceptación funcional).'); return; }
+    if (sub === 'cerrar') { T.close(root); console.log('Trabajo cerrado.'); return; }
+    if (sub === 'descartar') { T.close(root, { descartar: true }); console.log('Trabajo descartado.'); return; }
+    console.log('Uso: trabajo [estado] | plan --json … | iniciar <tarea> [--responsable x] | bloquear <tarea> --motivo … | verificar <tarea> | decision "texto" --motivo … | cerrar · (solo el usuario) aceptar [--motivo …] | descartar');
+    process.exitCode = 2;
+  } catch (e) { console.log(`No se pudo: ${e.message}`); process.exitCode = 1; }
+}
+const verificadoEstado = e => e === 'aprobado' || e === 'excepcion';
+
+function excepcion() {
+  const last = S.listSessions(root).find(s => !s.danado);
+  if (!last || !last.sensores || !last.sensores.huella) { console.log('No hay una verificación registrada en este proyecto.'); return; }
+  const pend = V.pendingControls(last.sensores);
+  if (!pend.length) { console.log('La última verificación no tiene controles pendientes.'); return; }
+  const wanted = positional.slice(1).length ? positional.slice(1) : pend;
+  const unknown = wanted.filter(c => !pend.includes(c));
+  if (unknown.length) { console.log(`No están pendientes: ${unknown.join(', ')}. Pendientes: ${pend.join(', ')}`); process.exitCode = 1; return; }
+  if (!motivo) { console.log(`Indica el motivo: sdd-harness.js excepcion ${wanted.join(' ')} --motivo "por qué se acepta"`); process.exitCode = 1; return; }
+  let ok = false;
+  S.updateState(root, last.sesion, s => { ok = V.addExceptions(s, wanted, s.sensores.huella, `autorizada por el usuario en la terminal: ${motivo}`); });
+  S.log(root, { herramienta: 'terminal', evento: 'excepción', decision: 'autorizada', detalle: wanted.join(', ') });
+  console.log(`Excepción registrada para ${wanted.join(', ')}: vale solo para el contenido actual (si los archivos cambian, deja de valer).${ok ? ' La verificación queda aprobada con excepción.' : ' Aún quedan controles pendientes.'}`);
+}
+
+/** Eventos estructurados: filtrar por sesión, o reconstruir la cadena de decisiones de uno (sin volver a ejecutar nada). */
+function eventos() {
+  const EV = require(path.join(SRC, 'eventos'));
+  const id = opt('--explicar');
+  if (id) {
+    const r = EV.explain(root, id);
+    if (!r) { console.log(`No hay un evento ${id} en este proyecto.`); process.exitCode = 1; return; }
+    if (flags.has('--json')) { console.log(JSON.stringify(r, null, 2)); return; }
+    console.log(`Cadena de decisiones del evento ${id} (sesión ${r.evento.sesion || '—'}):`);
+    for (const e of r.cadena) console.log(`${e.id === id ? '▶' : ' '} ${EV.format(e)}${e.politica ? `\n      política: ${e.politica}` : ''}${e.verificacion ? `\n      verificación: ${e.verificacion.estado}` : ''}${e.terminacion ? `\n      terminación: ${e.terminacion.motivo}` : ''}`);
+    return;
+  }
+  const list = EV.read(root, { sesion: opt('--sesion') || null, limit: Number(positional[1]) || 40 });
+  if (flags.has('--json')) { console.log(JSON.stringify(list, null, 2)); return; }
+  console.log(list.length ? list.map(EV.format).join('\n') : 'Sin eventos del harness en este proyecto.');
 }
 
 function registro() {
@@ -172,6 +435,7 @@ function aprobar() {
   if (!last) { console.log('No hay sesiones del harness en este proyecto.'); return; }
   S.updateState(root, last.sesion, st => { st.gate = { estado: 'aprobado', desde: new Date().toISOString() }; });
   S.log(root, { herramienta: 'terminal', evento: 'gate', decision: 'aprobado', detalle: 'aprobado manualmente por el usuario' });
+  try { if (require(path.join(SRC, 'trabajo')).freeze(root, { sesion: last.sesion, via: 'terminal' })) console.log('El plan registrado del trabajo quedó congelado.'); } catch (e) { console.log(`Aviso: no se pudo congelar el plan del trabajo (${e.message}).`); }
   console.log(`Plan aprobado para la sesión ${last.sesion} (${last.herramienta || '—'}). Pídele al agente que continúe.`);
 }
 
@@ -308,6 +572,6 @@ function reglas() {
   process.exitCode = hits.length ? 1 : 0;
 }
 
-const cmds = { estado, doctor, sensores, registro, aprobar, consumo, reglas, puntos, deshacer, workspace, hooks: () => { console.log('Hooks por herramienta:'); hookStatus(); } };
-if (!cmds[cmd]) { console.error('Comandos: estado | doctor | sensores | registro | consumo | reglas | workspace | puntos | deshacer | aprobar'); process.exit(1); }
+const cmds = { estado, doctor, sensores, registro, eventos, aprobar, consumo, reglas, puntos, deshacer, workspace, excepcion, 'excepción': excepcion, 'linea-base': lineaBase, trabajo, hooks: () => { const rows = clientes(); imprimirClientes(rows); if (rows.some(r => r.falla)) process.exitCode = 1; } };
+if (!cmds[cmd]) { console.error('Comandos: estado | doctor | hooks | sensores | linea-base | trabajo | registro | eventos | consumo | reglas | workspace | puntos | deshacer | aprobar | excepcion'); process.exit(1); }
 Promise.resolve(cmds[cmd]()).catch(e => { console.error(e.message); process.exit(1); });

@@ -1,0 +1,13 @@
+{
+  "descripcion": "experimental.session.compacting: agrega el contexto del proyecto",
+  "hook": "experimental.session.compacting",
+  "input": {
+    "sessionID": "o1"
+  },
+  "output": {
+    "context": []
+  },
+  "esperado": {
+    "contexto": "Contexto SDD del proyecto"
+  }
+}
