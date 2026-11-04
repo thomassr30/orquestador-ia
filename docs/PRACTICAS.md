@@ -6,7 +6,7 @@ Cada fila es una práctica publicada por equipos que construyen agentes en produ
 |---|---|---|
 | **Agente = modelo + harness**: el valor está en lo que rodea al modelo (guías, herramientas, controles, memoria) | OpenAI, *Harness engineering*; Anthropic | Todo el repositorio |
 | **Guías y sensores**: orientar antes de actuar y verificar después, con controles deterministas | Martin Fowler, *Harness engineering* | `core/` (guías) · `harness/src/sensors.js` (sensores) |
-| **Mapa, no manual**: instrucciones globales cortas; el detalle en skills que se cargan solo cuando hacen falta | OpenAI (AGENTS.md como índice); Anthropic (*progressive disclosure*, CLAUDE.md < 200 líneas) | `core/rules/global.md` + 104 skills |
+| **Mapa, no manual**: instrucciones globales cortas; el detalle en skills que se cargan solo cuando hacen falta | OpenAI (AGENTS.md como índice); Anthropic (*progressive disclosure*, CLAUDE.md < 200 líneas) | `core/rules/global.md` + 105 skills |
 | **Controles por código, no por instrucciones** | OpenAI; Anthropic (hooks) | `harness/src/policy.js`, `gate.js`, adaptadores por herramienta |
 | **Linters con mensaje de corrección**: cada error que no debe repetirse se vuelve una regla que dice cómo hacerlo bien | OpenAI | `harness/src/project-rules.js` → `harness.json` → `reglas` |
 | **Verificar de punta a punta antes de terminar** | Anthropic (*long-running agents*); OpenAI | Sensores al terminar el turno (`core.js` → `onStop`), también sobre lo cambiado por shell (`verificacion.js`) |

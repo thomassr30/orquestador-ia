@@ -22,7 +22,7 @@ Lee SOLO manifiestos: `package.json` (incl. `react-native`, `expo`, `react-nativ
   "skills":   ["stack-nestjs", "stack-angular", "stack-tailwind", "stack-scss", "stack-postgres"]
 }
 ```
-Versiones SIEMPRE desde los manifiestos, nunca de memoria. `skills` usa nombres existentes (infra: `ci-github-actions`, `ci-gitlab`, `ci-azure-pipelines`, `ci-jenkins`, `ci-bitbucket`, `container-docker`, `deploy-kubernetes`, `deploy-openshift`, `deploy-helm`, `deploy-kustomize`, `iac-terraform`, `config-consul`, `config-vault`, `ops-observability`): `stack-` go, nodejs, adonisjs, nestjs, angular, react, nextjs, html-css, tailwind, scss, postgres, sqlserver, react-native, expo, ios, swiftui, android, compose; además `rn-animations`, `ios-hardware`, `android-hardware`, `mobile-design`, `design-quality`, `test-mobile` cuando apliquen.
+Versiones SIEMPRE desde los manifiestos, nunca de memoria. `skills` usa nombres existentes (infra: `ci-github-actions`, `ci-gitlab`, `ci-azure-pipelines`, `ci-jenkins`, `ci-bitbucket`, `container-docker`, `deploy-kubernetes`, `deploy-openshift`, `deploy-helm`, `deploy-kustomize`, `iac-terraform`, `config-consul`, `config-vault`, `ops-observability`): `stack-` go, nodejs, adonisjs, nestjs, angular, react, nextjs, html-css, tailwind, scss, postgres, sqlserver, react-native, expo, ios, swiftui, android, compose; además `rn-animations`, `ios-hardware`, `android-hardware`, `mobile-design`, `design-quality`, `figma-design` (si el pedido trae un enlace de figma.com o el proyecto tiene «Fuente de diseño» en Figma), `test-mobile` cuando apliquen.
 
 ## 2. Analizar (en tu respuesta, sin crear archivos)
 - Busca con grep/glob por términos del input; abre solo los archivos relevantes (máx. ~15).

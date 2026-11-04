@@ -38,6 +38,7 @@ tokens:
   radios: { sm: ..., md: ..., lg: ... }
 ---
 # Sistema de diseño
+## Fuente de diseño (enlace del archivo de Figma u otra herramienta, si existe; sin datos de acceso)
 ## Resumen (carácter y modo predominante)
 ## Colores (rol de cada uno)
 ## Tipografía

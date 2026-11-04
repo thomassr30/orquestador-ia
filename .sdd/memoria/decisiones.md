@@ -15,3 +15,6 @@
 
 ## 2026-11-03 · espacio de trabajo sin tope de niveles (fuente: harness/src/workspace.js `limits`)
 - Espacio de trabajo sin tope de niveles por defecto (`espacio.profundidad: null`) y tope de 20.000 carpetas (`espacio.maxCarpetas`), configurables. Motivo: el recorrido es por niveles (BFS) y el tope de carpetas se agotaba antes de llegar a lo profundo; medido en Windows ~0,1 ms por carpeta (20.000 ≈ 2 s, al iniciar sesión y cada 20 min por la caché); con 10 niveles y 4.000 carpetas un árbol ancho daba 0 proyectos del nivel 7. Aprobado por el usuario.
+
+## 2026-11-04 · Figma por MCP (fuente: install.js registerMcp, config/mcp.json)
+- Figma remoto (https://mcp.figma.com/mcp) y no el de escritorio: sirve con Figma en la web, sin app abierta ni asiento de pago. Viene apagado (enabled:false) y se activa con `node install.js --mcp=figma`, para que quien no usa Figma no vea un servidor «pendiente de iniciar sesión». El enlace del archivo de cada proyecto vive en su memoria (diseno.md → «Fuente de diseño»); la conexión es por cuenta, no por proyecto. La desinstalación no quita MCP (como los locales). Aprobado por el usuario.

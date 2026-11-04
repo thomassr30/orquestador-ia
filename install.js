@@ -10,6 +10,7 @@
  *   node install.js --targets=claude,opencode
  *   node install.js --dry-run            muestra qué haría, sin escribir
  *   node install.js --no-mcp             no registra servidores MCP
+ *   node install.js --mcp=figma          registra también servidores MCP apagados en config/mcp.json (enabled:false)
  *   node install.js --no-deps            no instala pdfjs-dist / mammoth
  *   node install.js --auto-edits         Claude Code acepta ediciones de archivos sin preguntar (modo acceptEdits)
  *   node install.js --no-permissions     no agrega permisos preaprobados en Claude Code (git/gh siempre piden aprobación)
@@ -221,8 +222,13 @@ function removeRules(file) {
 // ---------- MCP ----------
 function mcpServers() {
   const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'config', 'mcp.json'), 'utf8'));
-  return Object.entries(cfg).filter(([k, v]) => !k.startsWith('_') && v.enabled !== false)
+  // --mcp=figma,otro activa servidores con enabled:false
+  const extra = (val('mcp') || '').split(',').map(s => s.trim()).filter(Boolean);
+  const unknown = extra.filter(n => n.startsWith('_') || !cfg[n]);
+  if (unknown.length) warn(`--mcp: servidores desconocidos en config/mcp.json: ${unknown.join(', ')}`);
+  return Object.entries(cfg).filter(([k, v]) => !k.startsWith('_') && (v.enabled !== false || extra.includes(k)))
     .map(([name, v]) => {
+      if (v.url) return { name, url: v.url }; // servidor remoto (HTTP)
       // En Windows, npx es npx.cmd: se envuelve con cmd /c para que lo lancen todas las herramientas
       const wrap = IS_WIN && v.command === 'npx';
       return { name, command: wrap ? 'cmd' : v.command, args: wrap ? ['/c', 'npx', ...v.args] : v.args };
@@ -234,17 +240,36 @@ function readJson(file) {
   if (!raw.trim()) return {};
   return JSON.parse(raw); // lanza si tiene comentarios (JSONC) → se informa al usuario
 }
+// Cómo inicia sesión cada herramienta en un servidor remoto (OAuth)
+const MCP_LOGIN = {
+  claude: n => `Claude Code: /mcp → ${n} → Authenticate`,
+  codex: n => `Codex: codex mcp login ${n}`,
+  gemini: n => `Gemini CLI: /mcp auth ${n}`,
+  cursor: n => `Cursor: Settings → MCP → ${n} → Login`,
+  copilot: n => `VS Code Copilot: en mcp.json, Start sobre ${n} y acepta el inicio de sesión`,
+  opencode: n => `OpenCode: opencode mcp auth ${n}`
+};
+const loginPending = new Map(); // servidor remoto → herramientas donde se registró
+function remoteAdded(tkey, s) { if (s.url) loginPending.set(s.name, [...(loginPending.get(s.name) || []), tkey]); }
+// Entrada JSON de un servidor remoto según la herramienta
+function remoteJson(tkey, url) {
+  if (tkey === 'opencode') return { type: 'remote', url, enabled: true };
+  if (tkey === 'gemini') return { httpUrl: url };
+  if (tkey === 'copilot') return { type: 'http', url };
+  return { url };
+}
+const claudeMcpArgs = s => s.url ? ['--transport', 'http', s.name, s.url] : [s.name, '--', s.command, ...s.args];
 function registerMcp(tkey, t) {
   const servers = mcpServers();
   const m = t.mcp;
   if (m.kind === 'claude') {
-    if (!hasCli('claude')) { notes.push(`Claude Code: CLI no encontrada; registra los MCP manualmente:\n${servers.map(s => `  claude mcp add -s user ${s.name} -- ${[s.command, ...s.args].join(' ')}`).join('\n')}`); return; }
+    if (!hasCli('claude')) { notes.push(`Claude Code: CLI no encontrada; registra los MCP manualmente:\n${servers.map(s => `  claude mcp add -s user ${claudeMcpArgs(s).join(' ')}`).join('\n')}`); return; }
     for (const s of servers) {
       const exists = run('claude', ['mcp', 'get', s.name], { stdio: 'ignore' }).status === 0;
       if (exists) { log(`  · MCP ${s.name} ya existe en Claude Code`); continue; }
       if (DRY) { log(`  [dry] claude mcp add -s user ${s.name}`); continue; }
-      const r = run('claude', ['mcp', 'add', '-s', 'user', s.name, '--', s.command, ...s.args], { stdio: 'pipe' });
-      if (r.status === 0) { log(`  ✓ MCP ${s.name}`); manifest.mcp.push({ target: tkey, name: s.name }); }
+      const r = run('claude', ['mcp', 'add', '-s', 'user', ...claudeMcpArgs(s)], { stdio: 'pipe' });
+      if (r.status === 0) { log(`  ✓ MCP ${s.name}`); manifest.mcp.push({ target: tkey, name: s.name }); remoteAdded(tkey, s); }
       else warn(`No se pudo registrar MCP ${s.name} en Claude Code: ${String(r.stderr || '').trim()}`);
     }
     return;
@@ -255,8 +280,9 @@ function registerMcp(tkey, t) {
     let add = '';
     for (const s of servers) {
       if (cur.includes(`[mcp_servers.${s.name}]`)) { log(`  · MCP ${s.name} ya existe en Codex`); continue; }
-      add += `\n[mcp_servers.${s.name}]\ncommand = ${q(s.command)}\nargs = [${s.args.map(q).join(', ')}]\n`;
+      add += s.url ? `\n[mcp_servers.${s.name}]\nurl = ${q(s.url)}\n` : `\n[mcp_servers.${s.name}]\ncommand = ${q(s.command)}\nargs = [${s.args.map(q).join(', ')}]\n`;
       manifest.mcp.push({ target: tkey, name: s.name, file: m.file });
+      remoteAdded(tkey, s);
     }
     if (add) { backup(m.file); writeFile(m.file, cur.trimEnd() + '\n' + add); log(`  ✓ MCP en ${m.file}`); }
     return;
@@ -270,10 +296,12 @@ function registerMcp(tkey, t) {
   let changed = false;
   for (const s of servers) {
     if (json[key][s.name]) { log(`  · MCP ${s.name} ya existe en ${t.label}`); continue; }
-    json[key][s.name] = m.kind === 'opencode'
-      ? { type: 'local', command: [s.command, ...s.args], enabled: true }
-      : { ...(m.stdioType ? { type: 'stdio' } : {}), command: s.command, args: s.args };
+    json[key][s.name] = s.url ? remoteJson(tkey, s.url)
+      : m.kind === 'opencode'
+        ? { type: 'local', command: [s.command, ...s.args], enabled: true }
+        : { ...(m.stdioType ? { type: 'stdio' } : {}), command: s.command, args: s.args };
     manifest.mcp.push({ target: tkey, name: s.name, file: m.file });
+    remoteAdded(tkey, s);
     changed = true;
   }
   if (changed) { backup(m.file); writeFile(m.file, JSON.stringify(json, null, 2) + '\n'); log(`  ✓ MCP en ${m.file}`); }
@@ -565,6 +593,7 @@ function install() {
   setupGitHooks();
 
   log(DRY ? '\n✅ Simulación completa (no se escribió nada).' : '\n✅ Instalación completa.');
+  for (const [name, tkeys] of loginPending) notes.push(`MCP ${name} necesita que inicies sesión una vez en cada herramienta:\n${tkeys.map(k => `  ${MCP_LOGIN[k](name)}`).join('\n')}`);
   if (notes.length) { log('\nNotas:'); notes.forEach(n => log(`- ${n}`)); }
   log('\nPrueba en cualquier proyecto:');
   log('  Claude Code / Cursor / Copilot / OpenCode / Gemini:  /sdd-status   /sdd-ask <pregunta>');

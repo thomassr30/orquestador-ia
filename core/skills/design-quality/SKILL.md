@@ -8,6 +8,7 @@ description: Núcleo de diseño de interfaces web y mobile con criterio profesio
 1. Lee `.sdd/memoria/temas/producto.md` (usuarios, propósito, plataforma, restricciones) y `.sdd/memoria/temas/diseno.md` (sistema visual: tokens y reglas). Si el proyecto tiene `PRODUCT.md`/`DESIGN.md` en la raíz, `.agents/context/` o `docs/`, léelos también.
 2. Si faltan → skill `design-context` (los deriva del código y confirma lo esencial con el usuario).
 3. **El sistema existente manda**: tokens, componentes y librería del proyecto. No inventes estilos paralelos. Si el código contradice el registro y es más reciente, actualiza el registro.
+4. **Diseño en Figma**: si el usuario pasa un enlace de figma.com o pide algo «según el Figma», carga `figma-design` (lectura, traducción a tokens y componentes, comparación visual obligatoria).
 
 ## 2. Modo de la pantalla (decide antes de diseñar)
 | Modo | Trabajo del usuario | Prioriza |

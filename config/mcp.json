@@ -1,5 +1,5 @@
 {
-  "_comentario": "Servidores MCP que install.js registra en cada herramienta (si no existen ya). Pon enabled:false para omitir uno.",
+  "_comentario": "Servidores MCP que install.js registra en cada herramienta (si no existen ya). Locales: command + args; remotos: url. Pon enabled:false para omitir uno; node install.js --mcp=<nombre> registra uno apagado.",
   "playwright": {
     "enabled": true,
     "command": "npx",
@@ -23,5 +23,10 @@
       "-y",
       "chrome-devtools-mcp@latest"
     ]
+  },
+  "figma": {
+    "enabled": false,
+    "_nota": "Figma remoto (sirve con Figma en la web). Requiere iniciar sesión una vez en cada herramienta. Actívalo con node install.js --mcp=figma.",
+    "url": "https://mcp.figma.com/mcp"
   }
 }

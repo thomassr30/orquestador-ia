@@ -22,6 +22,7 @@ Se instala **una vez** y queda activo en **todos tus proyectos**.
 - [Herramientas compatibles](#herramientas-compatibles)
 - [Instalación](#instalación)
 - [Uso diario](#uso-diario)
+- [Servidores MCP](#servidores-mcp)
 - [Cómo funciona el harness](#cómo-funciona-el-harness)
 - [Verificación de resultados](#verificación-de-resultados)
 - [Trabajo verificable](#trabajo-verificable)
@@ -94,7 +95,7 @@ Para algo trivial no hace falta plan: `cambia el título a "Clientes", directo`.
 | **Memoria por proyecto** | `.sdd/memoria/` se carga al iniciar y, según la herramienta, tras compactar. Cada proyecto tiene la suya; no mezclarlas es una regla para la IA (ver [Memoria](#memoria-del-proyecto)). |
 | **Varios proyectos a la vez** | En una carpeta con varios proyectos o un workspace de VS Code: mapa de todos los proyectos para que la IA busque en todos, y memoria, reglas, sensores y deshacer de cada uno. |
 | **Ahorro de tokens** | Esfuerzo según el tamaño del pedido, tope de sub-agentes, salidas de tests compactadas y reportes cortos. |
-| **Especialistas** | 1 orquestador, 22 sub-agentes, 104 skills (backend, frontend, mobile, bases de datos, DevOps, testing, diseño) y 19 comandos. |
+| **Especialistas** | 1 orquestador, 22 sub-agentes, 105 skills (backend, frontend, mobile, bases de datos, DevOps, testing, diseño) y 19 comandos. |
 | **Deshacer lo que hizo la IA** | Antes de cada turno que modifica archivos se guarda un punto de restauración (fuera del repo, sin commits ni secretos). `deshacer` vuelve los archivos a ese punto, en cualquier herramienta. |
 | **Arquitectura vigilada por código** | Reglas de capas (qué no puede importar qué), nombres de archivo, tamaño máximo y patrones prohibidos, cada una con el mensaje que le enseña a la IA cómo hacerlo bien. |
 | **Defensa contra instrucciones inyectadas** | Si la sesión leyó una web, un ticket o un MCP externo, los comandos y URLs que el harness reconoce como envío de datos afuera piden tu confirmación (detección por patrones, no exhaustiva). Las claves y tokens con formato conocido escritos en el código se bloquean. |
@@ -206,6 +207,7 @@ node install.js --targets=claude,codex    # solo algunas (claude, codex, copilot
 node install.js --dry-run                 # muestra qué haría, sin escribir nada
 node install.js --no-hooks                # solo guías (agentes y skills), sin controles por código
 node install.js --no-mcp                  # sin registrar Playwright, Context7 ni Chrome DevTools
+node install.js --mcp=figma              # registra también Figma (apagado por defecto; ver «Servidores MCP»)
 node install.js --auto-edits              # Claude Code acepta ediciones sin preguntar
 node install.js --no-permissions          # sin permisos preaprobados en Claude Code
 node install.js --detect                  # vuelve a detectar las herramientas instaladas
@@ -279,6 +281,68 @@ muéstrame cómo se ve /clientes en móvil          → [SDD] Flujo: browser
 | **Mejorar el orquestador** con evidencia | `/sdd-improve` | Solo con tu aprobación |
 
 </details>
+
+## Servidores MCP
+
+Los servidores MCP dan a la IA herramientas externas: navegador, documentación, diseños. El instalador los registra en cada herramienta (Claude Code, Codex, Gemini CLI, Cursor, Copilot y OpenCode) con el formato de cada una, sin duplicar los que ya existen. La lista está en `config/mcp.json`.
+
+| Servidor | Para qué | Tipo | Por defecto |
+|---|---|---|---|
+| `playwright` | Abrir páginas, capturar pantallas, probar flujos (QA, revisión visual) | local (`npx`) | activo |
+| `chrome-devtools` | Consola, red, rendimiento y Lighthouse | local (`npx`) | activo |
+| `context7` | Documentación actualizada de librerías y frameworks | local (`npx`) | activo |
+| `figma` | Leer los diseños de Figma que debes implementar | remoto (`https://mcp.figma.com/mcp`) | apagado |
+
+`node install.js --no-mcp` no registra ninguno. Desinstalar el orquestador no los quita (pueden usarlos otras herramientas).
+
+### Figma
+
+1. **Registrar**: `node install.js --mcp=figma` (una vez; las reinstalaciones siguientes lo mantienen). Para que se registre siempre, pon `"enabled": true` en `figma` dentro de `config/mcp.json`. Es el servidor remoto: sirve con Figma en la web y no necesita la app abierta.
+2. **Iniciar sesión una vez en cada herramienta** (el instalador lo recuerda al final):
+
+   | Herramienta | Cómo |
+   |---|---|
+   | Claude Code (terminal o VS Code) | `/mcp` → **figma** (no «claude.ai Figma») → *Authenticate* |
+   | Codex | `codex mcp login figma` |
+   | Gemini CLI | `/mcp auth figma` |
+   | OpenCode | `opencode mcp auth figma` |
+   | Cursor | *Settings → MCP* → figma → *Login* |
+   | VS Code Copilot | en `mcp.json`, *Start* sobre figma y aceptar |
+
+   Se abre una página de figma.com: acepta con la cuenta que tiene acceso a los diseños.
+3. **Comprobar**: `claude mcp list` debe mostrar `figma … ✔ Connected`. Dentro de la conversación, «¿con qué cuenta de Figma estás conectado?» usa `whoami` (cuenta, plan y asiento).
+4. **Usar**: en el proyecto, pega el enlace del frame (clic derecho → *Copy link to selection*): «implementa esta pantalla: <enlace>». La skill `figma-design` lee el diseño, muestra el inventario (componentes, variables, medidas, assets), lo traduce a los tokens y componentes del proyecto, compara el resultado con la captura de Figma en el navegador y guarda el enlace del archivo en la memoria del proyecto (`diseno.md` → «Fuente de diseño»); después basta con «según el Figma».
+
+La conexión es a tu **cuenta**, no a un proyecto: ve los archivos a los que tu cuenta tiene acceso. Si un cliente usa otra cuenta, pide que te invite con el correo que conectaste.
+
+**Límites según plan y asiento de Figma**
+
+| Asiento | Leer diseños | Modificar diseños | Lecturas por MCP |
+|---|---|---|---|
+| View / Collab, o plan Starter | sí | no | pocas al mes |
+| Dev (plan de pago) | sí | no | uso diario |
+| Full (plan de pago) | sí | sí, con confirmación de cada acción | uso diario |
+
+**Alternativa con la app de escritorio**: en Figma de escritorio, Dev Mode → *Enable desktop MCP server*, y agrega a `config/mcp.json` un servidor `{ "enabled": true, "url": "http://127.0.0.1:3845/mcp" }` con otro nombre (por ejemplo `figma-desktop`). Trabaja sobre lo seleccionado en la app; requiere asiento Dev o Full.
+
+### Agregar o quitar un servidor
+
+- **Local** (se lanza en tu equipo): `"nombre": { "enabled": true, "command": "npx", "args": ["-y", "paquete@versión"] }`.
+- **Remoto** (por URL): `"nombre": { "enabled": true, "url": "https://…/mcp" }`. Si pide inicio de sesión, se hace como en Figma.
+- Luego `node install.js`. Sin secretos en `config/mcp.json`: las claves van en variables de entorno o en el inicio de sesión del servidor.
+- Para quitar uno: `claude mcp remove <nombre> -s user` en Claude Code, o borra su entrada en el archivo de cada herramienta (`~/.codex/config.toml`, `~/.gemini/settings.json`, `~/.cursor/mcp.json`, `mcp.json` de VS Code, `~/.config/opencode/opencode.json`).
+
+### Problemas frecuentes
+
+| Síntoma | Causa y solución |
+|---|---|
+| El panel de MCP de VS Code no muestra el servidor recién instalado | La lista se carga al abrir la conversación: *Developer: Reload Window* o conversación nueva |
+| «Server not found» en una URL `claude.ai/api/organizations/…/mcp/start-auth/…` | Es el conector de claude.ai, no el servidor instalado (o el conector es de otra cuenta). Autentica la entrada **figma** de *User* |
+| Figma aparece dos veces | Conector de claude.ai y servidor instalado a la vez: usa uno solo |
+| «MCP server figma already exists» | Estás en el formulario de agregar: vuelve a la lista y autentica el existente |
+| Figma responde con límite de uso | Plan Starter o asiento View/Collab: espera al mes siguiente o pide asiento Dev |
+| Figma no encuentra el archivo | La cuenta conectada no tiene acceso: pide invitación con ese correo |
+| Un servidor local no arranca en Windows | Verifica `npx` en el PATH; el instalador ya lo envuelve con `cmd /c` |
 
 ## Cómo funciona el harness
 
@@ -584,13 +648,13 @@ TÚ → tu IA (Claude Code, Codex, Copilot, Cursor, Gemini CLI, OpenCode)
 Si una IA no puede lanzar sub-agentes, el orquestador ejecuta las mismas fases en secuencia.
 
 <details>
-<summary><b>Skills por área (104)</b></summary>
+<summary><b>Skills por área (105)</b></summary>
 
 - **Backend**: Go, Node.js, NestJS, AdonisJS.
 - **Frontend**: Angular, React, Next.js, HTML/CSS, Tailwind, SCSS.
 - **Bases de datos**: PostgreSQL, SQL Server.
 - **Mobile**: React Native y Expo, iOS y SwiftUI, Android y Compose, hardware de cada plataforma, diseño mobile.
-- **Diseño**: `design-quality` y 8 skills de proceso, inspiradas en Impeccable.
+- **Diseño**: `design-quality` y 8 skills de proceso, inspiradas en Impeccable; `figma-design` implementa diseños de Figma por MCP con comparación visual.
 - **DevOps** (una skill por plataforma): GitHub Actions, GitLab, Azure Pipelines, Jenkins, Bitbucket, Docker, Kubernetes, OpenShift, Helm, Kustomize, Terraform, Consul, Vault, observabilidad y verificación post-despliegue.
 - **Testing**: estrategia, unitarios, integración, BD con Testcontainers, contratos de API, e2e con Playwright, visual, accesibilidad, rendimiento y seguridad.
 - **Además**: análisis de requerimientos, QA funcional, gestores de tareas, multi-repo, dependencias, prototipos y mejora continua.
@@ -693,7 +757,7 @@ npm run update    # alternativa en un paso, con validaciones
 | Cambiar una regla de un framework | `core/skills/stack-<x>/SKILL.md` | `node install.js` |
 | Agregar detalle sin agrandar la skill | `core/skills/<x>/references/<tema>.md` | `node install.js` |
 | Elegir modelo por agente | `config/models.json` | `node install.js` |
-| Agregar o quitar servidores MCP | `config/mcp.json` | `node install.js` |
+| Agregar o quitar servidores MCP (locales con `command`, remotos con `url`) | `config/mcp.json` | `node install.js` |
 | Ajustar GATE, sensores o permisos | `~/.sdd-orquestador/harness.json` o `.sdd/harness.json` | inmediato |
 | Reglas de un solo proyecto | `AGENTS.md` o `CLAUDE.md` en la raíz del proyecto | tienen prioridad |
 
