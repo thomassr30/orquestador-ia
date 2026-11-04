@@ -2,3 +2,5 @@ node_modules/
 *.bak-sdd
 .DS_Store
 Thumbs.db
+.sdd/memoria/sesion.md
+

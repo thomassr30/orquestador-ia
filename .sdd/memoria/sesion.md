@@ -1,9 +1,9 @@
 Proyecto: C:/dev/orquestador-ia
 <!-- harness:inicio (bloque automático del harness; no editar) -->
-Última actividad: 2026-11-03 12:57 (claude) · Plan: directo (sin plan)
-Pedido en curso: necesito solucionar esos errores
-Archivos modificados en la sesión: harness/test/hook.e2e.test.js, bin/sdd-hook.js, bin/sdd-context.js
-Sensores: aprobado — ✓ tests
+Última actividad: 2026-11-04 00:33 (claude) · Plan: plan presentado, esperando aprobación
+Pedido en curso: pero yo se lo puedo pasar al harness y decirle algo con respecto a conectarse a figma via mcp
+Archivos modificados en la sesión: harness/src/trabajo.js, harness/test/trabajo.test.js
+Sensores: sin ejecutar
 <!-- harness:fin -->
 
 Objetivo actual: evolucionar el harness hacia resultados verificables, aprobaciones exactas, estado resistente y finalización por evidencia (7 lotes).
@@ -19,4 +19,7 @@ Estado: TERMINADO (2026-11-03). Lotes 1-7 implementados; npm test 192/192 en Win
 Hecho (2026-11-03): claude.js:25 opción a — compacta en Claude solo si las reglas de permiso del usuario ya permiten el comando original y ninguna ask/deny lo toca (adapters/claude-permisos.js + claude-permisos.test.js; npm test 197/197). No se hizo la mejora del GATE con contenido pegado (no pedida).
 Hecho (2026-11-03): CI rojo en los 12 jobs (run #8, 20fa079) por hook.e2e.test.js:27, que dependía de las reglas de ~/.claude/settings.json del equipo; ahora usa HOME temporal y espera null. npm test 197/197 en local y en entorno tipo CI (HOME vacío, sin identidad git); sdd-eval --validar ok. Linux/macOS no verificados en local (WSL sin node): se confirman al hacer push.
 Hecho (2026-11-03): CI macOS falló en gate-respaldo.test.js:68 («respaldo seguro») de forma intermitente. Causa probable: sdd-hook.js leía stdin con fs.readFileSync(0) tras tocar process.stdin (descriptor no bloqueante en Linux/macOS → EAGAIN si el JSON llegaba tarde → entrada vacía → acción sin control). Ahora lee stdin como stream (sdd-hook.js y sdd-context.js, este con tope de 1 s); test de regresión con entrada tardía en hook.e2e.test.js. npm test 198/198 en local y tipo CI. Sin confirmar en Linux/macOS.
-Pendientes para el usuario: commit + push y revisar el CI (macOS/Linux); falso positivo de «sin sdd» en contenido pegado (pendientes.md); instalar/actualizar 3.0.0 y usar cada cliente para llegar a doctor nivel d.
+Hecho (2026-11-03): detección del espacio de trabajo sin tope fijo de niveles. harness/src/workspace.js `limits(root)` lee `espacio.profundidad` (null = sin límite, por defecto) y `espacio.maxCarpetas` (20000 por defecto; antes 3 niveles y 4000 carpetas fijos) con loadConfig; la caché se invalida si cambian los límites; el aviso de recorte sugiere subir `espacio.maxCarpetas`. También cambian harness/src/config.js, config/harness.json, harness/test/espacio.test.js (4 tests nuevos), README (sección espacio de trabajo) y CHANGELOG 3.0.0 «Nuevo», y se restauró la entrada 2.8.0 del CHANGELOG. npm test 202/202.
+Hecho (2026-11-03): commit pasa de «nunca» a confirmación crítica. T-01 rules/policy/hooks-config/gate/install (GIT_NEVER→GIT_COMMIT, ask crítico; --amend destructivo; -m con atribución de IA = deny; Claude ask, OpenCode ask, Codex prompt; git envuelto en cmd /c, bash -c, $(…) pierde gitRule y lo confirma el harness). T-02 doctor usa `gh pr create` como prueba de bloqueo + tests/fixtures. T-03 docs (global.md, SKILL orquestador, 22 agentes, release-notes, sdd-ticket, README, SECURITY, PRACTICAS, config comentario, CHANGELOG «Cambiado»). npm test 202/202; T-01 y T-02 verificadas; T-03 espera revisión del usuario. Decisiones: GitHub/GitLab sigue bloqueado; sin opción de configuración; sub-agentes siguen sin escribir en git. Pendiente menor: log de configureOpencodeGit (install.js:421) dice «escritura bloqueada».
+Hecho (2026-11-03): bug de trabajo.js — tareas verificadas volvían solas a «por reverificar» porque la vigencia miraba todas sus evidencias (también las de fin de turno tomadas en curso). Ahora se mira solo la verificación que la aprobó (x.verificadaCon; respaldo: últimas evidencias «trabajo verificar <id>»). Test de regresión en trabajo.test.js; CHANGELOG Corregido. npm test 203/203.
+Pendientes para el usuario: commit + push y revisar el CI (macOS/Linux); falso positivo de «sin sdd» en contenido pegado (pendientes.md); instalar/actualizar 3.0.0 y usar cada cliente para llegar a doctor nivel d; actualizar la instalación para que rija el cambio de espacio de trabajo; revisar el `.gitignore` modificado (y `.sdd/memoria/sesion.md`), que este trabajo no tocó.

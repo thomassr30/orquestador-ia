@@ -132,7 +132,7 @@ function onPrompt(state, prompt, cfg) {
     state.gate = { estado: 'libre', desde: now };
     notes.push(wasOff
       ? 'Orquestador SDD desactivado por el usuario: responde y edita directo, sin flujos [SDD], sub-agentes ni plan.'
-      : 'El usuario DESACTIVÓ el orquestador SDD para esta conversación: responde y edita directo, como un asistente normal. No anuncies flujos [SDD], no lances sub-agentes, no presentes plan ni preguntes «¿Apruebo la implementación?». Se reactiva si escribe «con sdd». Siguen vigentes: commit nunca, git con confirmación y secretos protegidos.');
+      : 'El usuario DESACTIVÓ el orquestador SDD para esta conversación: responde y edita directo, como un asistente normal. No anuncies flujos [SDD], no lances sub-agentes, no presentes plan ni preguntes «¿Apruebo la implementación?». Se reactiva si escribe «con sdd». Siguen vigentes: commit y resto de git con confirmación y secretos protegidos.');
     return notes;
   }
 

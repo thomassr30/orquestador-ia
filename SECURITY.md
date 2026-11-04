@@ -48,8 +48,8 @@ Además, por pedido explícito tuyo: `workspace --aplicar` agrega carpetas a la 
 
 Valen cuando la herramienta invoca el hook y respeta su respuesta (`doctor` confirma lo primero en el nivel d, no lo segundo).
 
-- **Commit nunca**: `git commit` bloqueado, también por alias y herramientas que crean commits. Escritura en GitHub/GitLab bloqueada, también por MCP. Comandos destructivos bloqueados.
-- **Confirmación** para el resto de git (con aviso cuando descarta cambios o reescribe el remoto), infraestructura, bases de datos, borrados, dependencias, publicar paquetes, configurar servidores MCP, herramientas MCP que escriben, la configuración del harness y de los hooks, y escribir fuera del proyecto (salvo la carpeta temporal del sistema).
+- **Bloqueos**: escritura en GitHub/GitLab, también por MCP; comandos destructivos; un commit cuyo mensaje trae una línea de atribución de IA (`Co-Authored-By: Claude`, `Generated with…`).
+- **Confirmación** para `git commit`, también por alias y herramientas que crean commits (con aviso en `--amend`, que reescribe la historia), y para el resto de git (con aviso cuando descarta cambios o reescribe el remoto), infraestructura, bases de datos, borrados, dependencias, publicar paquetes, configurar servidores MCP, herramientas MCP que escriben, la configuración del harness y de los hooks, y escribir fuera del proyecto (salvo la carpeta temporal del sistema).
 - **Mismas protecciones por shell**: cuando un comando escribe en un destino reconocible (redirecciones, `sed -i`, `cp`/`mv`, `tee`, `dd`, cmdlets de PowerShell…), ese destino pasa por las mismas reglas que una edición (`policy.js`, `writeTargets`). Un comando que escribe archivos con claves o tokens de formato conocido se bloquea.
 - **Decisiones solo del usuario**: aprobar el plan, autorizar excepciones, aceptar o descartar el trabajo, y `sdd-state.js --approve | --accept-exception`. La política le niega esos comandos al agente.
 - **Estado del harness fuera del alcance del agente**: las ediciones y los comandos que nombran `~/.sdd-orquestador/estado` se deniegan.

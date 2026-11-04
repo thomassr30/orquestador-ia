@@ -84,14 +84,14 @@ function copilot(home) {
 /** Reglas nativas de Codex (~/.codex/rules/): red de seguridad aunque los hooks aún no estén aprobados. */
 function codexRules() {
   const rule = (words, decision, why) => `prefix_rule(pattern = ${JSON.stringify(words)}, decision = "${decision}", justification = ${JSON.stringify(why)})`;
-  const commit = 'Orquestador SDD: los commits los hace el usuario, nunca el agente. Sugiere el mensaje como texto, sin líneas de atribución.';
+  const commit = 'Orquestador SDD: crea un commit. Apruébalo solo si viste el mensaje (sin líneas de atribución de IA) y los archivos que incluye.';
   const git = 'Orquestador SDD: modifica el repositorio git. Apruébalo solo si entiendes el efecto.';
   const forge = 'Orquestador SDD: la escritura en GitHub/GitLab la hace el usuario. Sugiérelo como texto.';
   return [
     '# Orquestador SDD — reglas de comandos para Codex. Generado por install.js; se reemplaza al reinstalar.',
-    '# commit nunca (lo hace el usuario) · el resto de git con tu aprobación · escritura en GitHub/GitLab bloqueada.',
-    ...R.GIT_NEVER.map(c => rule(['git', ...c.split(' ')], 'forbidden', commit)),
-    ...R.COMMIT_TOOLS.map(c => rule(c.split(' '), 'forbidden', commit)),
+    '# commit y el resto de git con tu aprobación · escritura en GitHub/GitLab bloqueada.',
+    ...R.GIT_COMMIT.map(c => rule(['git', ...c.split(' ')], 'prompt', commit)),
+    ...R.COMMIT_TOOLS.map(c => rule(c.split(' '), 'prompt', commit)),
     ...R.GIT_WRITE.map(c => rule(['git', ...c.split(' ')], 'prompt', git)),
     ...R.FORGE_WRITE.map(c => rule(c.split(' '), 'forbidden', forge)),
     '',

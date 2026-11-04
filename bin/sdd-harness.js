@@ -147,7 +147,7 @@ function pruebaComando(id, text, CAP) {
   const sb = sandboxDoctor();
   try {
     const run = (ev, entrada) => { const c = findCommand(text, ev); return c ? ejecutar(c, entrada, sb.env) : { ok: false, json: {}, error: `${ev} no está registrado` }; };
-    const r1 = run(p.pre, p.entrada(sb.proj, 'git commit -m prueba'));
+    const r1 = run(p.pre, p.entrada(sb.proj, 'gh pr create --title prueba'));
     if (!r1.ok) return { ejecutable: false, motivo: r1.error };
     const deny = p.decision(r1.json)[0] === 'deny';
     // Git de escritura con aprobación nativa del cliente (Codex): el hook no decide; se prueba con otro comando crítico
@@ -179,7 +179,7 @@ try {
   out.carga = !!h && typeof h['tool.execute.before'] === 'function';
   if (out.carga) {
     const rej = async (c, id) => { try { await h['tool.execute.before']({ tool: 'bash', sessionID: 'doctor', callID: id }, { args: { command: c } }); return ''; } catch (e) { return String((e && e.message) || e); } };
-    out.deny = await rej('git commit -m prueba', '1');
+    out.deny = await rej('gh pr create --title prueba', '1');
     out.critica = await rej('kubectl apply -f k8s/', '2');
     await h.event({ event: { type: 'session.idle', properties: { sessionID: 'doctor' } } });
     await new Promise(r => setTimeout(r, 100));
@@ -245,7 +245,7 @@ function imprimirClientes(rows) {
     if (p) console.log(`      (b) ${p.ejecutable ? `✓ ${r.id === 'opencode' ? 'el plugin carga (con Node y un cliente simulado) y' : 'el hook'} responde (${p.ms} ms)` : `✗ ${p.motivo}`}`);
     if (p && p.ejecutable) {
       const s = p.sintetica;
-      const partes = [`${ok(s.deny)} bloquea «git commit»`, `${ok(s.critica)} ${s.aprobacion === 'nativa' ? 'pide confirmación nativa' : 'pide confirmación en el chat'} para «${s.critico}»`];
+      const partes = [`${ok(s.deny)} bloquea «gh pr create»`, `${ok(s.critica)} ${s.aprobacion === 'nativa' ? 'pide confirmación nativa' : 'pide confirmación en el chat'} para «${s.critico}»`];
       if (FIN[s.finDeTurno]) partes.push(`${ok(s.fin)} ${FIN[s.finDeTurno]}`);
       console.log(`      (c) ${ok(s.ok)} prueba sintética ${s.ok ? 'aprobada' : 'fallida'}: ${partes.join(' · ')}`);
     }

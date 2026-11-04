@@ -11,4 +11,4 @@ Ticket: $ARGUMENTS
 2. Lee el ticket (MCP → CLI de solo lectura → pedir que lo pegue).
 3. Elige el flujo según el tipo (`feature`, `fix`, `analysis`, `refactor`) y anuncia `[SDD] Flujo: <tipo> (ticket <CLAVE>)`.
 4. Ejecuta el flujo normal (con su GATE).
-5. Al cerrar, carga `release-notes` y entrega en el chat: mensaje de commit sugerido, descripción de PR y comentario para el ticket (textos para que el usuario los use). Escribir en el gestor solo con aprobación; git nunca.
+5. Al cerrar, carga `release-notes` y entrega en el chat: mensaje de commit sugerido, descripción de PR y comentario para el ticket (textos para que el usuario los use). Escribir en el gestor solo con aprobación; commit solo por el orquestador con confirmación del usuario, y el PR lo crea el usuario.

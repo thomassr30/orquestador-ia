@@ -29,7 +29,7 @@ test('Claude Code: GATE, permisos, sensores al terminar y checkpoint de sesión'
   const claudeEnv = { HOME: home, USERPROFILE: home, SDD_CLAUDE_MANAGED_DIR: tmp('sdd-managed-') };
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'npm test' } }, claudeEnv).json, null, 'los tests sí se pueden correr con el plan pendiente');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: `node "${require('os').homedir().replace(/\\/g, '/')}/.sdd-orquestador/bin/sdd-harness.js" estado` } }).json, null, '/sdd-status funciona con el plan pendiente');
-  assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'git commit -am x' } }).json.hookSpecificOutput.permissionDecision, 'deny');
+  assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'gh pr create --title x' } }).json.hookSpecificOutput.permissionDecision, 'deny');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Bash', tool_input: { command: 'kubectl apply -f k8s/' } }).json.hookSpecificOutput.permissionDecision, 'ask');
   assert.strictEqual(hook('claude', 'PreToolUse', { ...base, tool_name: 'Read', tool_input: { file_path: path.join(dir, '.env') } }).json.hookSpecificOutput.permissionDecision, 'deny');
 
@@ -116,7 +116,7 @@ test('un error interno nunca bloquea (falla abierta) y la salida es solo JSON', 
 
 test('la entrada que llega tarde por stdin se espera (antes, en Linux/macOS se leía vacía y la acción pasaba sin control)', async () => {
   const dir = project({ 'a.js': '' });
-  const input = { session_id: 'tarde', cwd: dir, tool_name: 'Bash', tool_input: { command: 'git commit -am x' } };
+  const input = { session_id: 'tarde', cwd: dir, tool_name: 'Bash', tool_input: { command: 'gh pr create --title x' } };
   const out = await new Promise((resolve, reject) => {
     const k = spawn(process.execPath, [HOOK, 'claude', 'PreToolUse'], { env: { ...process.env, SDD_HOME } });
     let s = '';

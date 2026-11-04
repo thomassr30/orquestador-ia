@@ -6,7 +6,7 @@
     "cwd": "/tmp/proyecto-sdd",
     "tool_name": "run_shell_command",
     "tool_input": {
-      "command": "git commit -m x"
+      "command": "gh pr create --title x"
     }
   },
   "normalizado": {
@@ -17,7 +17,7 @@
     "sessionId": "g1",
     "tool": {
       "kind": "shell",
-      "command": "git commit -m x"
+      "command": "gh pr create --title x"
     }
   },
   "resultado": {

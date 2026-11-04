@@ -7,10 +7,10 @@ const GIT_READ = ['status', 'diff', 'log', 'show', 'blame', 'ls-files', 'ls-tree
   'cat-file', 'merge-base', 'for-each-ref', 'name-rev', 'remote -v', 'remote show', 'branch --list', 'branch -a', 'branch -r',
   'branch -v', 'branch -vv', 'branch --show-current', 'stash list', 'stash show', 'worktree list', 'config --get', 'config --list', 'reflog show'];
 
-// Git: commit NUNCA lo hace el agente (ni aunque el usuario lo pida): los commits los hace el usuario.
-const GIT_NEVER = ['commit', 'commit-tree'];
+// Git: crear commits, solo con confirmación del usuario (decisión crítica; el agente muestra antes el mensaje y el efecto).
+const GIT_COMMIT = ['commit', 'commit-tree'];
 
-// Herramientas que crean commits por su cuenta (versionado y releases): tampoco las usa el agente.
+// Herramientas que crean commits por su cuenta (versionado y releases): también con confirmación del usuario.
 const COMMIT_TOOLS = ['npm version', 'yarn version', 'pnpm version', 'bun pm version', 'lerna version', 'lerna publish', 'npx lerna version', 'npx lerna publish',
   'npx standard-version', 'standard-version', 'npx release-it', 'release-it', 'npx semantic-release', 'semantic-release', 'npx commitizen', 'npx cz', 'cz commit', 'npx git-cz', 'git-cz',
   'npx changeset publish', 'mvn release:prepare', 'cargo release'];
@@ -38,7 +38,7 @@ const FORGE_WRITE = ['gh pr create', 'gh pr merge', 'gh pr close', 'gh pr reopen
 // Git que descarta trabajo o reescribe el remoto: se confirma con una advertencia explícita.
 const GIT_DESTRUCTIVE = [/^git (?:-\S+ )*push\b.*\s(?:-f|--force|--force-with-lease|--mirror|--delete|-d)(?:[\s=]|$)/i, /^git (?:-\S+ )*push\b.*\s\+\S/i,
   /^git (?:-\S+ )*reset\b.*--hard/i, /^git (?:-\S+ )*clean\b/i, /^git (?:-\S+ )*checkout\b.*\s(?:--\s+)?\.(?:\s|$)/i, /^git (?:-\S+ )*restore\b/i,
-  /^git (?:-\S+ )*stash (?:drop|clear)\b/i, /^git (?:-\S+ )*branch\b.*\s-D\b/, /^git (?:-\S+ )*(?:filter-branch|filter-repo|reflog (?:expire|delete)|gc|prune)\b/i];
+  /^git (?:-\S+ )*stash (?:drop|clear)\b/i, /^git (?:-\S+ )*commit\b.*\s--amend\b/i, /^git (?:-\S+ )*branch\b.*\s-D\b/, /^git (?:-\S+ )*(?:filter-branch|filter-repo|reflog (?:expire|delete)|gc|prune)\b/i];
 
 // Gestión de servidores MCP desde la terminal: listar es libre; agregar, quitar o autenticar pide confirmación.
 const MCP_READ = /^(?:npx\s+(?:-y\s+)?@?[\w/.-]+\s+)?(?:claude|codex|gemini|opencode|cursor-agent|copilot)\s+mcp\s+(?:list|get|ls|show|status)\b/i;
@@ -90,4 +90,4 @@ const SECRET_FILES = [/(^|[\\/])\.env(\.[^\\/]*)?$/i, /\.pem$/i, /\.key$/i, /\.p
 // Permitidos aunque parezcan secretos: plantillas sin valores.
 const SECRET_EXCEPTIONS = [/\.env\.(example|sample|template)$/i];
 
-module.exports = { GIT_READ, GIT_NEVER, COMMIT_TOOLS, GIT_WRITE, GIT_DESTRUCTIVE, MCP_READ, MCP_MANAGE, FORGE_READ, FORGE_WRITE, INFRA_ASK, DELETE_ASK, DEPS_ASK, SAFE_COMMANDS, DANGEROUS, SECRET_FILES, SECRET_EXCEPTIONS };
+module.exports = { GIT_READ, GIT_COMMIT, COMMIT_TOOLS, GIT_WRITE, GIT_DESTRUCTIVE, MCP_READ, MCP_MANAGE, FORGE_READ, FORGE_WRITE, INFRA_ASK, DELETE_ASK, DEPS_ASK, SAFE_COMMANDS, DANGEROUS, SECRET_FILES, SECRET_EXCEPTIONS };

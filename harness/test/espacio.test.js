@@ -116,3 +116,57 @@ test('al terminar, los sensores corren en cada proyecto con su propia configurac
   assert.match(estado, /Verificación: aprobado — ✓ tests@api/);
   assert.match(cli(c, 'registro', '200').stdout, /sensores · aprobado · tests@api:aprobado/);
 });
+
+/** Carpeta con un proyecto arriba y otro en el nivel 6 (n1/…/n5/hondo). */
+function deep() {
+  const c = tmp('sdd-prof-');
+  write(c, { 'arriba/package.json': '{"name":"arriba"}', 'n1/n2/n3/n4/n5/hondo/package.json': '{"name":"hondo"}' });
+  return c;
+}
+const names = ws => ws.proyectos.map(p => p.nombre).sort();
+const espacio = (c, e) => write(c, { '.sdd/harness.json': JSON.stringify({ espacio: e }) });
+
+test('por defecto recorre todos los niveles: detecta un proyecto en el nivel 6', () => {
+  const ws = W.detect(deep());
+  assert.deepStrictEqual(names(ws), ['arriba', 'hondo']);
+  assert.deepStrictEqual(ws.limites, { profundidad: null, maxCarpetas: 20000 });
+  assert.strictEqual(ws.recortado, false);
+});
+
+test('espacio.profundidad en .sdd/harness.json limita los niveles; valores inválidos usan el valor por defecto', () => {
+  const c = deep();
+  espacio(c, { profundidad: 2 });
+  const ws = W.detect(c);
+  assert.ok(!names(ws).includes('hondo'), 'el nivel 6 queda fuera con profundidad 2');
+  assert.ok(names(ws).includes('arriba'));
+  assert.strictEqual(ws.limites.profundidad, 2);
+  espacio(c, { profundidad: 0, maxCarpetas: 'mucho' });
+  const inv = W.detect(c);
+  assert.deepStrictEqual(inv.limites, { profundidad: null, maxCarpetas: 20000 });
+  assert.ok(names(inv).includes('hondo'));
+});
+
+test('con espacio.maxCarpetas bajo, el mapa se recorta y dice cómo ampliarlo', () => {
+  const c = tmp('sdd-tope-');
+  write(c, { 'a/package.json': '{}', 'b/package.json': '{}', 'c/package.json': '{}', 'd/package.json': '{}' });
+  espacio(c, { maxCarpetas: 3 });
+  const ws = W.detect(c);
+  assert.strictEqual(ws.recortado, true);
+  assert.ok(ws.proyectos.filter(p => p.ruta !== ws.raiz).length < 4, 'quedan carpetas sin revisar');
+  const map = W.mapBlock(ws);
+  assert.match(map, /el mapa se recortó: para ampliarlo sube `espacio\.maxCarpetas` en \.sdd\/harness\.json/);
+  assert.doesNotMatch(map, /espacio\.profundidad/, 'sin profundidad fijada no la sugiere');
+  espacio(c, { maxCarpetas: 3, profundidad: 4 });
+  assert.match(W.mapBlock(W.detect(c)), /`espacio\.maxCarpetas` o `espacio\.profundidad` en \.sdd\/harness\.json/);
+});
+
+test('la caché del espacio se recalcula si cambian los límites de espacio', () => {
+  const c = deep();
+  assert.ok(names(W.load(c)).includes('hondo'));
+  write(c, { 'nuevo/package.json': '{}' });
+  assert.ok(!names(W.load(c)).includes('nuevo'), 'mismos límites: usa la caché');
+  espacio(c, { profundidad: 2 });
+  const ws = W.load(c);
+  assert.strictEqual(ws.limites.profundidad, 2);
+  assert.ok(!names(ws).includes('hondo') && names(ws).includes('nuevo'), 'límites distintos: recalcula');
+});

@@ -6,7 +6,7 @@
     "workspace_roots": [
       "/tmp/proyecto-sdd"
     ],
-    "command": "git commit -m x"
+    "command": "gh pr create --title x"
   },
   "normalizado": {
     "host": "cursor",
@@ -15,7 +15,7 @@
     "sessionId": "c1",
     "tool": {
       "kind": "shell",
-      "command": "git commit -m x"
+      "command": "gh pr create --title x"
     }
   },
   "resultado": {

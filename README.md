@@ -51,7 +51,7 @@ Los agentes de IA son muy capaces, pero en el trabajo diario a veces:
 - pierden el hilo cuando la conversación se compacta;
 - gastan medio plan en una tarea chica.
 
-Una instrucción escrita ("nunca hagas commit") depende de que el modelo la recuerde. Este proyecto agrega dos cosas:
+Una instrucción escrita ("no hagas commit sin preguntarme") depende de que el modelo la recuerde. Este proyecto agrega dos cosas:
 
 1. **Controles por código (hooks)**: scripts locales que tu herramienta ejecuta antes y después de cada acción. Permiten, bloquean o piden confirmación aunque el modelo olvide las reglas, siempre que la herramienta invoque el hook y respete su respuesta.
 2. **Un orquestador con especialistas**: entiende el pedido, ajusta el esfuerzo a su tamaño, presenta un plan, implementa en paralelo y verifica.
@@ -76,7 +76,7 @@ Agente:  implementa → el harness corre lint, tipos y tests de lo modificado
            ↳ si algo falla o no se pudo verificar, se le pide corregir; lo omitido
              queda «no verificado», nunca como aprobado
          Listo. Commit sugerido: "feat(clientes): exportar listado a Excel"
-           ↳ sin "Co-Authored-By" ni firmas de IA; el commit lo haces tú
+           ↳ sin "Co-Authored-By" ni firmas de IA; lo hace solo si confirmas
 ```
 
 Para algo trivial no hace falta plan: `cambia el título a "Clientes", directo`. Para trabajar sin el orquestador el resto de la conversación: `sin sdd`.
@@ -85,8 +85,8 @@ Para algo trivial no hace falta plan: `cambia el título a "Clientes", directo`.
 
 | | |
 |---|---|
-| **Permisos por código** | **Commit nunca** (lo haces tú) y nada de PR ni issues en GitHub/GitLab, tampoco por MCP. El resto de git (push, merge, rebase, reset, stash…) con tu confirmación, para resolver problemas de git. Secretos protegidos y comandos destructivos bloqueados. Pide confirmación para infraestructura, bases de datos, borrados, dependencias y configurar servidores MCP. |
-| **Commits sin firma de IA** | Los mensajes de commit sugeridos van sin `Co-Authored-By: Claude`, `Generated with…` ni `Made-with: Cursor`: si aparecen, el harness pide reescribirlos. En Claude Code, además, se desactiva la atribución. |
+| **Permisos por código** | Nada de PR ni issues en GitHub/GitLab, tampoco por MCP. Commit y el resto de git (push, merge, rebase, reset, stash…) solo con tu confirmación, para ese comando exacto. Secretos protegidos y comandos destructivos bloqueados. Pide confirmación para infraestructura, bases de datos, borrados, dependencias y configurar servidores MCP. |
+| **Commits sin firma de IA** | Los mensajes de commit sugeridos van sin `Co-Authored-By: Claude`, `Generated with…` ni `Made-with: Cursor`: si aparecen, el harness pide reescribirlos, y un `git commit` que los trae se bloquea. En Claude Code, además, se desactiva la atribución. |
 | **Plan antes de editar (GATE)** | En un pedido de cambio, las ediciones y los comandos que el harness reconoce como escritura quedan bloqueados hasta que respondas `sí`. |
 | **Verificación al terminar** | Lint, tipos, tests y reglas propias sobre lo que cambió, también por comandos de shell. Cada control queda aprobado, fallido o **no verificado**; lo que no corrió nunca cuenta como aprobado. Node/TS, Angular y Go automáticos; plantillas para Android, iOS y SCSS. |
 | **Trabajo verificable** | Plan con requisitos, criterios y tareas guardado fuera del repo. Una tarea se da por hecha solo con evidencia del harness sobre el contenido actual; la aceptación funcional la marcas tú. |
@@ -106,7 +106,7 @@ Cada protección cae en una de cuatro categorías. Lo que figura como implementa
 
 **Implementado por el harness (código):**
 
-- Decisión sobre cada acción que la herramienta le pasa al hook: `git commit` y escritura en GitHub/GitLab bloqueados; archivos con secretos y comandos destructivos bloqueados; confirmación para el resto de git, infraestructura, bases de datos, borrados, dependencias, MCP que escriben, configuración del harness o de los hooks y escrituras fuera del proyecto (salvo la carpeta temporal del sistema).
+- Decisión sobre cada acción que la herramienta le pasa al hook: escritura en GitHub/GitLab bloqueada; archivos con secretos, comandos destructivos y commits con atribución de IA bloqueados; confirmación para `git commit` (con aviso en `--amend`), el resto de git, infraestructura, bases de datos, borrados, dependencias, MCP que escriben, configuración del harness o de los hooks y escrituras fuera del proyecto (salvo la carpeta temporal del sistema).
 - Las mismas protecciones de rutas para los comandos de shell cuando el destino es reconocible (redirecciones, `sed -i`, `cp`/`mv`, `tee`, cmdlets de PowerShell…). Es de mejor esfuerzo.
 - GATE: sin plan aprobado se bloquean las ediciones y los comandos reconocidos como escritura.
 - Verificación al terminar el turno con resultados explícitos (aprobado, fallido, no verificado, bloqueado, excepción). Lo omitido nunca cuenta como aprobado. Los cambios hechos por shell se detectan con git.
@@ -189,13 +189,13 @@ Por cada herramienta muestra hasta qué nivel llega la evidencia:
 |---|---|
 | (a) configuración encontrada | Los hooks del harness están registrados en la configuración de la herramienta. |
 | (b) hook ejecutable | El comando registrado responde. |
-| (c) prueba sintética aprobada | Con payloads simulados (`SDD_DOCTOR=1`, en un proyecto y estado temporales): bloquea `git commit`, pide confirmación para una decisión crítica y actúa al terminar el turno. No es una integración confirmada. |
+| (c) prueba sintética aprobada | Con payloads simulados (`SDD_DOCTOR=1`, en un proyecto y estado temporales): bloquea `gh pr create`, pide confirmación para una decisión crítica y actúa al terminar el turno. No es una integración confirmada. |
 | (d) integración confirmada | El harness recibió eventos reales de esa herramienta (`~/.sdd-orquestador/observado.json`). Confirma que la herramienta invoca los hooks, **no** que respete cada respuesta. |
 | (e) limitaciones | Capacidades no disponibles o degradadas según la tabla de arriba. |
 
 También muestra el modo, configuraciones ilegibles, sesiones dañadas o recuperadas, la clave de aprobaciones, la línea base y el último error interno del hook. `doctor --json` da el detalle con respaldo archivo:línea.
 
-Para llegar al nivel (d), abre tu IA en cualquier proyecto y pídele *"haz commit de los cambios"* o *"lee el archivo .env"*: debe responder con un bloqueo `[harness]`. Desde entonces `doctor` muestra esa herramienta en (d).
+Para llegar al nivel (d), abre tu IA en cualquier proyecto y pídele *"lee el archivo .env"*: debe responder con un bloqueo `[harness]`. Desde entonces `doctor` muestra esa herramienta en (d).
 
 <details>
 <summary><b>Opciones del instalador</b></summary>
@@ -251,7 +251,7 @@ muéstrame cómo se ve /clientes en móvil          → [SDD] Flujo: browser
 - **"sin sdd"** apaga el orquestador **para el resto de la conversación**: la IA trabaja como asistente normal, sin flujos, sub-agentes ni plan. **"con sdd"** lo vuelve a encender. Las reglas de git y secretos siguen activas.
 - **Al terminar**, el harness revisa lint, tipos, tests y reglas propias de lo modificado. Si algo falla o un control obligatorio no se pudo verificar, el agente debe corregirlo; no puede presentarlo como verificado. Ver [Verificación de resultados](#verificación-de-resultados).
 - **Sin archivos de trabajo**: análisis, planes y reportes quedan en el chat. Si quieres un documento, pídelo.
-- **Git**: la lectura (`status`, `diff`, `log`, `show`, `blame`) es libre. Push, pull, merge, rebase, reset, stash, checkout y ramas los puede hacer **con tu confirmación**: antes te explica qué hará, y si algo descarta cambios o reescribe el remoto lo dice. **Commit nunca**: te sugiere el mensaje, sin firmas de IA, y tú lo ejecutas.
+- **Git**: la lectura (`status`, `diff`, `log`, `show`, `blame`) es libre. Commit, push, pull, merge, rebase, reset, stash, checkout y ramas los puede hacer **con tu confirmación**: antes te explica qué hará (en un commit, te muestra el mensaje, sin firmas de IA), y si algo descarta cambios o reescribe la historia o el remoto lo dice.
 - **MCP**: puede conectar o configurar servidores MCP (`codex mcp add`, `claude mcp add`, `.mcp.json`…) mostrándote antes el cambio; tú lo confirmas.
 
 <details>
@@ -288,7 +288,7 @@ Tu herramienta ejecuta los hooks en momentos fijos, y cada uno responde permitir
 |---|---|
 | Al iniciar y tras compactar | Carga la memoria **de este proyecto** (índice, sesión de trabajo y temas disponibles) y el resumen del trabajo verificable. Tras compactar depende de la herramienta (ver [Herramientas compatibles](#herramientas-compatibles)). |
 | Cada mensaje tuyo | Detecta pedidos de cambio, que abren el GATE, y tus aprobaciones (`sí`, `dale`, `directo`). Separa tu texto del contexto que agregan algunas herramientas (archivo abierto, navegador). |
-| Antes de cada comando | **Bloquea** `git commit` (también disfrazado: alias, `npm version`, `release-it`), escritura en GitHub o GitLab, comandos destructivos, comandos que usan archivos con secretos y comandos que escriben archivos con claves o tokens. **Pide confirmación** para el resto de git, infraestructura (kubectl, terraform, nube, Vault), clientes de base de datos, borrados, dependencias, `sudo` y configurar servidores MCP. Si el destino de una escritura es reconocible, aplica las mismas protecciones de rutas que a una edición. Antes de aprobar el plan, frena los comandos que reconoce como escritura; lo demás (lectura, tests, lint) corre. Un comando que no reconoce como seguro lo decide la herramienta (en modo `estricto`, pide confirmación). |
+| Antes de cada comando | **Bloquea** escritura en GitHub o GitLab, commits con una línea de atribución de IA en el mensaje, comandos destructivos, comandos que usan archivos con secretos y comandos que escriben archivos con claves o tokens. **Pide confirmación** para `git commit` (también disfrazado: alias, `npm version`, `release-it`; en `--amend` avisa que reescribe la historia), el resto de git, infraestructura (kubectl, terraform, nube, Vault), clientes de base de datos, borrados, dependencias, `sudo` y configurar servidores MCP. Si el destino de una escritura es reconocible, aplica las mismas protecciones de rutas que a una edición. Antes de aprobar el plan, frena los comandos que reconoce como escritura; lo demás (lectura, tests, lint) corre. Un comando que no reconoce como seguro lo decide la herramienta (en modo `estricto`, pide confirmación). |
 | Antes de cada herramienta MCP | Escribir en GitHub o GitLab por MCP se bloquea; lo que escribe en otros servidores pide confirmación. Navegador y documentación quedan libres. |
 | Antes de cada edición | Sin plan aprobado no se edita código. No se edita `.git` ni archivos con secretos; cambiar la configuración del harness o de los hooks y escribir fuera del proyecto (salvo la carpeta temporal del sistema) piden confirmación. Revisa tus reglas de arquitectura y bloquea claves o tokens reales en el código. La primera modificación del turno guarda antes un **punto de restauración**. |
 | Después de cada edición | Chequeo instantáneo: JSON y YAML válidos, marcadores de conflicto de merge, sintaxis de Go. |
@@ -311,7 +311,7 @@ node "$HOME/.sdd-orquestador/bin/sdd-harness.js" deshacer --confirmar   # lo apl
 
 Antes de aplicar se intenta guardar el estado actual para poder rehacer: si se guardó, el comando muestra `Para rehacer: sdd-harness.js deshacer <id> --confirmar`; si no se pudo guardar, no hay rehacer. En el chat puedes pedir *"deshaz lo último"*: la IA te muestra la vista previa y `deshacer --confirmar` pide tu confirmación.
 
-**Carpetas con varios proyectos y workspaces.** Si abres una carpeta que contiene varios proyectos (repos separados, subcarpetas o un monorepo), o un workspace multi-raíz de VS Code (`*.code-workspace`), el harness detecta cada proyecto por sus archivos (`package.json`, `angular.json`, `go.mod`, `pom.xml`, `.csproj`, `pyproject.toml`, `.git`…) y:
+**Carpetas con varios proyectos y workspaces.** Si abres una carpeta que contiene varios proyectos (repos separados, subcarpetas o un monorepo), o un workspace multi-raíz de VS Code (`*.code-workspace`), el harness detecta cada proyecto por sus archivos (`package.json`, `angular.json`, `go.mod`, `pom.xml`, `.csproj`, `pyproject.toml`, `.git`…), en todos los niveles de carpetas, y:
 
 - al iniciar le entrega a la IA un **mapa del espacio** (nombre, ruta, stack y si tiene memoria, una línea por proyecto) con la instrucción de buscar en todos los proyectos involucrados, no solo en el primero;
 - carga la **memoria de cada proyecto** cuando lo mencionas o cuando la IA empieza a editar en él (una vez por sesión), y la de la raíz como memoria del espacio, sin mezclarlas;
@@ -324,6 +324,12 @@ node "$HOME/.sdd-orquestador/bin/sdd-harness.js" workspace --aplicar   # workspa
 ```
 
 En un workspace multi-raíz, Claude Code y Codex trabajan sobre la primera carpeta. `workspace --aplicar` agrega las demás (`additionalDirectories` en Claude Code, `writable_roots` en Codex). Copilot y Cursor ya trabajan con todas.
+
+La búsqueda va por niveles y, por defecto, sin límite de profundidad: se detiene al revisar 20.000 carpetas entre todos los niveles; las que se saltan (`node_modules`, `dist`, `.git`, ocultas…) no cuentan. Si el tope se agota, lo más profundo queda sin revisar y el mapa lo avisa. Ambos topes se ajustan con la clave `espacio` de `.sdd/harness.json` (`profundidad`: `null` = sin límite):
+
+```json
+{ "espacio": { "profundidad": 6, "maxCarpetas": 40000 } }
+```
 
 **Contenido externo.** Una página, un ticket, un PDF o una respuesta de un MCP pueden traer instrucciones escondidas para la IA. Desde que la sesión lee algo externo, los comandos y URLs que el harness reconoce como envío de datos a otro servidor (`curl` con datos, `scp`, `ssh`, `nc`, parámetros largos en una URL) piden tu confirmación con el motivo. La detección es por patrones: un script que arme su propia conexión puede no reconocerse. Tu propia app (`localhost`) no cuenta.
 
@@ -638,7 +644,7 @@ No. Usa la herramienta y el plan que ya tienes. El harness son scripts locales.
 No por el harness: no usa red ni telemetría. Tu herramienta de IA sigue funcionando como siempre.
 
 **¿Puede hacer commits o abrir PR?**
-No. Los commits los haces tú, y PR e issues tampoco los crea, ni por MCP. Sí puede ayudarte con el resto de git (push, merge, rebase, resolver conflictos, stash…), siempre con tu confirmación. El mensaje de commit que sugiere va sin firmas de IA.
+Commits sí, con tu confirmación: te muestra el mensaje y el «sí» vale para ese comando, una vez. PR e issues no los crea, ni por MCP. También puede ayudarte con el resto de git (push, merge, rebase, resolver conflictos, stash…), siempre con tu confirmación. El mensaje de commit va sin firmas de IA; si trae una, el commit se bloquea.
 
 **¿Puedo usar la IA sin el orquestador?**
 Sí: escribe `sin sdd` y el resto de la conversación trabaja como asistente normal (git y secretos siguen protegidos). `con sdd` lo reactiva. Para un solo mensaje sin plan, usa `directo`.

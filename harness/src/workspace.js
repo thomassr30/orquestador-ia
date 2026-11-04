@@ -7,13 +7,13 @@
 //   · un solo proyecto
 // Detecta los proyectos por sus marcadores, su stack y si tienen memoria. Cada archivo pertenece al proyecto más
 // cercano que lo contiene: su memoria, sus reglas, sus sensores y sus puntos de restauración son los de ese proyecto.
+// Por defecto recorre todos los niveles de carpetas; los topes se ajustan en .sdd/harness.json → espacio.
 const fs = require('fs');
 const path = require('path');
 const { isInside, relPosix, shortHash } = require('./util');
 const { STATE_DIR, fwd } = require('./paths');
+const { loadConfig, DEFAULTS } = require('./config');
 
-const MAX_DEPTH = 3;
-const MAX_DIRS = 4000;
 const MAX_PROJECTS = 60;
 const CACHE_MS = 20 * 60000;
 const SKIP = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'target', 'vendor', 'coverage', '.next', '.nuxt', '.angular', '.svelte-kit',
@@ -98,16 +98,25 @@ function projectInfo(dir, markers, base) {
   };
 }
 
-/** Proyectos dentro de una carpeta (ella incluida si es un proyecto), hasta MAX_DEPTH niveles. */
-function scan(folder, base, out, budget) {
+/** Límites del recorrido: espacio.profundidad (entero ≥ 1; null = sin límite) y espacio.maxCarpetas (entero ≥ 1). Lo inválido usa el valor por defecto. */
+function limits(root) {
+  let e = null;
+  try { e = loadConfig(root).espacio; } catch { /* configuración ilegible: valores por defecto */ }
+  const o = e && typeof e === 'object' ? e : {};
+  const ok = v => Number.isInteger(v) && v >= 1;
+  return { profundidad: ok(o.profundidad) ? o.profundidad : DEFAULTS.espacio.profundidad, maxCarpetas: ok(o.maxCarpetas) ? o.maxCarpetas : DEFAULTS.espacio.maxCarpetas };
+}
+
+/** Proyectos dentro de una carpeta (ella incluida si es un proyecto), por niveles, hasta la profundidad o el total de carpetas de `lim`. */
+function scan(folder, base, out, budget, lim) {
   const queue = [[path.resolve(folder), 0]];
-  while (queue.length && budget.dirs < MAX_DIRS && out.length < MAX_PROJECTS) {
+  while (queue.length && budget.dirs < lim.maxCarpetas && out.length < MAX_PROJECTS) {
     const [dir, depth] = queue.shift();
     budget.dirs++;
     const list = entries(dir);
     const markers = markersIn(dir, list);
     if (markers.length) out.push(projectInfo(dir, markers, base));
-    if (depth >= MAX_DEPTH) continue;
+    if (lim.profundidad != null && depth >= lim.profundidad) continue;
     for (const e of list) {
       if (!e.isDirectory() || e.name.startsWith('.') || SKIP.has(e.name)) continue;
       queue.push([path.join(dir, e.name), depth + 1]);
@@ -143,26 +152,31 @@ function extraFolders(root) {
   return { extra: [...new Set(extra.map(x => path.resolve(x)))].filter(x => fs.existsSync(x)), fuentes, comun };
 }
 
-/** Detecta el espacio de trabajo (sin caché). */
-function detect(root) {
+/** Detecta el espacio de trabajo (sin caché). Un solo contador de carpetas para la raíz y las carpetas extra. */
+function detect(root, lim = limits(root)) {
   const r = path.resolve(root);
   const { extra, fuentes, comun } = extraFolders(r);
   const proyectos = []; const budget = { dirs: 0 };
-  for (const f of [r, ...extra]) scan(f, r, proyectos, budget);
+  for (const f of [r, ...extra]) scan(f, r, proyectos, budget, lim);
   const seen = new Set();
   const unique = proyectos.filter(p => { const k = p.ruta.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
   // Memoria del espacio: la de la carpeta común del workspace, o la de la raíz si es una carpeta contenedora
   const espacio = comun && fs.existsSync(path.join(comun, '.sdd', 'memoria')) ? comun : null;
-  return { raiz: r, carpetas: [r, ...extra], fuentes, espacio, proyectos: unique, recortado: proyectos.length >= MAX_PROJECTS || budget.dirs >= MAX_DIRS, en: Date.now() };
+  return { raiz: r, carpetas: [r, ...extra], fuentes, espacio, proyectos: unique, recortado: proyectos.length >= MAX_PROJECTS || budget.dirs >= lim.maxCarpetas,
+    limites: { profundidad: lim.profundidad, maxCarpetas: lim.maxCarpetas }, en: Date.now() };
 }
 
 const cacheFile = root => path.join(STATE_DIR, shortHash(path.resolve(root).toLowerCase()), 'espacio.json');
 
-/** Espacio de trabajo con caché (se recalcula al iniciar sesión o cada 20 minutos). */
+/** Espacio de trabajo con caché (se recalcula al iniciar sesión, cada 20 minutos o si cambian los límites de `espacio`). */
 function load(root, { fresh = false } = {}) {
   const f = cacheFile(root);
-  if (!fresh) { const c = readJson(f); if (c && c.raiz === path.resolve(root) && Date.now() - c.en < CACHE_MS) return c; }
-  const ws = detect(root);
+  const lim = limits(root);
+  if (!fresh) {
+    const c = readJson(f); const l = (c && c.limites) || {};
+    if (c && c.raiz === path.resolve(root) && Date.now() - c.en < CACHE_MS && l.profundidad === lim.profundidad && l.maxCarpetas === lim.maxCarpetas) return c;
+  }
+  const ws = detect(root, lim);
   try { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(ws)); } catch { /* sin permisos */ }
   return ws;
 }
@@ -206,10 +220,13 @@ function mapBlock(ws, maxChars = 3000) {
     return `- **${p.nombre}** — \`${ruta}\` — ${info}${p.descripcion ? ` — ${p.descripcion}` : ''}`;
   }).filter(l => { used += l.length + 1; if (used > maxChars) { cut++; return false; } return true; });
   const extra = ws.carpetas.slice(1).map(fwd);
+  // Recortado por carpetas revisadas (no por el tope fijo de proyectos ni por el largo del mapa): se amplía en la configuración
+  const fijo = ws.limites && ws.limites.profundidad != null;
+  const hint = ws.recortado && ws.proyectos.length < MAX_PROJECTS ? `: para ampliarlo sube \`espacio.maxCarpetas\`${fijo ? ' o `espacio.profundidad`' : ''} en .sdd/harness.json` : '';
   return [
     `## Espacio de trabajo: ${ws.proyectos.length} proyecto(s)${extra.length ? ` en ${ws.carpetas.length} carpetas` : ''}`,
     ...lines,
-    ...(ws.recortado || cut ? [`- … (${cut ? `${cut} proyecto(s) más` : 'hay más proyectos'}; el mapa se recortó)`] : []),
+    ...(ws.recortado || cut ? [`- … (${cut ? `${cut} proyecto(s) más` : 'hay más proyectos'}; el mapa se recortó${hint})`] : []),
     ...(extra.length ? [`Carpetas fuera de la raíz: ${extra.join(', ')}`] : []),
     'Cómo trabajar aquí: antes de responder, planificar o concluir que algo "no existe", busca en TODOS los proyectos que puedan estar involucrados (por ejemplo, rg sobre cada ruta), no solo en el primero. Cada proyecto tiene su propia memoria y reglas: antes de trabajar en uno, lee su `.sdd/memoria/MEMORIA.md` si existe. No mezcles la memoria de un proyecto con la de otro; lo que cruza proyectos (contratos, dependencias entre servicios) va en la memoria de la raíz del espacio. Al delegar, pasa a cada sub-agente este mapa y la ruta del proyecto que le toca.',
   ].join('\n');

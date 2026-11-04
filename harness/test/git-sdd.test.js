@@ -1,5 +1,5 @@
 'use strict';
-// Git con confirmación (commit nunca), mensajes de commit sin atribución y "sin sdd" para toda la conversación.
+// Git y commit con confirmación,mensajes de commit sin atribución y "sin sdd" para toda la conversación.
 const test = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
@@ -15,13 +15,20 @@ const hook = (host, ev, input) => {
   return r.stdout.trim() ? JSON.parse(r.stdout) : null;
 };
 
-test('git por herramienta: Claude Code pregunta con su diálogo; Codex deja la aprobación a sus reglas; commit se bloquea en todas', () => {
+test('git por herramienta: Claude Code pregunta con su diálogo; Codex deja la aprobación a sus reglas; commit con confirmación y sin atribución', () => {
   const dir = project({ 'a.js': '' });
   const bash = (host, command) => hook(host, 'PreToolUse', { session_id: 'g', cwd: dir, tool_name: 'Bash', tool_input: { command } });
   assert.strictEqual(bash('claude', 'git push origin main').hookSpecificOutput.permissionDecision, 'ask');
   assert.strictEqual(bash('codex', 'git push origin main'), null, 'Codex: la regla "prompt" pide la aprobación nativa');
   assert.strictEqual(bash('codex', 'git reset --hard HEAD~1').hookSpecificOutput.permissionDecision, 'deny', 'destructivo: confirmación en el chat con explicación');
-  for (const host of ['claude', 'codex']) assert.strictEqual(bash(host, 'git commit -m "fix: x"').hookSpecificOutput.permissionDecision, 'deny', host);
+  assert.strictEqual(bash('claude', 'git commit -m "fix: x"').hookSpecificOutput.permissionDecision, 'ask', 'commit: confirmación crítica');
+  assert.strictEqual(bash('codex', 'git commit -m "fix: x"'), null, 'Codex: commit con su regla "prompt"');
+  assert.strictEqual(bash('codex', 'git commit --amend --no-edit').hookSpecificOutput.permissionDecision, 'deny', 'amend: confirmación en el chat con explicación');
+  for (const host of ['claude', 'codex']) {
+    const r = bash(host, 'git commit -m "feat: x\\n\\nCo-Authored-By: Claude <noreply@anthropic.com>"').hookSpecificOutput;
+    assert.strictEqual(r.permissionDecision, 'deny', host);
+    assert.match(String(r.permissionDecisionReason), /quita la línea de atribución/, host);
+  }
   // Con el plan pendiente, git sigue disponible con confirmación (para resolver problemas de git)
   hook('claude', 'UserPromptSubmit', { session_id: 'g', cwd: dir, prompt: 'agrega un filtro por fecha' });
   assert.strictEqual(bash('claude', 'git stash').hookSpecificOutput.permissionDecision, 'ask');

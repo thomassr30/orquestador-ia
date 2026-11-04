@@ -9,10 +9,28 @@ const { Policy, splitSegments } = require('../src/policy');
 const p = new Policy({ root: '/tmp/proyecto' });
 const d = c => p.checkCommand(c).decision;
 
-test('git: lectura libre, commit nunca (aunque venga disfrazado), el resto con confirmación', () => {
+test('git: lectura libre; commit y el resto con confirmación crítica (aunque venga disfrazado)', () => {
   for (const c of ['git status', 'git log --oneline | head -5', 'git -C "mi dir" diff', 'git --no-pager log', 'git branch', 'git stash list', '"C:\\Program Files\\Git\\bin\\git.exe" status']) assert.strictEqual(d(c), 'allow', c);
   for (const c of ['git commit -m x', 'git commit --amend --no-edit', 'cmd /c "git commit -m x"', 'bash -lc "git commit -am x"', 'echo $(git commit -m x)',
-    'git -c core.pager=cat commit', 'git commit-tree abc', 'git config alias.ci commit', 'git -c alias.c=commit c -m x', 'npm version patch', 'npx release-it']) assert.strictEqual(d(c), 'deny', c);
+    'git -c core.pager=cat commit', 'git commit-tree abc', 'git config alias.ci commit', 'git -c alias.c=commit c -m x', 'npm version patch', 'npx release-it', 'release-it --ci']) {
+    const r = p.checkCommand(c);
+    assert.strictEqual(r.decision, 'ask', c);
+    assert.strictEqual(r.critical, true, c);
+  }
+  assert.match(p.checkCommand('git commit -m x').reason, /crea un commit/);
+  assert.strictEqual(p.checkCommand('git commit -m x').gitRule, true, 'commit normal: la herramienta puede pedir la aprobación nativa');
+  for (const c of ['cmd /c "git commit -m x"', 'bash -lc "git commit -am x"', 'echo $(git commit -m x)', 'git -c alias.c=commit c -m x', 'cmd /c "git push"']) assert.ok(!p.checkCommand(c).gitRule, `disfrazado, sin aprobación nativa: ${c}`);
+  const amend = p.checkCommand('git commit --amend --no-edit');
+  assert.match(amend.reason, /reescribe el último commit/);
+  assert.ok(!amend.gitRule, 'amend: siempre con la explicación del harness');
+  assert.match(p.checkCommand('npm version patch').reason, /herramienta de versionado/);
+  for (const c of ['git commit -m "feat: x\\n\\nCo-Authored-By: Claude <noreply@anthropic.com>"', 'git commit -m "feat: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>"',
+    'git commit -m "$(cat <<\'EOF\'\nfeat: x\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\nEOF\n)"', 'git commit -m "fix: y" -m "Made-with: Cursor"']) {
+    const r = p.checkCommand(c);
+    assert.strictEqual(r.decision, 'deny', c);
+    assert.match(r.reason, /quita la línea de atribución/, c);
+  }
+  assert.strictEqual(d('git commit -m "feat: x\\n\\nCo-authored-by: Juan Pérez <juan@empresa.cl>"'), 'ask', 'coautor humano: no es atribución de IA');
   for (const c of ['git -C x push', 'cd x && git push', 'git checkout -b y', 'git stash', 'git branch -D main', 'cmd /c "git push"', 'powershell -NoProfile -Command "git reset --hard"',
     'bash -lc "git add ."', 'git merge main', 'git rebase --continue', 'git pull', 'git fetch', 'git ci -m x']) {
     const r = p.checkCommand(c);

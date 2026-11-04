@@ -40,7 +40,7 @@
     }
   },
   "permisos": {
-    "_comentario": "Se suman a las reglas fijas (commit nunca, resto de git con confirmación, secretos, infraestructura con confirmación). Prefijos de comando; '*' al final = comodín.",
+    "_comentario": "Se suman a las reglas fijas (commit y resto de git con confirmación, secretos, infraestructura con confirmación). Prefijos de comando; '*' al final = comodín.",
     "permitir": [],
     "preguntar": [],
     "denegar": [],
@@ -139,5 +139,10 @@
   "seguridad": {
     "contenidoExterno": true,
     "secretosEnCodigo": true
+  },
+  "_espacio": "Detección de proyectos del espacio de trabajo (carpeta con varios proyectos o workspace). profundidad: niveles de carpetas a revisar (null = sin límite). maxCarpetas: total de carpetas revisadas sumando todos los niveles; las que se saltan (node_modules, dist, .git, ocultas…) no cuentan. Va por niveles: si se agota, queda sin revisar lo más profundo y el mapa avisa que se recortó. Se recalcula al iniciar sesión, cada 20 minutos o al cambiar estos valores.",
+  "espacio": {
+    "profundidad": null,
+    "maxCarpetas": 20000
   }
 }

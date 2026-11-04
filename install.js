@@ -293,22 +293,23 @@ function permissionRules() {
     'Bash(semgrep scan:*)', 'Bash(docker ps:*)'
   ];
 }
-// ---------- git: lectura libre, escritura con aprobación, commit nunca (deny > ask > allow en Claude Code) ----------
+// ---------- git: lectura libre, escritura y commit con aprobación (deny > ask > allow en Claude Code) ----------
 // Fuente única: harness/src/rules.js (las mismas reglas que aplican los hooks del harness)
-const { GIT_READ, GIT_NEVER, COMMIT_TOOLS, GIT_WRITE, FORGE_READ, FORGE_WRITE, INFRA_ASK } = require('./harness/src/rules');
+const { GIT_READ, GIT_COMMIT, COMMIT_TOOLS, GIT_WRITE, FORGE_READ, FORGE_WRITE, INFRA_ASK } = require('./harness/src/rules');
 const HC = require('./harness/src/hooks-config');
 
 const CLAUDE_RULES = {
   allow: [...GIT_READ.map(c => `Bash(git ${c}:*)`), 'Bash(git branch)', 'Bash(git remote)', 'Bash(git stash list)', ...FORGE_READ.map(c => `Bash(${c}:*)`)],
-  deny: [...GIT_NEVER.map(c => `Bash(git ${c}:*)`), ...COMMIT_TOOLS.map(c => `Bash(${c}:*)`), ...FORGE_WRITE.map(c => `Bash(${c}:*)`)],
+  deny: [...FORGE_WRITE.map(c => `Bash(${c}:*)`)],
   // (no se pone 'git:*' en ask: ask tiene prioridad sobre allow y bloquearía la lectura; lo no listado ya pregunta por defecto)
-  ask: [...INFRA_ASK.map(c => `Bash(${c}:*)`), ...GIT_WRITE.map(c => `Bash(git ${c}:*)`), 'Bash(git stash)'],
+  ask: [...INFRA_ASK.map(c => `Bash(${c}:*)`), ...GIT_WRITE.map(c => `Bash(git ${c}:*)`), 'Bash(git stash)',
+    ...GIT_COMMIT.filter(c => !GIT_WRITE.includes(c)).map(c => `Bash(git ${c}:*)`), ...COMMIT_TOOLS.map(c => `Bash(${c}:*)`)],
 };
-// OpenCode: el último patrón que coincide gana → orden: general (ask) → lectura (allow) → escritura (deny)
+// OpenCode: el último patrón que coincide gana → orden: general (ask) → lectura (allow) → commit (ask) → escritura en la forja (deny)
 const OPENCODE_RULES = [
   ...['git *', 'gh *', 'glab *', ...INFRA_ASK.map(c => `${c} *`)].map(k => [k, 'ask']),
   ...GIT_READ.map(c => [`git ${c}*`, 'allow']), ['git branch', 'allow'], ...FORGE_READ.map(c => [`${c}*`, 'allow']),
-  ...GIT_NEVER.map(c => [`git ${c}*`, 'deny']), ...COMMIT_TOOLS.map(c => [`${c}*`, 'deny']), ...FORGE_WRITE.map(c => [`${c}*`, 'deny']),
+  ...GIT_COMMIT.map(c => [`git ${c}*`, 'ask']), ...COMMIT_TOOLS.map(c => [`${c}*`, 'ask']), ...FORGE_WRITE.map(c => [`${c}*`, 'deny']),
 ];
 
 function configureClaudePermissions(file) {
@@ -330,7 +331,7 @@ function configureClaudePermissions(file) {
   if (opt('auto-edits') && P.defaultMode !== 'acceptEdits') { previousMode = P.defaultMode || 'default'; P.defaultMode = 'acceptEdits'; }
   backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n');
   manifest.permissions = { file, added: added.allow, addedAsk: added.ask, addedDeny: added.deny, previousMode, attribution };
-  log(`  ✓ permisos: git con aprobación (commit nunca) · gh/glab solo lectura · infraestructura con aprobación${P.defaultMode === 'acceptEdits' ? ' · ediciones automáticas' : ''} → ${file}`);
+  log(`  ✓ permisos: git y commit con aprobación · gh/glab solo lectura · infraestructura con aprobación${P.defaultMode === 'acceptEdits' ? ' · ediciones automáticas' : ''} → ${file}`);
 }
 // ---------- harness: hooks en cada herramienta (permisos por código, GATE, sensores, memoria) ----------
 const HOOK_FILES = {

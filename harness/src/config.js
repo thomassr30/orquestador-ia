@@ -28,6 +28,7 @@ const DEFAULTS = {
   deshacer: { activo: true, maxPuntos: 30, excluir: [] }, // puntos de restauración antes de cada turno que modifica archivos
   seguridad: { contenidoExterno: true, secretosEnCodigo: true }, // envío de datos tras leer contenido externo · secretos en ediciones
   aprobaciones: { vigenciaMin: 30 }, // minutos que vale una confirmación en el chat (solicitud pendiente o aprobada, un solo uso)
+  espacio: { profundidad: null, maxCarpetas: 20000 }, // detección de proyectos: niveles (null = sin límite) y total de carpetas revisadas
 };
 
 function readJson(file) {

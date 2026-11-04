@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const R = require('./rules');
+const { findAttribution } = require('./attribution');
 const { HOME, SDD_HOME } = require('./paths');
 const { isInside, relPosix } = require('./util');
 
@@ -134,7 +135,11 @@ function readOnlyVariant(norm, tokens) {
 
 function classifySegment(seg, extra) {
   const n = normalizeSegment(seg);
-  if (n.inner) return classifyCommand(n.inner, extra);
+  if (n.inner) {
+    // Dentro de un envoltorio (cmd /c, bash -lc…) las reglas nativas por prefijo no ven el comando: confirma el harness.
+    const r = classifyCommand(n.inner, extra);
+    return r.gitRule ? { ...r, gitRule: false } : r;
+  }
   const norm = n.norm;
   if (!norm) return { decision: 'allow' };
   if (matchesAny(norm, extra.deny)) return { decision: 'deny', reason: `bloqueado por configuración: "${norm}"` };
@@ -142,7 +147,9 @@ function classifySegment(seg, extra) {
     // Comando envuelto por el compactador de salidas: se evalúa el comando real
     let inner = '';
     try { inner = Buffer.from(String(n.tokens[2] || ''), 'base64').toString('utf8'); } catch { /* inválido */ }
-    return inner.trim() ? classifyCommand(inner, extra) : { decision: 'deny', reason: 'comando envuelto inválido' };
+    if (!inner.trim()) return { decision: 'deny', reason: 'comando envuelto inválido' };
+    const r = classifyCommand(inner, extra);
+    return r.gitRule ? { ...r, gitRule: false } : r;
   }
   if (/sdd-harness\.js$/i.test(String(n.tokens[1] || '')) && /^deshacer$/i.test(String(n.tokens[2] || '')) && n.tokens.some(t => /^--confirmar$/i.test(t))) {
     return { decision: 'ask', critical: true, reason: 'vuelve los archivos del proyecto a un punto de restauración (decisión del usuario). Muéstrale antes la vista previa' };
@@ -153,11 +160,29 @@ function classifySegment(seg, extra) {
   if (approvesGate(n.tokens)) return { decision: 'deny', reason: 'solo el usuario aprueba el plan, autoriza excepciones o acepta el trabajo (en el chat o desde su terminal); el agente no puede hacerlo' };
   const isGit = norm.startsWith('git ');
   const gitSub = isGit ? norm.slice(4) : '';
-  if (isGit && matchesAny(gitSub, R.GIT_NEVER)) {
-    return { decision: 'deny', reason: 'los commits los hace el usuario, nunca el agente (aunque lo pida). Sugiere el mensaje de commit como texto, sin líneas de atribución (Co-Authored-By, "Generated with…").' };
+  if (isGit && matchesAny(gitSub, R.GIT_COMMIT)) {
+    // El mensaje puede traer saltos de línea reales o "\n" literales (-m "feat: x\n\nCo-Authored-By: …")
+    // (cada -m es un párrafo: se revisan también por separado)
+    const msgs = [];
+    for (let i = 2; i < n.tokens.length; i++) {
+      const t = String(n.tokens[i]);
+      if (t === '--message' || /^-[a-z]*m$/i.test(t)) msgs.push(String(n.tokens[++i] || ''));
+      else if (/^--message=/.test(t)) msgs.push(t.slice(10));
+      else if (/^-m./.test(t)) msgs.push(t.slice(2));
+    }
+    const attribution = findAttribution([seg, ...msgs].join('\n').replace(/(?:\\r)?\\n/g, '\n'));
+    if (attribution) return { decision: 'deny', reason: `quita la línea de atribución "${attribution}" del mensaje de commit (el usuario no quiere atribuciones de IA en sus commits)` };
+    const raw = ['git', ...n.tokens.slice(1)].join(' ');
+    const destructive = R.GIT_DESTRUCTIVE.some(re => re.test(raw));
+    return { decision: 'ask', critical: true, git: true, gitRule: !destructive, reason: destructive
+      ? 'git: reescribe el último commit (--amend; si ya se publicó, obliga a reescribir el remoto). Muestra al usuario el mensaje y qué cambia antes de confirmar (decisión crítica)'
+      : 'git: crea un commit (decisión crítica). Muestra al usuario el mensaje de commit y los archivos que incluye antes de confirmar' };
   }
-  if ((isGit && /alias\./i.test(seg) && /commit/i.test(seg)) || matchesAny(norm, R.COMMIT_TOOLS)) {
-    return { decision: 'deny', reason: 'crea commits (alias de git o herramienta de versionado): los commits los hace el usuario, nunca el agente.' };
+  if (isGit && /alias\./i.test(seg) && /commit/i.test(seg)) {
+    return { decision: 'ask', critical: true, git: true, reason: 'git: crea un commit mediante un alias (decisión crítica). Muestra al usuario el comando real, el mensaje y el efecto antes de confirmar' };
+  }
+  if (matchesAny(norm, R.COMMIT_TOOLS)) {
+    return { decision: 'ask', critical: true, git: true, gitRule: true, reason: 'crea commits (y quizá tags o una versión) con una herramienta de versionado (decisión crítica). Muestra al usuario qué commit, versión y tags creará antes de confirmar' };
   }
   if (isGit && (matchesAny(gitSub, R.GIT_WRITE) || gitSub === 'stash')) {
     const raw = ['git', ...n.tokens.slice(1)].join(' ');
@@ -301,13 +326,18 @@ function classifyCommand(cmd, extra) {
   }
   if (/\.sdd-orquestador[\\/]+estado\b/i.test(raw)) return { decision: 'deny', reason: 'el estado del harness solo lo modifica el propio harness' };
   const hasSubst = /\$\(|`/.test(raw);
+  let result = { decision: 'allow' };
   if (hasSubst) {
     // Sustitución de comandos: se evalúa el interior; como mínimo se pregunta.
     const inner = [...raw.matchAll(/\$\(([^)]*)\)|`([^`]*)`/g)].map(m => m[1] || m[2] || '');
-    const worst = inner.map(i => classifyCommand(i, extra)).find(r => r.decision === 'deny');
+    const results = inner.map(i => classifyCommand(i, extra));
+    const worst = results.find(r => r.decision === 'deny');
     if (worst) return worst;
+    // Una decisión crítica escondida en la sustitución (p. ej. $(git commit …)) sigue siendo crítica y no se
+    // delega en la aprobación nativa de la herramienta (sus reglas por prefijo no la ven).
+    const crit = results.find(r => r.decision === 'ask' && r.critical);
+    if (crit) result = { ...crit, gitRule: false };
   }
-  let result = { decision: 'allow' };
   for (const seg of splitSegments(raw)) {
     const r = classifySegment(seg, extra);
     if (r.decision === 'deny') return r;

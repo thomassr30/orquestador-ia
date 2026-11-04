@@ -29,10 +29,13 @@ test('compacta: conserva errores con contexto y el resumen final, omite el ruido
   assert.strictEqual(short.compacted, false);
 });
 
-test('el comando envuelto se evalúa por su contenido real (no sirve para colar un git commit)', () => {
+test('el comando envuelto se evalúa por su contenido real (no sirve para colar un git commit ni un PR)', () => {
   const p = new Policy({ root: '/tmp/p' });
   const wrap = c => `node "C:/Users/X/.sdd-orquestador/bin/sdd-salida.js" ${Buffer.from(c).toString('base64')} 4000`;
-  assert.strictEqual(p.checkCommand(wrap('git commit -m x')).decision, 'deny');
+  assert.strictEqual(p.checkCommand(wrap('gh pr create --title x')).decision, 'deny');
+  const c = p.checkCommand(wrap('git commit -m x'));
+  assert.strictEqual(c.decision, 'ask');
+  assert.strictEqual(c.critical, true);
   assert.strictEqual(p.checkCommand(wrap('npm test')).decision, 'allow');
   assert.strictEqual(p.checkCommand(wrap('rm -rf dist')).critical, true);
 });

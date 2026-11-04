@@ -12,3 +12,6 @@
 - Excepción de control ligada a la huella del contenido: si cambia el archivo, deja de valer.
 - Compactador en Claude Code: solo compacta si las reglas de permiso del usuario (archivos de settings y política en archivo) ya permiten el comando original y ninguna ask/deny lo toca. Motivo: Claude evalúa sus reglas contra el comando envuelto, así que el «allow» del hook concedía permisos y anulaba reglas del usuario (opción a, aprobada 2026-11-03).
 - Plan del trabajo congelado al aprobar el GATE; un plan nuevo queda como propuesta hasta otra aprobación. Motivo: no rebajar criterios de aceptación aprobados.
+
+## 2026-11-03 · espacio de trabajo sin tope de niveles (fuente: harness/src/workspace.js `limits`)
+- Espacio de trabajo sin tope de niveles por defecto (`espacio.profundidad: null`) y tope de 20.000 carpetas (`espacio.maxCarpetas`), configurables. Motivo: el recorrido es por niveles (BFS) y el tope de carpetas se agotaba antes de llegar a lo profundo; medido en Windows ~0,1 ms por carpeta (20.000 ≈ 2 s, al iniciar sesión y cada 20 min por la caché); con 10 niveles y 4.000 carpetas un árbol ancho daba 0 proyectos del nivel 7. Aprobado por el usuario.

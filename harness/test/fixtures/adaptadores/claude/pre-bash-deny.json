@@ -7,7 +7,7 @@
     "hook_event_name": "PreToolUse",
     "tool_name": "Bash",
     "tool_input": {
-      "command": "git commit -m x"
+      "command": "gh pr create --title x"
     }
   },
   "normalizado": {
@@ -17,7 +17,7 @@
     "sessionId": "s1",
     "tool": {
       "kind": "shell",
-      "command": "git commit -m x"
+      "command": "gh pr create --title x"
     }
   },
   "resultado": {

@@ -154,6 +154,18 @@ function freeze(root, { sesion, via = 'chat' } = {}) {
 /** ¿La evidencia sigue valiendo para el contenido actual de sus archivos? */
 const vigente = (root, ev) => !!ev && fingerprint(root, ev.archivos || []) === ev.huella;
 
+/**
+ * Evidencias que aprobaron la tarea (su última verificación). Las de fin de turno mientras estaba en curso son
+ * historial: se tomaron con el trabajo a medias y no deciden si la verificación sigue vigente.
+ */
+function aprobadaCon(t, x) {
+  const byId = id => t.evidencias.find(e => e.id === id);
+  if (x.verificadaCon) return x.verificadaCon.map(byId).filter(Boolean);
+  const propias = (x.evidencias || []).map(byId).filter(e => e && e.origen === `trabajo verificar ${x.id}`);
+  const ultima = propias.length ? propias[propias.length - 1].en : null;
+  return propias.filter(e => e.en === ultima);
+}
+
 /** Estado de un criterio: {ok, motivo, evidencia?}. */
 function criterion(root, t, req, c) {
   if (c.manual) return { ok: !!t.aceptado, manual: true, motivo: t.aceptado ? 'aceptado por el usuario' : 'requiere la aceptación del usuario' };
@@ -173,8 +185,7 @@ function status(root) {
   if (problema) return { problema };
   if (!t) return null;
   const tareas = t.tareas.map(x => {
-    const evs = (x.evidencias || []).map(id => t.evidencias.find(e => e.id === id)).filter(Boolean);
-    const reverify = x.estado === 'verificada' && evs.some(e => !vigente(root, e));
+    const reverify = x.estado === 'verificada' && aprobadaCon(t, x).some(e => !vigente(root, e));
     return { ...x, estado: reverify ? 'por_reverificar' : x.estado, motivo: reverify ? 'sus archivos cambiaron después de verificarla' : x.motivo };
   });
   const requisitos = t.requisitos.map(r => {
@@ -289,7 +300,7 @@ async function verifyTask(root, id, { cfg, sesion, excepciones = [], cambios = [
     t.evidencias = t.evidencias.slice(-300);
     x.evidencias = [...(x.evidencias || []), ...ids].slice(-30);
     let sinProgreso = false;
-    if (verificado(res.estado)) { x.estado = 'verificada'; x.motivo = res.estado === 'excepcion' ? res.motivo : ''; x.intentos = [...(x.intentos || []), { n: (x.intentos || []).length + 1, en: now(), resultado: res.estado }].slice(-20); } else {
+    if (verificado(res.estado)) { x.estado = 'verificada'; x.verificadaCon = ids; x.motivo = res.estado === 'excepcion' ? res.motivo : ''; x.intentos = [...(x.intentos || []), { n: (x.intentos || []).length + 1, en: now(), resultado: res.estado }].slice(-20); } else {
       if (x.estado !== 'bloqueada') x.estado = 'en_curso';
       sinProgreso = addAttempt(x, res.estado, firma, limit);
     }
@@ -316,8 +327,7 @@ function recordRun(root, { sesion, sensores, archivos, cfg }) {
         x.evidencias = [...(x.evidencias || []), ev.id].slice(-30);
         if (addAttempt(x, sensores.estado, firma, limit)) notes.push(`${x.id} quedó BLOQUEADA: ${x.motivo}.`);
       } else if (x.estado === 'verificada') {
-        const evs = (x.evidencias || []).map(id => t.evidencias.find(e => e.id === id)).filter(Boolean);
-        if (evs.some(e => !vigente(root, e))) { x.estado = 'por_reverificar'; x.motivo = 'sus archivos cambiaron después de verificarla'; notes.push(`${x.id} vuelve a «por reverificar»: sus archivos cambiaron.`); }
+        if (aprobadaCon(t, x).some(e => !vigente(root, e))) { x.estado = 'por_reverificar'; x.motivo = 'sus archivos cambiaron después de verificarla'; notes.push(`${x.id} vuelve a «por reverificar»: sus archivos cambiaron.`); }
       }
     }
     return { trabajo: t };

@@ -88,6 +88,23 @@ test('verificar crea evidencia del harness; un cambio posterior la vence y deja 
   assert.match(st.faltan.join(' '), /venció: los archivos cambiaron/);
 });
 
+test('las evidencias de fin de turno tomadas en curso no vencen una verificación posterior; un cambio después sí', async () => {
+  const d = await approved();
+  T.startTask(d, 'T-01', { responsable: 'backend' });
+  fs.writeFileSync(path.join(d, 'src/pdf.js'), 'v2');
+  await E(d, 's', 'post', edit('src/pdf.js'));
+  await E(d, 's', 'stop', { lastMessage: 'avance' });
+  assert.ok(T.load(d).trabajo.tareas[0].evidencias.length >= 1, 'el fin de turno dejó evidencia en la tarea en curso');
+  fs.writeFileSync(path.join(d, 'src/pdf.js'), 'v3');
+  const r = await T.verifyTask(d, 'T-01', { cfg: loadConfig(d), sesion: 's' });
+  assert.strictEqual(r.tarea.estado, 'verificada');
+  assert.strictEqual(T.status(d).tareas[0].estado, 'verificada', 'la evidencia vieja (v2) no la vence');
+  await E(d, 's', 'stop', { lastMessage: 'listo' });
+  assert.strictEqual(T.load(d).trabajo.tareas[0].estado, 'verificada', 'el fin de turno tampoco');
+  fs.writeFileSync(path.join(d, 'src/pdf.js'), 'v4');
+  assert.strictEqual(T.status(d).tareas[0].estado, 'por_reverificar');
+});
+
 test('un comando de aceptación que falla impide verificar; el «sin progreso» bloquea la tarea al tercer intento igual', async () => {
   const plan = { ...PLAN, requisitos: [{ id: 'REQ-01', texto: 'x', criterios: [{ id: 'CA-01', texto: 'aceptación', comando: `"${NODE}" -e "console.log('falla igual');process.exit(1)"` }] }] };
   const d = await approved({}, plan);
