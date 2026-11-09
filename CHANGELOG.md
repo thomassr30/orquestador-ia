@@ -15,6 +15,10 @@ No cambia el formato del estado ni la configuración existente: basta `npm run u
 - **«sin sdd» dentro de contenido pegado ya no apaga el orquestador** (`gate.js`, `switchScope`): la frase solo cuenta en mensajes cortos que no parecen un log o un fragmento de código.
 - **Tickets de Azure Boards abren el GATE**: `AB#1234`, `PBI 4521` y el enlace `…/_workitems/edit/1234`, además del formato Jira `LAB-123`.
 
+### Documentación
+- **Sección «Empezar en un proyecto nuevo»** en el README: que la instalación es global y no hay nada que instalar por proyecto, y los tres pasos que sí valen la pena una vez (crear la memoria con `sdd-memory init`, comprobar con `doctor` qué sensores detectó y cómo fijarlos si falta alguno, y registrar Azure DevOps por proyecto si sus work items están ahí), más lo opcional: reglas propias, el enlace de Figma y qué skills instalar.
+- Secciones nuevas de **Azure DevOps** (incluido el caso de varios proyectos en organizaciones distintas y qué puede o no hacer en Azure), **Del work item al plan**, **Preguntas abiertas**, **Cuánto cuestan las skills** y **Varias tareas a la vez (worktrees)**; tabla del runner de tests por proyecto y el aviso de contexto recortado en Memoria del proyecto.
+
 ### Skills: instalar solo las que usas
 - **Medición primero.** Las 105 skills cuestan **~6.400 tokens en cada sesión**, que es lo que suman sus nombres y descripciones; el contenido completo (~47.700 tokens) no entra: el cliente lo lee recién cuando el agente usa la skill. Y los 22 agentes **no precargaban nada**: el campo `skills:` de su frontmatter no se escribía en el archivo que lee el cliente, así que ahí no había nada que arreglar.
 - **`config/skills.json` → `excluir`** deja fuera las skills de tecnologías que no usas, por nombre o por patrón (`deploy-*`). También `--skills=` (instala solo esas) y `--sin-skills=` por línea de comandos. Las del flujo (`sdd-*`, `tracker-common`) nunca se excluyen. Un nombre que no existe se avisa y no rompe la instalación.

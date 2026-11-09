@@ -21,6 +21,7 @@ Se instala **una vez** y queda activo en **todos tus proyectos**.
 - [Qué garantiza y qué no](#qué-garantiza-y-qué-no)
 - [Herramientas compatibles](#herramientas-compatibles)
 - [Instalación](#instalación)
+- [Empezar en un proyecto nuevo](#empezar-en-un-proyecto-nuevo)
 - [Uso diario](#uso-diario)
 - [Servidores MCP](#servidores-mcp) · [Azure DevOps](#azure-devops) · [Del work item al plan](#del-work-item-al-plan)
 - [Cuánto cuestan las skills](#cuánto-cuestan-las-skills) · [Varias tareas a la vez (worktrees)](#varias-tareas-a-la-vez-worktrees)
@@ -236,6 +237,56 @@ Reinstalar es seguro: no duplica nada y recuerda dónde instalaste.
 El código del harness, los scripts y tu configuración quedan en `~/.sdd-orquestador/`.
 
 </details>
+
+## Empezar en un proyecto nuevo
+
+La instalación es global: **no hay que instalar nada por proyecto**. Abres tu herramienta de IA en la carpeta y ya rigen el GATE, los permisos por código, los sensores y los puntos de restauración. El estado del harness vive fuera del repositorio.
+
+Dicho eso, tres cosas valen la pena una vez por proyecto.
+
+**1. Crear la memoria del proyecto.** Es lo que evita que la IA tenga que releer el proyecto en cada sesión:
+
+```bash
+node "$HOME/.sdd-orquestador/bin/sdd-memory.js" init   # o /sdd-memory init desde el chat
+```
+
+Crea `.sdd/memoria/` con `MEMORIA.md`, `decisiones.md`, `pendientes.md`, `historial.md` y `temas/`. Después pídele a la IA que llene `MEMORIA.md` con el stack, los módulos y las convenciones: eso es lo que recibe al iniciar cada sesión. Conviene versionar la memoria para compartirla con el equipo; `sesion.md` es volátil y puedes ignorarlo en git.
+
+**2. Comprobar qué detecta el harness**, desde la carpeta del proyecto:
+
+```bash
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" doctor
+```
+
+Al final te muestra los sensores que detectó. Por ejemplo, en un proyecto con `vitest` y `eslint`:
+
+```
+Sensores para los 3 archivo(s) modificados:
+  • lint: npm run lint
+  • tests (vitest): npx --no-install vitest related --run --passWithNoTests "src/a.ts"
+```
+
+Si falta alguno (`tipos`, por ejemplo) es porque esa herramienta no está instalada en el proyecto todavía o el script `test` usa algo que la detección no reconoce. Lo fijas a mano en `.sdd/harness.json`:
+
+```json
+{ "sensores": { "comandos": { "tipos": "npx tsc --noEmit -p tsconfig.app.json" } } }
+```
+
+Ver [Verificación de resultados](#verificación-de-resultados) y [Configuración](#configuración).
+
+**3. Si los work items de ese proyecto están en Azure DevOps**, registrar su organización solo para ese repositorio:
+
+```bash
+node install.js --mcp=azure-devops --org=<organización> --proyecto
+```
+
+Ver [Azure DevOps](#azure-devops), que explica el caso de varios proyectos en organizaciones distintas.
+
+Después, opcional y cuando haga falta:
+
+- **Reglas propias de arquitectura** en `.sdd/harness.json` → `reglas`: bloquean por código cosas como que un componente llame HTTP directo o que el dominio importe infraestructura. Ejemplos listos en `~/.sdd-orquestador/harness.json` → `_ejemplosReglas`.
+- **El enlace del archivo de Figma** en la memoria (`temas/diseno.md` → «Fuente de diseño»), si el proyecto tiene diseño.
+- **Qué skills instalar**, si en este equipo no usas algunas tecnologías: ver [Cuánto cuestan las skills](#cuánto-cuestan-las-skills).
 
 ## Uso diario
 
