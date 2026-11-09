@@ -1,0 +1,14 @@
+{
+  "_comentario": "Qué skills instalar. El nombre y la descripción de CADA skill instalada entran en el contexto de todas tus sesiones (las 105 cuestan unos 6.400 tokens), así que conviene no instalar las de tecnologías que no usas. El contenido completo solo se lee cuando el agente usa la skill.",
+  "_excluir": "Nombres o patrones con '*' al final. Se quitan al reinstalar: node install.js. También por línea de comandos: --sin-skills=ci-*,tracker-jira (se suma a esta lista) o --skills=sdd-*,stack-angular (instala SOLO esas).",
+  "excluir": [],
+  "_nunca": "Las skills del propio orquestador (sdd-*) y tracker-common nunca se excluyen: son el flujo, no una tecnología.",
+  "_ejemplos": {
+    "_nota": "Copia la lista que te sirva a «excluir». Mira lo que tienes instalado y su costo con: sdd-harness.js doctor",
+    "sin-ci-que-no-uso": ["ci-bitbucket", "ci-gitlab", "ci-jenkins"],
+    "sin-trackers-que-no-uso": ["tracker-jira", "tracker-linear", "tracker-github-issues", "tracker-gitlab-issues"],
+    "sin-infraestructura": ["deploy-*", "iac-terraform", "config-consul", "config-vault", "container-docker", "ops-observability"],
+    "sin-moviles": ["stack-android", "stack-compose", "stack-ios", "stack-swiftui", "stack-expo", "stack-react-native", "rn-animations", "ios-hardware", "android-hardware", "qa-mobile", "test-mobile", "mobile-design"],
+    "sin-stacks-que-no-uso": ["stack-go", "stack-sqlserver", "stack-adonisjs"]
+  }
+}

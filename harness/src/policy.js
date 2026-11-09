@@ -114,6 +114,11 @@ function secretReference(raw) {
   return null;
 }
 
+// Operaciones del orquestador que cambian el proyecto o la configuración del usuario: antes del «sí» el agente
+// anuncia en una o dos líneas qué va a hacer y por qué, no solo pide permiso. Un diálogo sin contexto obliga al
+// usuario a reconstruir de qué se trata para poder decidir.
+const ANUNCIA = 'Antes del sí, dile en una o dos líneas qué vas a hacer y por qué ahora.';
+
 // Scripts propios del orquestador (estado, memoria, diagnóstico): siempre permitidos, también antes del GATE.
 const OWN_SCRIPT = /(^|\/)\.sdd-orquestador\/bin\/(sdd-harness|sdd-status|sdd-memory|sdd-context|sdd-workspace|sdd-improve|to-md|new-change|sdd-state)\.js$/;
 const ownScript = tokens => (tokens[0] || '').toLowerCase() === 'node' && OWN_SCRIPT.test(String(tokens[1] || '').replace(/\\/g, '/').toLowerCase());
@@ -152,10 +157,21 @@ function classifySegment(seg, extra) {
     return r.gitRule ? { ...r, gitRule: false } : r;
   }
   if (/sdd-harness\.js$/i.test(String(n.tokens[1] || '')) && /^deshacer$/i.test(String(n.tokens[2] || '')) && n.tokens.some(t => /^--confirmar$/i.test(t))) {
-    return { decision: 'ask', critical: true, reason: 'vuelve los archivos del proyecto a un punto de restauración (decisión del usuario). Muéstrale antes la vista previa' };
+    return { decision: 'ask', critical: true, reason: `vuelve los archivos del proyecto a un punto de restauración (decisión del usuario). Muéstrale antes la vista previa. ${ANUNCIA}` };
   }
   if (/sdd-harness\.js$/i.test(String(n.tokens[1] || '')) && /^workspace$/i.test(String(n.tokens[2] || '')) && n.tokens.some(t => /^--aplicar$/i.test(t))) {
-    return { decision: 'ask', critical: true, reason: 'cambia la configuración de la herramienta de IA (carpetas con acceso): decisión del usuario' };
+    return { decision: 'ask', critical: true, reason: `cambia la configuración de la herramienta de IA (carpetas con acceso): decisión del usuario. ${ANUNCIA}` };
+  }
+  // Worktrees: «listar» y las vistas previas son lectura; crear, mezclar y quitar tocan ramas y carpetas, así que
+  // valen lo mismo que el git equivalente (que ya es crítico) aunque se pidan por el script propio.
+  if (/sdd-harness\.js$/i.test(String(n.tokens[1] || '')) && /^worktree$/i.test(String(n.tokens[2] || ''))) {
+    const sub = String(n.tokens[3] || '').toLowerCase();
+    const arg = String(n.tokens[4] || '').replace(/^--.*/, '');
+    const confirma = n.tokens.some(t => /^--confirmar$/i.test(t));
+    if (sub === 'nuevo') return { decision: 'ask', critical: true, reason: `crea la rama${arg ? ` «${arg}»` : ''} y una carpeta de trabajo nueva, nacida de la rama base (decisión del usuario). ${ANUNCIA}` };
+    if (sub === 'sincronizar' && confirma) return { decision: 'ask', critical: true, reason: `mezcla la rama base en la rama de este worktree (decisión del usuario). Muéstrale primero la vista previa, que es «sincronizar» sin --confirmar: qué commits entran, qué archivos cambian y dónde habría conflicto. ${ANUNCIA}` };
+    if (sub === 'cerrar' && confirma) return { decision: 'ask', critical: true, reason: `quita la carpeta de trabajo${arg ? ` de «${arg}»` : ''} (decisión del usuario; la rama se conserva). ${ANUNCIA}` };
+    if (confirma) return { decision: 'ask', critical: true, reason: `operación de worktree que modifica el proyecto (decisión del usuario). ${ANUNCIA}` };
   }
   if (approvesGate(n.tokens)) return { decision: 'deny', reason: 'solo el usuario aprueba el plan, autoriza excepciones o acepta el trabajo (en el chat o desde su terminal); el agente no puede hacerlo' };
   const isGit = norm.startsWith('git ');

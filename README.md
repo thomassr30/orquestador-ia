@@ -23,6 +23,7 @@ Se instala **una vez** y queda activo en **todos tus proyectos**.
 - [Instalación](#instalación)
 - [Uso diario](#uso-diario)
 - [Servidores MCP](#servidores-mcp) · [Azure DevOps](#azure-devops) · [Del work item al plan](#del-work-item-al-plan)
+- [Cuánto cuestan las skills](#cuánto-cuestan-las-skills) · [Varias tareas a la vez (worktrees)](#varias-tareas-a-la-vez-worktrees)
 - [Cómo funciona el harness](#cómo-funciona-el-harness)
 - [Verificación de resultados](#verificación-de-resultados)
 - [Trabajo verificable](#trabajo-verificable)
@@ -699,6 +700,57 @@ node bin/sdd-eval.js evals/mis.tareas.json --confirmar --max-tareas=10 --max-cos
 - **Metadatos por corrida** (`<tareas>.resultados.json`, formato v2): versión y hash del dataset, commit del proyecto y si el árbol estaba limpio, versión del harness y hash del `.sdd/harness.json` commiteado, cliente, su versión y modelo, y tokens y costo como «medido» o «no_disponible».
 - **Comparación**: solo con corridas compatibles (mismo dataset, cliente, modelo, modo y configuración). Regresión = tarea aprobada en la línea base compatible que ahora no se aprueba. No se calculan porcentajes de mejora.
 - **Límites actuales**: solo el cliente `claude` está implementado; Codex está pendiente. El modo `flujo` y la lectura del JSON del cliente están probados con un ejecutable falso, no contra Claude Code real.
+
+## Cuánto cuestan las skills
+
+El nombre y la descripción de **cada skill instalada** entran en el contexto de todas tus sesiones. Las 105 suman unos **6.400 tokens**. El contenido completo de una skill (~47.700 tokens entre todas) **no** entra: tu cliente lo lee recién cuando el agente la usa.
+
+Así que lo que baja ese costo fijo es no instalar las de tecnologías que no usas. Se declara en `config/skills.json`:
+
+```json
+{ "excluir": ["tracker-jira", "tracker-linear", "ci-jenkins", "deploy-*"] }
+```
+
+Acepta nombres y patrones con `*` al final, y el archivo trae ejemplos listos para copiar. Por línea de comandos: `--sin-skills=ci-*,tracker-jira` se suma a la lista, y `--skills=sdd-*,stack-angular` instala **solo** esas. Las skills del flujo (`sdd-*` y `tracker-common`) nunca se excluyen: son el orquestador, no una tecnología.
+
+Al instalar verás cuántas quedaron y cuánto cuestan, y `sdd-harness.js doctor` lo repite para lo que tienes puesto:
+
+```
+Skills (77 de 105, ~4675 tokens de descripciones en cada sesión) → ~/.claude/skills
+```
+
+Reinstalar limpia las que quedaron fuera, así que para cambiar la selección basta editar la lista y correr `node install.js` de nuevo.
+
+## Varias tareas a la vez (worktrees)
+
+El problema: tienes dos ventanas de tu herramienta de IA en el mismo proyecto, cada una en algo distinto, y te llega una tarea urgente. Cambiar de rama en la carpeta obliga a revertir o guardar lo que está en curso, y al volver hay que empezar de nuevo.
+
+La solución de git es un **worktree**: una carpeta más del mismo repositorio, con su propia rama, que comparte el historial. Lo que commiteas en una existe al instante para las demás, sin copiar archivos entre carpetas.
+
+```bash
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" worktree listar                     # qué worktrees hay y cómo están
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" worktree nuevo fix/urgente          # carpeta hermana con esa rama
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" worktree sincronizar                # qué entraría de la base y qué choca
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" worktree sincronizar --confirmar     # lo mezcla
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" worktree cerrar fix/urgente --confirmar
+```
+
+- **`nuevo <rama>`** crea `../<proyecto>-<rama>` con la rama nacida de la base **actualizada** (`develop`, o `main`/`master` si no hay; `--desde <rama>` para otra, `--ruta` para elegir la carpeta). No toca lo que tengas en curso en la carpeta actual. Abre tu herramienta de IA en la carpeta nueva y listo.
+- **`sincronizar`** trae la base y, sin `--confirmar`, **solo muestra**: qué commits entran, qué archivos cambian y en cuáles habría conflicto. Si tienes cambios sin commitear se niega y te dice cuáles: traer cambios encima es la forma típica de perder trabajo.
+- **`cerrar`** avisa primero si el worktree tiene cambios sin commitear o commits sin subir, y con `--confirmar` no lo quita mientras los tenga. La rama sigue existiendo: solo se va la carpeta.
+
+El flujo de entrega: cada rama nace de la base; cuando la primera entra a la base, en la otra carpeta corres `sincronizar` y resuelves ahí los conflictos. Así nunca llegas a `develop` con cambios desfasados, y si algo choca, choca en tu rama.
+
+Dos cosas a tener en cuenta:
+
+- **El estado del harness ya queda separado por worktree**, porque se guarda según la ruta del proyecto: cada carpeta tiene su propio GATE, sus sensores y sus puntos de restauración.
+- **La memoria (`.sdd/memoria`) vive dentro del repositorio**, así que la carpeta nueva nace con la de la rama base y cada rama tendrá su versión hasta el merge. `sesion.md` es volátil y conviene ignorarlo en git para que no choque; `worktree nuevo` te lo avisa si está versionado.
+
+**La IA te lo propone, no lo hace por su cuenta.** Crear, mezclar y quitar piden tu confirmación cuando los pide la IA, igual que el `git` equivalente, y el harness le exige anunciarlo antes en una o dos líneas: qué va a hacer y por qué ahora. Algo así:
+
+> Voy a crear el worktree `fix/login-500` en `../api-fix-login-500`, desde `develop`, para atender esto sin tocar lo que tienes a medias en `feature/reportes`. ¿Lo hago?
+
+Lo mismo vale para `deshacer --confirmar` y `workspace --aplicar`: el harness no acepta un permiso a secas, sin decirte de qué se trata. `listar` y las vistas previas no molestan, así que la IA puede mirar antes de proponerte algo.
 
 ## Memoria del proyecto
 

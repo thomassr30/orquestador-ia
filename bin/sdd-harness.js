@@ -7,6 +7,8 @@
 //   node sdd-harness.js sensores [ruta]   ejecuta ahora los sensores sobre lo modificado (git status)
 //   node sdd-harness.js registro [n]      últimas decisiones del harness en este proyecto
 //   node sdd-harness.js trabajo preguntas  dudas abiertas, listas para que TÚ las publiques (el harness no escribe en el gestor)
+//   node sdd-harness.js worktree listar | nuevo <rama> [--desde develop] [--ruta …] | sincronizar [--confirmar] | cerrar <rama|ruta> [--confirmar]
+//                                          una carpeta por tarea, cada una con su rama: varias ventanas sin pisarse
 //   node sdd-harness.js aprobar  [ruta]   (tú, desde tu terminal) aprueba el plan pendiente de la última sesión
 //   node sdd-harness.js consumo  [ruta]   en qué se fueron los tokens de la última sesión (Claude Code)
 //   node sdd-harness.js reglas   [ruta]   revisa TODO el proyecto contra las reglas propias (harness.json → reglas)
@@ -33,7 +35,7 @@ const { HOME, SDD_HOME, fwd } = require(path.join(SRC, 'paths'));
 const argv = process.argv.slice(2);
 // Opciones con valor: --motivo "x", --json '{…}', --archivo ruta, --responsable nombre (también --opcion=valor)
 // --json lleva valor solo en «trabajo plan --json '{…}'»; en doctor es una bandera (salida para máquinas)
-const VALUED = ['--motivo', '--archivo', '--responsable', '--explicar', '--sesion', '--para', '--donde', '--tarea', '--respuesta', ...(argv[0] === 'trabajo' ? ['--json'] : [])];
+const VALUED = ['--motivo', '--archivo', '--responsable', '--explicar', '--sesion', '--para', '--donde', '--tarea', '--respuesta', '--desde', '--ruta', ...(argv[0] === 'trabajo' ? ['--json'] : [])];
 const opt = name => { const i = argv.indexOf(name); if (i >= 0) return argv[i + 1]; const eq = argv.find(a => a.startsWith(`${name}=`)); return eq ? eq.slice(name.length + 1) : undefined; };
 const motivo = opt('--motivo') || '';
 const positional = argv.filter((a, i) => !a.startsWith('--') && !VALUED.includes(argv[i - 1]));
@@ -298,6 +300,14 @@ function doctor() {
   console.log(`Presupuesto: modo ${(cfg.presupuesto || {}).modo || 'normal'} · ${limitFor(cfg) ? `máx. ${limitFor(cfg)} sub-agentes por mensaje` : 'sin tope de sub-agentes'} · salidas largas ${cfg.salida && cfg.salida.compactar ? 'compactadas' : 'completas'}`);
   const projCfg = path.join(root, '.sdd', 'harness.json');
   console.log(`Config. del proyecto: ${fs.existsSync(projCfg) ? fwd(projCfg) : 'no hay (.sdd/harness.json)'}`);
+  // Nombre y descripción de cada skill instalada entran en el contexto de todas las sesiones
+  const skillsDir = path.join(HOME, '.claude', 'skills');
+  try {
+    const ns = fs.readdirSync(skillsDir).filter(n => fs.existsSync(path.join(skillsDir, n, 'SKILL.md')));
+    let chars = 0;
+    for (const n of ns) { const t = fs.readFileSync(path.join(skillsDir, n, 'SKILL.md'), 'utf8'); const m = /^description:\s*(.*)$/m.exec(t); chars += n.length + ((m && m[1]) || '').length + 2; }
+    console.log(`Skills instaladas: ${ns.length} · ~${Math.round(chars / 4)} tokens de descripciones en cada sesión (el contenido solo se lee al usarlas). Para no instalar las que no usas: config/skills.json → excluir`);
+  } catch { /* sin skills instaladas acá */ }
   console.log(`Sesiones del harness: ${sesiones.length}${danadas.length ? ` · ✗ con estado dañado: ${danadas.join(', ')}` : ''}${recuperadas.length ? ` · recuperadas en modo restrictivo: ${recuperadas.map(x => `${x.sesion} (${CAP.fecha(x.en)}: ${x.motivo})`).join(', ')}` : ''}`);
   console.log(`Línea base de errores: ${lb.lb ? `commit ${lb.lb.commit.slice(0, 8)} (${String(lb.lb.en).slice(0, 10)})` : lb.motivo}`);
   const ctx = require(path.join(SRC, 'memory')).contextStats(root);
@@ -342,6 +352,59 @@ async function lineaBase() {
   if (!r.ok) { console.log(`No se pudo tomar la línea base: ${r.motivo}`); process.exitCode = 1; return; }
   const entries = Object.entries(r.data.controles);
   console.log(`Línea base del commit ${r.data.commit.slice(0, 8)}: ${entries.length ? entries.map(([k, v]) => `${k} ${v.lineas.length ? `${v.lineas.length} error(es) conocidos` : 'sin errores'}`).join(' · ') : 'no hay chequeos de proyecto completo que registrar'}. Vale mientras no cambie el commit.`);
+}
+
+/**
+ * Worktrees: una carpeta por tarea, cada una con su rama, compartiendo el historial. «listar» y las vistas previas
+ * son de lectura; crear, mezclar y quitar piden confirmación (y la política se la pide al agente).
+ */
+function worktree() {
+  const W = require(path.join(SRC, 'worktree'));
+  const sub = positional[1] || 'listar';
+  const fw2 = p => String(p).replace(/\\/g, '/');
+  try {
+    if (sub === 'listar') {
+      const ws = W.list(root);
+      for (const w of ws) {
+        const estado = [!w.existe ? 'la carpeta no existe' : null, w.sucio.length ? `${w.sucio.length} sin commitear` : null, w.sinSubir.length ? `${w.sinSubir.length === 1 && w.sinSubir[0].startsWith('(') ? w.sinSubir[0] : `${w.sinSubir.length} commit(s) sin subir`}` : null].filter(Boolean);
+        console.log(`${w.principal ? '▸' : '•'} ${w.rama || '(sin rama)'}${w.principal ? ' (principal)' : ''} → ${fw2(w.dir)}${estado.length ? ` · ${estado.join(' · ')}` : ' · limpio'}`);
+      }
+      if (ws.length === 1) console.log('\nSolo el principal. Crea uno por tarea: sdd-harness.js worktree nuevo <rama>');
+      return;
+    }
+    if (sub === 'nuevo') {
+      const r = W.create(root, positional[2], { desde: opt('--desde'), ruta: opt('--ruta') });
+      console.log(`Listo: rama «${r.rama}» desde ${r.remoto ? `origin/${r.base}` : r.base} en ${fw2(r.dir)}`);
+      if (r.aviso) console.log(`Aviso: ${r.aviso}.`);
+      console.log(`Abre tu herramienta de IA en esa carpeta. Lo que tengas en curso acá no se toca, y lo que commitees allá existe al instante para este repositorio.`);
+      if (r.memoria) console.log('Ojo: .sdd/memoria/sesion.md está versionado, así que la carpeta nueva nace con la memoria de la rama base y al mezclar puede chocar. Conviene ignorarlo en git (es volátil).');
+      return;
+    }
+    if (sub === 'sincronizar') {
+      const r = W.sync(root, { desde: opt('--desde'), confirmar: flags.has('--confirmar') });
+      if (r.bloqueado) { console.log(`No se hizo nada: ${r.bloqueado}`); process.exitCode = 1; return; }
+      if (r.aviso) console.log(`Aviso: ${r.aviso}.`);
+      if (r.nada) { console.log(`«${r.rama}» ya está al día con ${r.ref}.`); return; }
+      console.log(`Rama: ${r.rama} · base: ${r.ref}`);
+      console.log(`Entran ${r.entran.length} commit(s):\n${r.entran.slice(0, 15).map(c => `  ${c}`).join('\n')}${r.entran.length > 15 ? `\n  … y ${r.entran.length - 15} más` : ''}`);
+      if (r.archivos.length) console.log(`Archivos que cambian: ${r.archivos.slice(0, 20).join(', ')}${r.archivos.length > 20 ? ` (+${r.archivos.length - 20})` : ''}`);
+      if (r.conflictos === null) console.log('Conflictos: no se pudo prever (tu git no tiene «merge-tree --write-tree»; actualiza a 2.38 o más).');
+      else console.log(r.conflictos.length ? `Conflictos previstos en: ${r.conflictos.join(', ')}` : 'Sin conflictos previstos.');
+      if (r.mezclado) console.log(`\nMezclado. Tus ${r.tuyos.length} commit(s) siguen arriba; revisa y sube cuando esté listo.`);
+      else if (!flags.has('--confirmar')) console.log('\nNada se mezcló todavía. Para hacerlo: worktree sincronizar --confirmar');
+      return;
+    }
+    if (sub === 'cerrar') {
+      const r = W.close(root, positional[2], { confirmar: flags.has('--confirmar') });
+      if (r.bloqueado) { console.log(`No se quitó: ${r.bloqueado}`); process.exitCode = 1; return; }
+      if (r.quitado) { console.log(`Quitado ${fw2(r.worktree.dir)} (la rama «${r.worktree.rama}» sigue existiendo).`); return; }
+      console.log(`Se quitaría ${fw2(r.worktree.dir)} (rama «${r.worktree.rama}»).${r.riesgos.length ? ` ⚠ ${r.riesgos.join(' y ')}.` : ''}`);
+      console.log(r.riesgos.length ? 'Resuélvelo antes: con cambios sin commitear o sin subir no se quita.' : 'Para quitarlo: worktree cerrar --confirmar');
+      return;
+    }
+    console.log('Uso: worktree listar | nuevo <rama> [--desde <rama base>] [--ruta <carpeta>] | sincronizar [--desde <rama base>] [--confirmar] | cerrar <rama|ruta> [--confirmar]');
+    process.exitCode = 2;
+  } catch (e) { console.log(`No se pudo: ${e.message}`); process.exitCode = 1; }
 }
 
 /** Modelo de trabajo verificable (ver harness/src/trabajo.js). aceptar y descartar los ejecuta solo el usuario. */
@@ -611,6 +674,6 @@ function reglas() {
   process.exitCode = hits.length ? 1 : 0;
 }
 
-const cmds = { estado, doctor, sensores, registro, eventos, aprobar, consumo, reglas, puntos, deshacer, workspace, excepcion, 'excepción': excepcion, 'linea-base': lineaBase, trabajo, hooks: () => { const rows = clientes(); imprimirClientes(rows); if (rows.some(r => r.falla)) process.exitCode = 1; } };
+const cmds = { estado, doctor, sensores, registro, eventos, aprobar, consumo, reglas, puntos, deshacer, workspace, worktree, excepcion, 'excepción': excepcion, 'linea-base': lineaBase, trabajo, hooks: () => { const rows = clientes(); imprimirClientes(rows); if (rows.some(r => r.falla)) process.exitCode = 1; } };
 if (!cmds[cmd]) { console.error('Comandos: estado | doctor | hooks | sensores | linea-base | trabajo | registro | eventos | consumo | reglas | workspace | puntos | deshacer | aprobar | excepcion'); process.exit(1); }
 Promise.resolve(cmds[cmd]()).catch(e => { console.error(e.message); process.exit(1); });

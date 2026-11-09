@@ -13,6 +13,8 @@
  *   node install.js --mcp=figma          registra también servidores MCP apagados en config/mcp.json (enabled:false)
  *   node install.js --mcp=azure-devops --org=<organización>   servidor remoto por organización (dev.azure.com/<organización>)
  *   node install.js --mcp=azure-devops --org=<org> --proyecto  registra el MCP SOLO en el proyecto actual (dos repos, dos organizaciones)
+ *   node install.js --skills=sdd-*,stack-angular    instala SOLO esas skills (patrones con * al final)
+ *   node install.js --sin-skills=ci-*,tracker-jira  no instala esas (se suma a config/skills.json → excluir)
  *   node install.js --no-deps            no instala pdfjs-dist / mammoth
  *   node install.js --auto-edits         Claude Code acepta ediciones de archivos sin preguntar (modo acceptEdits)
  *   node install.js --no-permissions     no agrega permisos preaprobados en Claude Code (git/gh siempre piden aprobación)
@@ -572,6 +574,37 @@ function installProjectMcp() {
   if (notes.length) { log('\nNotas:'); notes.forEach(n => log(`- ${n}`)); }
 }
 
+// Las skills del flujo nunca se excluyen: no son una tecnología que se pueda no usar.
+const SKILLS_FIJAS = /^(sdd-|tracker-common$)/;
+const matchSkill = (name, pat) => (pat.endsWith('*') ? name.startsWith(pat.slice(0, -1)) : name === pat);
+
+/**
+ * Qué skills instalar. El nombre y la descripción de cada una entran en el contexto de TODAS las sesiones, así que
+ * no instalar las de tecnologías que no se usan es lo que baja ese costo fijo. El contenido completo no entra:
+ * el cliente lo lee recién cuando el agente usa la skill.
+ */
+function selectSkills(todas) {
+  let cfg = {};
+  try { cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'config', 'skills.json'), 'utf8')); } catch { cfg = {}; }
+  const lista = n => (val(n) || '').split(',').map(x => x.trim()).filter(Boolean);
+  const solo = lista('skills');
+  const excluir = [...(Array.isArray(cfg.excluir) ? cfg.excluir : []), ...lista('sin-skills')].filter(x => typeof x === 'string' && !x.startsWith('_'));
+  const instalar = todas.filter(n => SKILLS_FIJAS.test(n)
+    || ((!solo.length || solo.some(p => matchSkill(n, p))) && !excluir.some(p => matchSkill(n, p))));
+  const desconocidos = [...solo, ...excluir].filter(p => !todas.some(n => matchSkill(n, p)));
+  if (desconocidos.length) warn(`skills que no existen: ${desconocidos.join(', ')} (revisa config/skills.json o --skills/--sin-skills)`);
+  return { instalar, fuera: todas.filter(n => !instalar.includes(n)) };
+}
+
+/** Costo aproximado en tokens de las descripciones que entran en cada sesión (4 caracteres por token). */
+function costoSkills(nombres) {
+  let chars = 0;
+  for (const n of nombres) {
+    try { const t = fs.readFileSync(path.join(CORE, 'skills', n, 'SKILL.md'), 'utf8'); const m = /^description:\s*(.*)$/m.exec(t); chars += n.length + ((m && m[1]) || '').length + 2; } catch { /* sin SKILL.md */ }
+  }
+  return Math.round(chars / 4);
+}
+
 function install() {
   const targets = selectTargets();
   if (!targets.length) {
@@ -610,10 +643,12 @@ function install() {
   }
 
   // 2. skills (un directorio por destino distinto)
-  const skillNames = fs.readdirSync(path.join(CORE, 'skills')).filter(n => fs.existsSync(path.join(CORE, 'skills', n, 'SKILL.md')));
+  const todas = fs.readdirSync(path.join(CORE, 'skills')).filter(n => fs.existsSync(path.join(CORE, 'skills', n, 'SKILL.md')));
+  const { instalar: skillNames, fuera } = selectSkills(todas);
   const skillDirs = [...new Set(targets.map(k => TARGETS[k].skills))];
+  if (fuera.length) log(`• Skills excluidas (${fuera.length}): ${fuera.join(", ")}`);
   for (const dir of skillDirs) {
-    log(`• Skills (${skillNames.length}) → ${dir}`);
+    log(`• Skills (${skillNames.length} de ${todas.length}, ~${costoSkills(skillNames)} tokens de descripciones en cada sesión) → ${dir}`);
     for (const n of skillNames) {
       const dst = path.join(dir, n);
       if (foreign(dst)) { warn(`ya existe una skill "${n}" que no es del orquestador; se omite (usa --force)`); continue; }

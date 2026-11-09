@@ -93,3 +93,37 @@ test('desinstalar quita solo lo del orquestador y conserva la configuración del
   assert.ok(!fs.existsSync(path.join(HOME, '.codex/rules/sdd-orquestador.rules')));
   assert.strictEqual(fs.readFileSync(path.join(HOME, '.sdd-orquestador/harness.json'), 'utf8'), '{"gate":"siempre"}');
 });
+
+test('skills: se instalan solo las que se usan, y el flujo nunca se excluye', () => {
+  const H2 = tmp('sdd-skills-');
+  const env2 = { ...env, HOME: H2, USERPROFILE: H2, APPDATA: path.join(H2, 'AppData', 'Roaming') };
+  const run = (...args) => spawnSync(process.execPath, [path.join(REPO, 'install.js'), '--targets=claude', '--no-mcp', '--no-deps', ...args], { env: env2, encoding: 'utf8' });
+  const puestas = () => fs.readdirSync(path.join(H2, '.claude', 'skills')).filter(n => fs.existsSync(path.join(H2, '.claude', 'skills', n, 'SKILL.md')));
+
+  assert.strictEqual(run().status, 0);
+  const todas = puestas();
+  assert.ok(todas.length > 90, `se instalaron ${todas.length}`);
+
+  // Excluir por nombre y por patrón, y la reinstalación limpia las que ya no van
+  assert.strictEqual(run('--sin-skills=tracker-jira,deploy-*').status, 0);
+  const menos = puestas();
+  assert.ok(!menos.includes('tracker-jira'));
+  assert.ok(!menos.some(n => n.startsWith('deploy-')), menos.filter(n => n.startsWith('deploy-')).join(','));
+  assert.ok(menos.length < todas.length);
+  assert.ok(menos.includes('stack-angular'), 'lo no excluido sigue');
+
+  // El flujo del orquestador no se puede dejar fuera ni pidiéndolo
+  assert.strictEqual(run('--skills=stack-angular', '--sin-skills=sdd-*,tracker-common').status, 0);
+  const solo = puestas();
+  assert.ok(solo.includes('sdd-apply') && solo.includes('tracker-common'), 'sdd-* y tracker-common son fijas');
+  assert.ok(solo.includes('stack-angular'));
+  assert.ok(!solo.includes('stack-go'), '--skills instala solo lo pedido (más las fijas)');
+
+  // Un nombre inexistente avisa y no rompe la instalación
+  const r = run('--sin-skills=no-existe-esta-skill');
+  assert.strictEqual(r.status, 0);
+  assert.match(r.stdout + r.stderr, /skills que no existen: no-existe-esta-skill/);
+
+  // Y el instalador informa el costo fijo que tienen las descripciones en cada sesión
+  assert.match(run().stdout, /Skills \(\d+ de \d+, ~\d+ tokens de descripciones en cada sesión\)/);
+});
