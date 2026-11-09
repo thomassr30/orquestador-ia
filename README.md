@@ -22,7 +22,7 @@ Se instala **una vez** y queda activo en **todos tus proyectos**.
 - [Herramientas compatibles](#herramientas-compatibles)
 - [Instalación](#instalación)
 - [Uso diario](#uso-diario)
-- [Servidores MCP](#servidores-mcp)
+- [Servidores MCP](#servidores-mcp) · [Azure DevOps](#azure-devops) · [Del work item al plan](#del-work-item-al-plan)
 - [Cómo funciona el harness](#cómo-funciona-el-harness)
 - [Verificación de resultados](#verificación-de-resultados)
 - [Trabajo verificable](#trabajo-verificable)
@@ -292,6 +292,7 @@ Los servidores MCP dan a la IA herramientas externas: navegador, documentación,
 | `chrome-devtools` | Consola, red, rendimiento y Lighthouse | local (`npx`) | activo |
 | `context7` | Documentación actualizada de librerías y frameworks | local (`npx`) | activo |
 | `figma` | Leer los diseños de Figma que debes implementar | remoto (`https://mcp.figma.com/mcp`) | apagado |
+| `azure-devops` | Leer work items (HU, PBI, task), wikis, backlog y WIQL de Azure DevOps | remoto, uno por organización | apagado |
 
 `node install.js --no-mcp` no registra ninguno. Desinstalar el orquestador no los quita (pueden usarlos otras herramientas).
 
@@ -324,6 +325,49 @@ La conexión es a tu **cuenta**, no a un proyecto: ve los archivos a los que tu 
 | Full (plan de pago) | sí | sí, con confirmación de cada acción | uso diario |
 
 **Alternativa con la app de escritorio**: en Figma de escritorio, Dev Mode → *Enable desktop MCP server*, y agrega a `config/mcp.json` un servidor `{ "enabled": true, "url": "http://127.0.0.1:3845/mcp" }` con otro nombre (por ejemplo `figma-desktop`). Trabaja sobre lo seleccionado en la app; requiere asiento Dev o Full.
+
+### Azure DevOps
+
+Sirve para que el orquestador lea tus HU, PBI, task y wikis, y arme el plan de desarrollo a partir de eso (ver [Del work item al plan](#del-work-item-al-plan)).
+
+La URL del servidor incluye tu organización, la de `dev.azure.com/<organización>`, así que hay que indicarla:
+
+```bash
+node install.js --mcp=azure-devops --org=siigsa
+```
+
+Después inicia sesión una vez en cada herramienta (en Claude Code: `/mcp` → `azure-devops-siigsa` → Authenticate). Sin `--org` el instalador avisa y no lo registra, porque no puede armar la URL.
+
+**El nombre del servidor lleva la organización** (`azure-devops-siigsa`). Eso no es un detalle: dos organizaciones son dos cuentas distintas, y si los dos servidores se llamaran igual, el inicio de sesión de una pisaría el de la otra.
+
+#### Varios proyectos en organizaciones distintas
+
+Es el caso normal cuando trabajas para más de un cliente: un repositorio cuyos work items están en la organización de tu empresa y otro en la del cliente. Registra el servidor **dentro de cada repositorio** con `--proyecto`:
+
+```bash
+cd C:/dev/proyecto-a && node install.js --mcp=azure-devops --org=miempresa --proyecto
+cd C:/dev/proyecto-b && node install.js --mcp=azure-devops --org=cliente   --proyecto
+```
+
+Así cada ventana de tu herramienta de IA ve **solo** la organización de su repositorio. No tienes que aclararle de cuál leer: le dices «lee el PBI 4521» y esa ventana solo puede buscarlo donde corresponde. Y el contexto de cada sesión no carga las herramientas de las demás organizaciones.
+
+Detalles del modo `--proyecto`:
+
+- Registra **solo** lo que pides con `--mcp`. Los servidores de siempre (`playwright`, `context7`, `chrome-devtools`) ya están a nivel de usuario y duplicarlos en el repositorio solo sumaría herramientas al contexto.
+- Escribe en el archivo de MCP **por proyecto** de cada herramienta: `.mcp.json` en Claude Code (el que se usa por defecto), y con `--targets=cursor,copilot,opencode,gemini` en las demás. Codex no admite MCP por proyecto: solo globales.
+- Ese archivo queda **dentro del repositorio**, así que si haces commit lo comparten tus compañeros. Si no quieres eso, agrégalo al `.gitignore`.
+- Anota la organización en la memoria del proyecto (`.sdd/memoria`), que es lo que pide la skill `tracker-azure-boards`, junto con el proyecto, el equipo, el area path y el proceso (Agile, Scrum o CMMI), porque de eso dependen los estados válidos de un work item.
+
+#### Qué puede y qué no puede hacer en Azure
+
+| Acción | Qué pasa |
+|---|---|
+| Leer work items, wiki, backlog, WIQL, pipelines, planes de prueba | pasa libre |
+| Comentar un work item, cambiar su estado, vincularlo | **pide tu confirmación** |
+| Editar una página de wiki, crear un plan de prueba, lanzar un pipeline | **pide tu confirmación** |
+| Crear o actualizar un pull request, crear una rama | **bloqueado** (es código: se propone como texto) |
+
+El harness reconoce la escritura también cuando viene en el argumento `action` de una herramienta agrupada: `wit_backlog` es lectura con `list` y escritura con `reorder`, con el mismo nombre.
 
 ### Agregar o quitar un servidor
 
@@ -364,6 +408,20 @@ Tu herramienta ejecuta los hooks en momentos fijos, y cada uno responde permitir
 - **Angular**: `ng build --configuration development` (también revisa las plantillas) y Karma en modo headless.
 - **Go**: `go vet`, `go test` de los paquetes tocados y `golangci-lint` si está configurado.
 - **Android, iOS, SCSS y otros**: plantillas listas en `~/.sdd-orquestador/harness.json` → `sensores._ejemplos`.
+
+**Qué runner de tests usa.** Lo decide el script `test` de tu `package.json`, y siempre lo corre en una sola pasada: el modo observación no termina solo y el harness lo cortaría por tiempo.
+
+| Tu script `test` | Qué corre | Sobre qué |
+|---|---|---|
+| `ng test` (con la CLI instalada) | `ng test --watch=false --browsers=ChromeHeadless` | la suite completa |
+| `karma start` (con o sin Angular) | `karma start --single-run --browsers=ChromeHeadless` | la suite completa |
+| `vitest` | `vitest related --run` | solo lo relacionado con lo cambiado |
+| `jest`, también con `--watch` | `jest --ci --findRelatedTests` | solo lo relacionado con lo cambiado |
+| `mocha` o `jasmine` | el runner sin modo observación | la suite completa |
+| otro script propio | `npm test` | la suite completa |
+| `nodemon`, o `ng test` sin la CLI | nada: queda **sin verificar** | — |
+
+Cuando corre la suite completa, un test que ya fallaba antes de tu cambio **no se te atribuye**: el resultado queda «no verificado» y te pide tomar la línea base (`sdd-harness linea-base`) sobre el último commit. `sdd-harness doctor` y `sdd-harness sensores` te muestran qué runner detectó en cada proyecto. Si prefieres fijarlo a mano, `sensores.comandos.tests` en `.sdd/harness.json` manda sobre la detección.
 
 **Deshacer lo que hizo la IA.** Antes de la primera modificación de cada turno, el harness guarda una copia del proyecto en un almacén interno (`~/.sdd-orquestador/puntos`). El `.git` del proyecto no se toca ni se crean commits, y no se copian secretos ni lo ignorado por `.gitignore`.
 
@@ -440,7 +498,36 @@ node "$HOME/.sdd-orquestador/bin/sdd-harness.js" trabajo aceptar --motivo "…" 
 node "$HOME/.sdd-orquestador/bin/sdd-harness.js" trabajo descartar             # (solo tú) descarta el trabajo
 ```
 
-El agente usa además `trabajo plan | iniciar | bloquear | verificar | decision | cerrar` (`cerrar` solo cierra un trabajo aceptado). La carpeta `changes/` y `sdd-state.js` ya no guardan el estado del trabajo: `sdd-state.js` sigue por compatibilidad y avisa que está obsoleto.
+### Preguntas abiertas
+
+Cuando el agente topa con una duda que no puede resolver (una regla de negocio que nadie definió, un estado que aparece en la wiki pero no en la HU, un campo que cambió de nombre), no la responde suponiendo ni la deja solo en el chat, donde se perdería al compactar la conversación. La registra en el trabajo:
+
+```bash
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" trabajo preguntas   # las abiertas, listas para copiar
+```
+
+- Cada pregunta lleva **a quién va dirigida** y **dónde se publica** (un work item, una página). `trabajo preguntas` te las muestra con esos dos datos para que **tú** las publiques y etiquetes a quien corresponda: el harness no escribe en el gestor.
+- Si la pregunta bloquea una tarea, esa tarea queda **bloqueada** con su motivo y el resto del trabajo sigue avanzando.
+- Una pregunta abierta impide el «técnicamente completo» y aparece en lo que falta: «terminé» no pasa con dudas sin resolver.
+- Las preguntas abiertas y las últimas respondidas **se reinyectan tras compactar**, así que no hay que volver a plantearlas.
+- Cuando llega la respuesta: `trabajo responder <id> --respuesta "…"`. El agente te informa qué cambió y retoma las tareas que la esperaban.
+
+El agente usa además `trabajo plan | iniciar | bloquear | verificar | decision | preguntar | responder | descartar-pregunta | cerrar` (`cerrar` solo cierra un trabajo aceptado). La carpeta `changes/` y `sdd-state.js` ya no guardan el estado del trabajo: `sdd-state.js` sigue por compatibilidad y avisa que está obsoleto.
+
+## Del work item al plan
+
+Si tu trabajo llega como una HU, un PBI, una task o una página de wiki, dale la clave o el enlace y el orquestador hace esto (skill `sdd-ticket`):
+
+1. **Lee todo el contexto**, no solo la descripción: el work item con su padre y sus hijos, los comentarios (donde suele estar lo que se acordó después de escribirlo), los adjuntos y los enlaces a la wiki y a Figma. Si el punto de partida es una wiki, parte de ahí y busca el work item vinculado.
+2. **Lo cruza con tu proyecto**: qué de lo pedido ya existe, qué hay que construir y dónde va según tu arquitectura y tus reglas, con archivos y capas concretas.
+3. **Separa lo claro de lo dudoso**, y las dudas van a dos lugares distintos:
+   - **Técnicas** (dónde crear el módulo, qué patrón seguir): te las pregunta en el chat, una a la vez.
+   - **De negocio o de alcance** (un estado que está en la wiki pero no en la HU, un campo que cambió de nombre, una regla que nadie definió): las registra como [preguntas abiertas](#preguntas-abiertas) y te las entrega listas, con dónde van y a quién etiquetar. **Las publicas tú**: el harness no escribe en Azure.
+4. **Registra el plan** y te lo presenta con sus tres partes: lo que está claro y se va a hacer, lo que queda bloqueado esperando respuesta, y lo que queda fuera del alcance.
+5. **Desarrolla solo con tu aprobación**, y solo lo que no depende de una pregunta abierta. No hay desarrollo automático.
+6. **Cuando llega una respuesta**, te informa qué cambió y qué tareas quedan listas. Si la respuesta cambia el alcance, el plan nuevo queda como propuesta hasta que lo apruebes otra vez.
+
+Para que el agente sepa a quién etiquetar y qué estados son válidos, registra una vez en la memoria del proyecto la organización, el proyecto, el equipo, el area path y el proceso (Agile, Scrum o CMMI tienen estados distintos). Lo pide la skill `tracker-azure-boards`.
 
 ## Aprobaciones en el chat
 
@@ -620,11 +707,19 @@ Cada proyecto guarda su memoria en `.sdd/memoria/`. Conviene versionarla para co
 | Archivo | Se lee | Contiene |
 |---|---|---|
 | `MEMORIA.md` | Siempre (lo carga el harness) | Índice: qué es, stack, módulos, convenciones, comandos, temas |
-| `sesion.md` | Al iniciar y tras compactar | Trabajo en curso y bloque automático del harness (plan, archivos, sensores) |
+| `sesion.md` | Al iniciar y tras compactar | **Solo lo actual**: objetivo en curso, decisiones vigentes, próximo paso, y el bloque automático del harness (plan, archivos, sensores) |
 | `temas/*.md` | Solo si el índice dice que aplica | Conocimiento por área |
 | `decisiones.md` | Al diseñar | Decisiones con motivo y estado |
 | `pendientes.md` | Al planificar | Deuda técnica, riesgos, preguntas abiertas |
 | `historial.md` | Rara vez | Una línea por cambio cerrado |
+
+**El contexto tiene un tope** (unos 9.000 caracteres) y antes se recortaba en silencio: la IA recibía memoria incompleta sin saberlo y se ponía a releer el proyecto, que cuesta el doble de tokens. Ahora `sdd-harness doctor` te dice cuántos caracteres se reinyectan sobre el tope y avisa cuando `MEMORIA.md` o `sesion.md` superan las líneas que se leen:
+
+```
+Contexto que se reinyecta: 9178 de 9000 caracteres · ⚠ RECORTADO: el agente no recibe todo
+```
+
+Si lo ves, lo primero que hay que acortar es `sesion.md`: mueve la bitácora de los trabajos terminados a `temas/sesiones-anteriores.md`, que no se inyecta. Y si la memoria no se puede leer por algún error, la IA recibe la instrucción de abrir `MEMORIA.md` y `sesion.md` en vez de reconstruir el contexto explorando todo el proyecto.
 
 - **Sin pérdida al compactar**: el harness recarga la memoria, y el bloque automático de `sesion.md` conserva el estado aunque el modelo olvide actualizarlo.
 - **Por proyecto**: el harness carga la memoria del proyecto en el que trabajas (y, en un espacio con varios proyectos, la de cada uno cuando corresponde). Que la IA no traspase información de un proyecto a otro es una regla de sus instrucciones. Por código, escribir fuera del proyecto pide confirmación, pero las carpetas de un mismo espacio de trabajo cuentan como parte del proyecto.

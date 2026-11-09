@@ -6,6 +6,7 @@
 //                                          capacidades y límites, estado del harness y sensores detectados
 //   node sdd-harness.js sensores [ruta]   ejecuta ahora los sensores sobre lo modificado (git status)
 //   node sdd-harness.js registro [n]      últimas decisiones del harness en este proyecto
+//   node sdd-harness.js trabajo preguntas  dudas abiertas, listas para que TÚ las publiques (el harness no escribe en el gestor)
 //   node sdd-harness.js aprobar  [ruta]   (tú, desde tu terminal) aprueba el plan pendiente de la última sesión
 //   node sdd-harness.js consumo  [ruta]   en qué se fueron los tokens de la última sesión (Claude Code)
 //   node sdd-harness.js reglas   [ruta]   revisa TODO el proyecto contra las reglas propias (harness.json → reglas)
@@ -32,7 +33,7 @@ const { HOME, SDD_HOME, fwd } = require(path.join(SRC, 'paths'));
 const argv = process.argv.slice(2);
 // Opciones con valor: --motivo "x", --json '{…}', --archivo ruta, --responsable nombre (también --opcion=valor)
 // --json lleva valor solo en «trabajo plan --json '{…}'»; en doctor es una bandera (salida para máquinas)
-const VALUED = ['--motivo', '--archivo', '--responsable', '--explicar', '--sesion', ...(argv[0] === 'trabajo' ? ['--json'] : [])];
+const VALUED = ['--motivo', '--archivo', '--responsable', '--explicar', '--sesion', '--para', '--donde', '--tarea', '--respuesta', ...(argv[0] === 'trabajo' ? ['--json'] : [])];
 const opt = name => { const i = argv.indexOf(name); if (i >= 0) return argv[i + 1]; const eq = argv.find(a => a.startsWith(`${name}=`)); return eq ? eq.slice(name.length + 1) : undefined; };
 const motivo = opt('--motivo') || '';
 const positional = argv.filter((a, i) => !a.startsWith('--') && !VALUED.includes(argv[i - 1]));
@@ -299,6 +300,9 @@ function doctor() {
   console.log(`Config. del proyecto: ${fs.existsSync(projCfg) ? fwd(projCfg) : 'no hay (.sdd/harness.json)'}`);
   console.log(`Sesiones del harness: ${sesiones.length}${danadas.length ? ` · ✗ con estado dañado: ${danadas.join(', ')}` : ''}${recuperadas.length ? ` · recuperadas en modo restrictivo: ${recuperadas.map(x => `${x.sesion} (${CAP.fecha(x.en)}: ${x.motivo})`).join(', ')}` : ''}`);
   console.log(`Línea base de errores: ${lb.lb ? `commit ${lb.lb.commit.slice(0, 8)} (${String(lb.lb.en).slice(0, 10)})` : lb.motivo}`);
+  const ctx = require(path.join(SRC, 'memory')).contextStats(root);
+  const largos = (ctx.archivos || []).filter(x => x.recortado);
+  console.log(`Contexto que se reinyecta: ${ctx.error ? `✗ no se puede leer (${ctx.error})` : `${ctx.chars} de ${ctx.max} caracteres${ctx.recortado ? ' · ⚠ RECORTADO: el agente no recibe todo' : ''}`}${largos.length ? ` · ⚠ ${largos.map(x => `${x.nombre} tiene ${x.lineas} líneas y solo se leen ${x.max}`).join('; ')} (mueve lo terminado a historial.md)` : ''}`);
   console.log(`\nSensores ${files.length ? `para los ${files.length} archivo(s) modificados` : '(ejemplo con un archivo del proyecto)'}:`);
   if (!steps.length) console.log('  ninguno detectado: configura sensores.comandos en .sdd/harness.json');
   for (const s of steps) console.log(`  • ${s.nombre}${s.modulo !== '.' ? ` [${s.modulo}]` : ''}${s.runner ? ` (${s.runner})` : ''}: ${s.cmd}`);
@@ -360,6 +364,7 @@ async function trabajo() {
         for (const c of r.criterios) console.log(`    ${c.ok ? '✓' : c.manual ? '?' : '✗'} ${c.id} ${c.texto || ''} [${c.control ? `control ${c.control}` : c.comando ? 'comando' : 'manual'}] — ${c.motivo}`);
       }
       for (const x of st.tareas) console.log(`${x.estado === 'verificada' ? '✓' : x.estado === 'bloqueada' ? '⏸' : '•'} ${x.id} ${x.titulo} — ${T.ETAREA[x.estado]}${x.responsable ? ` (${x.responsable})` : ''}${x.motivo ? `: ${x.motivo}` : ''}${(x.intentos || []).length ? ` · ${x.intentos.length} intento(s)` : ''}`);
+      for (const q of st.abiertas || []) console.log(`? ${q.id} ${q.texto}${q.para ? ` → ${q.para}` : ''}${q.donde ? ` [${q.donde}]` : ''}${q.tarea ? ` · bloquea ${q.tarea}` : ''}`);
       if ((t.decisiones || []).length) console.log(`Decisiones: ${t.decisiones.map(d => `${d.texto} (${d.motivo})`).join(' · ')}`);
       if (st.faltan.length) console.log(`\nFalta:\n${st.faltan.map(f => `  - ${f}`).join('\n')}`);
       process.exitCode = st.tecnico ? 0 : 1;
@@ -377,6 +382,37 @@ async function trabajo() {
     if (sub === 'iniciar') { out(T.startTask(root, id, { responsable: opt('--responsable'), tomar: flags.has('--tomar') })); return; }
     if (sub === 'bloquear') { out(T.blockTask(root, id, motivo)); return; }
     if (sub === 'decision' || sub === 'decisión') { T.addDecision(root, positional[2], motivo); console.log('Decisión registrada.'); return; }
+    if (sub === 'preguntas') {
+      const st = T.status(root);
+      if (!st || st.problema) { console.log(st && st.problema ? `El trabajo guardado no se puede usar: ${st.problema}.` : 'No hay un trabajo registrado en este proyecto.'); process.exitCode = 1; return; }
+      const abiertas = st.abiertas || [];
+      if (!abiertas.length) console.log('No hay preguntas abiertas.');
+      // Listas para copiar: el harness no publica nada en el gestor; eso lo hace el usuario
+      for (const q of abiertas) {
+        console.log(`\n[${q.id}] ${q.donde ? `en ${q.donde}` : 'sin destino indicado'}${q.para ? ` · etiquetar a ${q.para}` : ''}${q.tarea ? ` · bloquea ${q.tarea}` : ''}`);
+        console.log(q.texto);
+      }
+      const cerradas = (st.preguntas || []).filter(q => q.estado !== 'abierta');
+      if (cerradas.length) console.log(`\nCerradas: ${cerradas.map(q => `${q.id} ${T.EPREGUNTA[q.estado]}`).join(' · ')}`);
+      process.exitCode = abiertas.length ? 1 : 0;
+      return;
+    }
+    if (sub === 'preguntar') {
+      const r = T.addQuestion(root, positional[2], { para: opt('--para'), donde: opt('--donde'), tarea: opt('--tarea') });
+      console.log(`Pregunta ${r.pregunta.id} registrada${r.tarea ? ` · ${r.tarea.id} queda bloqueada esperando la respuesta` : ''}. Muéstrasela al usuario para que la publique: «trabajo preguntas».`);
+      return;
+    }
+    if (sub === 'responder') {
+      if (!id) { console.log('Uso: trabajo responder <id> --respuesta "…"'); process.exitCode = 2; return; }
+      const r = T.answerQuestion(root, id, opt('--respuesta'));
+      console.log(`Pregunta ${r.pregunta.id} respondida.${r.liberadas.length ? ` Tareas que la esperaban: ${r.liberadas.map(x => x.id).join(', ')} (retomar con «trabajo iniciar <tarea>»).` : ''}`);
+      return;
+    }
+    if (sub === 'descartar-pregunta') {
+      if (!id) { console.log('Uso: trabajo descartar-pregunta <id> --motivo "…"'); process.exitCode = 2; return; }
+      console.log(`Pregunta ${T.dropQuestion(root, id, motivo).pregunta.id} descartada.`);
+      return;
+    }
     if (sub === 'verificar') {
       if (!id) { console.log('Uso: trabajo verificar <tarea>'); process.exitCode = 2; return; }
       const r = await T.verifyTask(root, id, { cfg: loadConfig(root), sesion: last.sesion, excepciones: last.excepciones || [], cambios: last.cambios || [] });
@@ -389,7 +425,7 @@ async function trabajo() {
     if (sub === 'aceptar') { T.accept(root, { motivo }); console.log('Trabajo aceptado por el usuario (aceptación funcional).'); return; }
     if (sub === 'cerrar') { T.close(root); console.log('Trabajo cerrado.'); return; }
     if (sub === 'descartar') { T.close(root, { descartar: true }); console.log('Trabajo descartado.'); return; }
-    console.log('Uso: trabajo [estado] | plan --json … | iniciar <tarea> [--responsable x] | bloquear <tarea> --motivo … | verificar <tarea> | decision "texto" --motivo … | cerrar · (solo el usuario) aceptar [--motivo …] | descartar');
+    console.log('Uso: trabajo [estado] | plan --json … | iniciar <tarea> [--responsable x] | bloquear <tarea> --motivo … | verificar <tarea> | decision "texto" --motivo … | preguntas | preguntar "¿…?" --para quién --donde AB#1234 [--tarea T-01] | responder <id> --respuesta … | descartar-pregunta <id> --motivo … | cerrar · (solo el usuario) aceptar [--motivo …] | descartar');
     process.exitCode = 2;
   } catch (e) { console.log(`No se pudo: ${e.message}`); process.exitCode = 1; }
 }

@@ -11,6 +11,8 @@
  *   node install.js --dry-run            muestra qué haría, sin escribir
  *   node install.js --no-mcp             no registra servidores MCP
  *   node install.js --mcp=figma          registra también servidores MCP apagados en config/mcp.json (enabled:false)
+ *   node install.js --mcp=azure-devops --org=<organización>   servidor remoto por organización (dev.azure.com/<organización>)
+ *   node install.js --mcp=azure-devops --org=<org> --proyecto  registra el MCP SOLO en el proyecto actual (dos repos, dos organizaciones)
  *   node install.js --no-deps            no instala pdfjs-dist / mammoth
  *   node install.js --auto-edits         Claude Code acepta ediciones de archivos sin preguntar (modo acceptEdits)
  *   node install.js --no-permissions     no agrega permisos preaprobados en Claude Code (git/gh siempre piden aprobación)
@@ -226,13 +228,22 @@ function mcpServers() {
   const extra = (val('mcp') || '').split(',').map(s => s.trim()).filter(Boolean);
   const unknown = extra.filter(n => n.startsWith('_') || !cfg[n]);
   if (unknown.length) warn(`--mcp: servidores desconocidos en config/mcp.json: ${unknown.join(', ')}`);
+  const org = val('org');
   return Object.entries(cfg).filter(([k, v]) => !k.startsWith('_') && (v.enabled !== false || extra.includes(k)))
     .map(([name, v]) => {
+      if (v.url && v.url.includes('{org}')) {
+        // Servidor remoto por organización (Azure DevOps): sin --org no se puede armar la URL.
+        if (!org) { warn(`${name}: necesita tu organización. Regístralo con: node install.js --mcp=${name} --org=<organización> [--proyecto]`); return null; }
+        // El nombre lleva la organización: dos organizaciones distintas son dos cuentas, y con el mismo nombre
+        // el inicio de sesión de una pisaría el de la otra.
+        const slug = org.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+        return { name: `${name}-${slug}`, url: v.url.replace('{org}', encodeURIComponent(org)) };
+      }
       if (v.url) return { name, url: v.url }; // servidor remoto (HTTP)
       // En Windows, npx es npx.cmd: se envuelve con cmd /c para que lo lancen todas las herramientas
       const wrap = IS_WIN && v.command === 'npx';
       return { name, command: wrap ? 'cmd' : v.command, args: wrap ? ['/c', 'npx', ...v.args] : v.args };
-    });
+    }).filter(Boolean);
 }
 function readJson(file) {
   if (!fs.existsSync(file)) return {};
@@ -498,6 +509,69 @@ function selectTargets() {
   return Object.keys(TARGETS).filter(k => TARGETS[k].detect.some(p => fs.existsSync(p)) || (TARGETS[k].cli && hasCli(TARGETS[k].cli)));
 }
 
+// Archivos de MCP por PROYECTO de cada herramienta (los globales están en TARGETS[*].mcp).
+const PROJECT_MCP = {
+  claude: { label: 'Claude Code', file: ['.mcp.json'], key: 'mcpServers' },
+  cursor: { label: 'Cursor', file: ['.cursor', 'mcp.json'], key: 'mcpServers', stdioType: true },
+  copilot: { label: 'VS Code Copilot', file: ['.vscode', 'mcp.json'], key: 'servers', stdioType: true },
+  opencode: { label: 'OpenCode', file: ['opencode.json'], key: 'mcp' },
+  gemini: { label: 'Gemini CLI', file: ['.gemini', 'settings.json'], key: 'mcpServers' },
+};
+
+/** Raíz del proyecto: el directorio con .git más cercano; si no hay, el actual. */
+function repoRoot(start) {
+  let d = path.resolve(start);
+  for (;;) {
+    if (fs.existsSync(path.join(d, '.git'))) return d;
+    const up = path.dirname(d);
+    if (up === d) return path.resolve(start);
+    d = up;
+  }
+}
+
+/**
+ * --proyecto: registra los servidores MCP SOLO en el proyecto actual, no en el usuario. Es lo que sirve cuando
+ * cada repositorio apunta a una organización distinta (dos repos, dos organizaciones de Azure DevOps): cada
+ * ventana ve únicamente la suya y el contexto no carga las herramientas de las demás. No toca nada más de la
+ * instalación: para eso está «node install.js» sin --proyecto.
+ */
+function installProjectMcp() {
+  const root = repoRoot(process.cwd());
+  // Solo los servidores que se piden con --mcp: los de siempre (playwright, context7, chrome-devtools) ya están
+  // registrados a nivel de usuario y repetirlos en el proyecto solo duplicaría herramientas en el contexto.
+  const pedidos = (val('mcp') || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (!pedidos.length) { console.error('Indica qué servidor registrar en este proyecto: --mcp=<nombre> (y --org=<organización> si lo pide). Los servidores de siempre ya están a nivel de usuario.'); process.exit(1); }
+  const servers = mcpServers().filter(s => (s.url || s.command) && pedidos.some(n => s.name === n || s.name.startsWith(`${n}-`)));
+  if (!servers.length) { console.error(`No quedó ningún servidor que registrar de: ${pedidos.join(', ')}. Revisa el aviso de más arriba.`); process.exit(1); }
+  const tkeys = (val('targets') === 'all' ? Object.keys(PROJECT_MCP) : (val('targets') || 'claude').split(',').map(s => s.trim()).filter(Boolean));
+  const bad = tkeys.filter(k => !PROJECT_MCP[k]);
+  if (bad.length) { console.error(`Destinos sin configuración de MCP por proyecto: ${bad.join(', ')}. Válidos: ${Object.keys(PROJECT_MCP).join(', ')}, all. Codex solo admite MCP globales.`); process.exit(1); }
+  log(`Orquestador SDD v${VERSION}${DRY ? ' (simulación)' : ''} · MCP solo para este proyecto`);
+  log(`Proyecto: ${root.replace(/\\/g, '/')}`);
+  for (const tkey of tkeys) {
+    const m = PROJECT_MCP[tkey];
+    const file = path.join(root, ...m.file);
+    log(`\n• ${m.label} → ${path.relative(root, file).split(path.sep).join('/')}`);
+    let json;
+    try { json = readJson(file); } catch { warn(`${file} no es JSON puro (¿comentarios?): agrégalos a mano (${servers.map(s => s.name).join(', ')})`); continue; }
+    json[m.key] = json[m.key] || {};
+    let changed = false;
+    for (const s of servers) {
+      if (json[m.key][s.name]) { log(`  · MCP ${s.name} ya está en este proyecto`); continue; }
+      json[m.key][s.name] = s.url ? remoteJson(tkey, s.url)
+        : tkey === 'opencode' ? { type: 'local', command: [s.command, ...s.args], enabled: true }
+          : { ...(m.stdioType ? { type: 'stdio' } : {}), command: s.command, args: s.args };
+      log(`  ✓ MCP ${s.name}`); remoteAdded(tkey, s); changed = true;
+    }
+    if (changed && !DRY) { mkdirp(path.dirname(file)); backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n'); }
+  }
+  log(DRY ? '\n✅ Simulación completa (no se escribió nada).' : '\n✅ MCP registrados en este proyecto.');
+  for (const [name, tkeys2] of loginPending) notes.push(`MCP ${name} necesita que inicies sesión una vez:\n${tkeys2.map(k => `  ${MCP_LOGIN[k](name)}`).join('\n')}`);
+  notes.push('Anota la organización en la memoria de este proyecto (.sdd/memoria) para que el agente sepa cuál usa: lo pide la skill tracker-azure-boards.');
+  notes.push('El archivo que se acaba de escribir va al repositorio: si no quieres compartirlo con el equipo, agrégalo al .gitignore.');
+  if (notes.length) { log('\nNotas:'); notes.forEach(n => log(`- ${n}`)); }
+}
+
 function install() {
   const targets = selectTargets();
   if (!targets.length) {
@@ -612,4 +686,4 @@ function setupGitHooks() {
   if (r.status === 0) log('\n• Git: actualización automática activada (cada "git pull" reinstala lo que cambie).');
 }
 
-if (opt('uninstall')) uninstall(); else install();
+if (opt('uninstall')) uninstall(); else if (opt('proyecto')) installProjectMcp(); else install();

@@ -55,6 +55,33 @@ test('la configuración manda sobre todo lo anterior', () => {
   assert.strictEqual(d('playwright', 'browser_click').decision, 'allow', 'servidores del orquestador');
 });
 
+test('wiki, planes de prueba y pipelines de una forja: confirmación, no bloqueo', () => {
+  for (const [tool, args] of [['wiki', { action: 'upsert_page' }], ['wiki_upsert_page', {}],
+    ['testplan_test_case_write', { action: 'create' }], ['pipelines_write', { action: 'run_pipeline' }]]) {
+    const r = classifyMcp({ server: 'azure-devops', tool, args });
+    assert.strictEqual(r.decision, 'ask', tool);
+    assert.ok(r.critical, `${tool}: decisión del usuario`);
+    assert.match(r.reason, /no es el código del repositorio/);
+  }
+  // Leerlos sigue pasando libre
+  for (const [tool, args] of [['wiki', { action: 'get_page_content' }], ['pipelines_build', { action: 'list' }],
+    ['testplan', { action: 'list_plans' }]]) {
+    assert.strictEqual(classifyMcp({ server: 'azure-devops', tool, args }).decision, 'allow', tool);
+  }
+});
+
+test('las herramientas agrupadas no esconden la escritura en el argumento «action»', () => {
+  const t = tool => ({ server: 'azure-devops', tool });
+  // wit_backlog es lectura en «list» y escritura en «reorder»: el nombre no alcanza para distinguirlas
+  assert.strictEqual(classifyMcp({ ...t('wit_backlog'), args: { action: 'list' } }).decision, 'allow');
+  assert.strictEqual(classifyMcp({ ...t('wit_backlog'), args: { action: 'reorder' } }).decision, 'ask');
+  assert.strictEqual(classifyMcp({ ...t('wit_work_item'), args: { action: 'get' } }).decision, 'allow');
+  assert.strictEqual(classifyMcp({ ...t('wit_work_item'), args: { action: 'update' } }).decision, 'ask');
+  // Sin args no se rompe, y «operation» se mira igual
+  assert.strictEqual(classifyMcp(t('wit_backlog')).decision, 'allow');
+  assert.strictEqual(classifyMcp({ ...t('wit_backlog'), args: { operation: 'reorder' } }).decision, 'ask');
+});
+
 test('nombres MCP de cada herramienta', () => {
   assert.deepStrictEqual(parseMcpName('mcp__azure-devops__wit_work_item_write'), { server: 'azure-devops', tool: 'wit_work_item_write' });
   assert.deepStrictEqual(parseMcpName('mcp_ado_wit_query'), { server: 'ado', tool: 'wit_query' });

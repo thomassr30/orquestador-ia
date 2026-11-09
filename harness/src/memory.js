@@ -86,8 +86,25 @@ function contextBlock(root, { source, mapa = '', espacio = null, proyectos = [] 
   ].join('\n');
   // El mapa va primero (es lo que evita "perder la onda" en carpetas con varios proyectos); la memoria se recorta antes que el mapa
   let out = [header, mapa, own, ws, extra].filter(Boolean).join('\n\n');
-  if (out.length > MAX_CHARS) out = `${out.slice(0, MAX_CHARS)}\n[… memoria recortada; leer .sdd/memoria/MEMORIA.md y sesion.md si se necesita más]`;
+  if (out.length > MAX_CHARS) out = `${out.slice(0, MAX_CHARS)}\n[… memoria recortada en ${MAX_CHARS} caracteres: lee .sdd/memoria/MEMORIA.md y sesion.md si necesitas más, y avísale al usuario que conviene acortarlos (lo terminado va a historial.md)]`;
   return out;
+}
+
+/**
+ * Tamaño del contexto que se reinyecta y qué quedó fuera. Para que el recorte no sea invisible: el agente lo ve
+ * en el propio texto y el usuario, en «sdd-harness doctor». Un sesion.md que crece sin parar es la causa típica
+ * de que el agente reciba contexto viejo y se ponga a releer el proyecto completo.
+ */
+function contextStats(root) {
+  const mem = path.join(root, '.sdd', 'memoria');
+  const archivos = Object.entries(MAX_LINES).map(([nombre, max]) => {
+    let lineas;
+    try { lineas = fs.readFileSync(path.join(mem, nombre), 'utf8').split(/\r?\n/).length; } catch { return null; }
+    return { nombre, lineas, max, recortado: lineas > max };
+  }).filter(Boolean);
+  let texto = '';
+  try { texto = contextBlock(root, { source: 'compact' }); } catch (e) { return { error: e.message, archivos }; }
+  return { chars: texto.length, max: MAX_CHARS, recortado: texto.includes('memoria recortada'), archivos };
 }
 
 const GATE_LABEL = { inicial: 'sin cambio en curso', requerido: 'pedido de cambio, plan sin presentar', pendiente: 'plan presentado, esperando aprobación', aprobado: 'aprobado', libre: 'directo (sin plan)' };
@@ -132,4 +149,4 @@ function hasAutoBlock(root) {
   try { return fs.readFileSync(path.join(root, '.sdd', 'memoria', 'sesion.md'), 'utf8').includes(AUTO_START); } catch { return false; }
 }
 
-module.exports = { contextBlock, projectMemoryBlock, checkpoint, hasAutoBlock, AUTO_START, AUTO_END };
+module.exports = { contextBlock, contextStats, projectMemoryBlock, checkpoint, hasAutoBlock, MAX_CHARS, MAX_LINES, AUTO_START, AUTO_END };

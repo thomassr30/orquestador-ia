@@ -15,17 +15,34 @@ No cambia el formato del estado ni la configuración existente: basta `npm run u
 - **«sin sdd» dentro de contenido pegado ya no apaga el orquestador** (`gate.js`, `switchScope`): la frase solo cuenta en mensajes cortos que no parecen un log o un fragmento de código.
 - **Tickets de Azure Boards abren el GATE**: `AB#1234`, `PBI 4521` y el enlace `…/_workitems/edit/1234`, además del formato Jira `LAB-123`.
 
-### Sensores: runner de tests por proyecto
-- **Karma fuera de Angular ya se detecta.** Un proyecto con `"test": "karma start"` y sin `angular.json` no obtenía ningún control de tests, así que el cambio quedaba «no verificado» sin decir por qué. Ahora corre `karma start --single-run --browsers=ChromeHeadless`.
+### Preguntas abiertas y contexto que no se pierde
+- **Registro de preguntas en el trabajo verificable.** Una duda que el agente no puede resolver solo deja de vivir en el chat, donde se perdía al compactar y había que volver a plantearla. Cada pregunta lleva a quién va dirigida, dónde se publica y su respuesta: `trabajo preguntar "¿…?" --para "PO" --donde "AB#1234" [--tarea T-02]`, `trabajo responder <id> --respuesta "…"`, `trabajo descartar-pregunta <id> --motivo "…"` y `trabajo preguntas`, que las lista listas para copiar. **El harness no publica nada en el gestor**: eso lo hace el usuario.
+  - Con `--tarea`, esa tarea queda bloqueada esperando la respuesta, así que el resto del trabajo puede avanzar y lo que depende de la duda no. Al responder, la tarea queda retomable con `trabajo iniciar`.
+  - Una pregunta abierta impide el «técnicamente completo» y aparece en lo que falta, así que «terminé» no pasa con dudas sin resolver.
+  - Las preguntas abiertas y las últimas tres respondidas se reinyectan tras compactar, en una línea cada una.
+- **El recorte del contexto deja de ser invisible.** `sdd-harness doctor` muestra cuántos caracteres se reinyectan sobre el tope y avisa cuándo `MEMORIA.md` o `sesion.md` superan las líneas que se leen, con el consejo de mover lo terminado. Antes el contexto se cortaba en silencio y el agente recibía memoria incompleta sin saberlo.
+- **Una memoria ilegible ya no deja al agente a ciegas.** Si la memoria no se puede leer, el contexto que recibe dice qué leer (`MEMORIA.md` y `sesion.md`) y que no reconstruya el contexto explorando el proyecto completo. Antes no recibía nada y la relectura costaba el doble de tokens.
+
+### Sensores: runner de tests por proyecto- **Karma fuera de Angular ya se detecta.** Un proyecto con `"test": "karma start"` y sin `angular.json` no obtenía ningún control de tests, así que el cambio quedaba «no verificado» sin decir por qué. Ahora corre `karma start --single-run --browsers=ChromeHeadless`.
 - **El modo observación se neutraliza en vez de descartar el control.** Antes, cualquier script `test` con `--watch` quedaba fuera por completo; ahora se reconoce el runner y se corre en una sola pasada (`jest --watch` → `jest --ci --findRelatedTests`, `mocha --watch` → `mocha`). Lo que no se puede correr sin observar (`nodemon`, o `ng test` sin la CLI instalada) sigue sin control, que es lo correcto: nunca se da por aprobado.
 - **Mocha y Jasmine se reconocen por nombre** en vez de caer en el `npm test` genérico.
 - **La suite completa deja de marcarse como «scoped»** (`ng test`, `karma`, `mocha`, `jasmine`, `npm test`): un test ajeno que falla ya no se atribuye al cambio sin línea base. Antes se marcaba como fallo del cambio; ahora queda «no verificado» y el aviso apunta a `sdd-harness linea-base`. Los runners que sí corren solo lo relacionado (vitest, jest) siguen scoped.
 - **El runner detectado se muestra** en `sdd-harness doctor` y en `sdd-harness sensores`, que ahora imprime los controles detectados antes de correrlos y, si no hay ninguno, dice dónde mirar.
 
-### Azure DevOps por MCP- **Los work items de Azure Boards se escriben con tu confirmación, no se bloquean.** Antes el servidor caía en la regla de forja y se denegaba todo, incluso comentar un avance o mover un estado, en contra de lo que dicen `tracker-common` y `tracker-azure-boards`. Escribir en Azure **Repos** (pull requests) sigue bloqueado, igual que GitHub y GitLab.
+### Azure DevOps por MCP (registro y clasificación)- **Los work items de Azure Boards se escriben con tu confirmación, no se bloquean.** Antes el servidor caía en la regla de forja y se denegaba todo, incluso comentar un avance o mover un estado, en contra de lo que dicen `tracker-common` y `tracker-azure-boards`. Escribir en Azure **Repos** (pull requests) sigue bloqueado, igual que GitHub y GitLab.
 - **`query` deja de contar como verbo de escritura**: una consulta WIQL (`wit_query`) es lectura. Lo que sí ejecuta (`run_query`, `execute_query`, `sql_query`) sigue cubierto por `run`, `execute` y `sql`.
 - **La decisión ya no depende del nombre del servidor**: `azure-devops`, `ado`, `azdo`, `vsts` y `tfs` se reconocen igual.
 - `tracker-azure-boards` indica qué registrar una vez por proyecto: organización, proyecto, equipo, area path, iteration path y proceso (los estados válidos dependen de Agile, Scrum o CMMI).
+- **Se registra el servidor remoto de Microsoft**: `node install.js --mcp=azure-devops --org=<organización>` (la de `dev.azure.com/<organización>`). Sin `--org` avisa y no lo registra, porque la URL se arma con ella. `config/mcp.json` lo trae apagado.
+- **Un servidor por organización, y MCP por proyecto.** El nombre del servidor lleva la organización (`azure-devops-siigsa`), porque dos organizaciones son dos cuentas y con el mismo nombre el inicio de sesión de una pisa el de la otra. Y `--proyecto` lo registra SOLO en el repositorio actual (`.mcp.json` en Claude Code; `--targets=` para las demás, salvo Codex, que solo admite MCP globales):
+  ```
+  cd <repo de JUNJI> && node install.js --mcp=azure-devops --org=siigsa --proyecto
+  cd <repo de SAG>   && node install.js --mcp=azure-devops --org=sag    --proyecto
+  ```
+  Así cada ventana ve solo su organización, sin decírselo, y el contexto no carga las herramientas de las demás. En este modo se registra únicamente lo que se pide con `--mcp`: los servidores de siempre ya están a nivel de usuario y duplicarlos solo sumaría herramientas al contexto.
+- **La wiki, los planes de prueba y los pipelines dejan de estar bloqueados**: escribir ahí no es publicar código, así que piden confirmación. `wiki_upsert_page` pasaba libre porque `upsert` no era verbo de escritura; ahora lo es, junto con `reorder` y `vote`.
+- **Las herramientas agrupadas ya no esconden la escritura en el argumento `action`**: `wit_backlog` es lectura en `list` y escritura en `reorder`, con el mismo nombre. Se clasifica también por `action` (y por `operation`).
+- **`sdd-ticket` lleva el flujo completo del work item al plan**: leer el ticket con su padre, hijos, comentarios, adjuntos y enlaces a wiki y Figma; cruzarlo con el proyecto; separar las dudas técnicas (al chat) de las de negocio (al registro de preguntas, que el usuario publica); registrar el plan con sus tres partes (lo claro, lo bloqueado y lo que queda fuera); y desarrollar solo con la aprobación del usuario.
 - Pruebas nuevas en `harness/test/mcp.test.js` con los nombres reales del MCP oficial (`@azure-devops/mcp`).
 
 ### Pruebas- `evals/gate/frases.json`: banco de 126 pedidos, 64 consultas, 41 aprobaciones y 20 negativas, con umbrales en `harness/test/gate-banco.test.js`. Corre en `npm test`, sin modelos.

@@ -159,3 +159,43 @@ test('CLI: el agente registra y verifica; aceptar y descartar son solo del usuar
   assert.match(deny.reason, /solo el usuario/);
   assert.strictEqual(await E(d, 's', 'pre', { tool: { kind: 'shell', name: 'Bash', command: 'node "$HOME/.sdd-orquestador/bin/sdd-harness.js" trabajo verificar T-01', paths: [] } }), null);
 });
+
+test('preguntas abiertas: bloquean su tarea, sobreviven a la compactación y no dejan dar el trabajo por terminado', async () => {
+  const PLAN2 = {
+    objetivo: 'mantenedor de estados',
+    requisitos: [{ id: 'REQ-01', texto: 'CRUD de estados', criterios: [{ id: 'CA-01', texto: 'tests', control: 'tests' }] }],
+    tareas: [{ id: 'T-01', titulo: 'módulo', requisitos: ['REQ-01'], archivos: ['src/pdf.js'] },
+      { id: 'T-02', titulo: 'estado nuevo', requisitos: ['REQ-01'], archivos: ['src/pdf.js'] }],
+  };
+  const d = await approved({}, PLAN2);
+  const q = T.addQuestion(d, '¿Se crea el estado «Anulado», que está en la wiki pero no en la HU?', { para: 'PO', donde: 'AB#1234', tarea: 'T-02' });
+  assert.strictEqual(q.pregunta.estado, 'abierta');
+  assert.strictEqual(q.tarea.estado, 'bloqueada', 'la tarea que depende de la duda queda bloqueada');
+  assert.match(q.tarea.motivo, /espera respuesta de PO/);
+
+  // Una pregunta abierta impide el «técnicamente completo», aunque todo lo demás tenga evidencia
+  const st = T.status(d);
+  assert.strictEqual(st.estado, 'bloqueado');
+  assert.strictEqual(st.tecnico, false);
+  assert.ok(st.faltan.some(f => /pregunta .* sin responder \(PO\)/.test(f)), st.faltan.join(' | '));
+
+  // El resumen es lo que se reinyecta tras compactar: la duda no vive solo en el chat
+  const compact = await E(d, 's', 'compact', { wantsContext: true });
+  assert.match(compact.context, /Pregunta abierta .*Anulado/);
+  assert.match(compact.context, /para PO/);
+  assert.match(compact.context, /en AB#1234/);
+
+  // Al responder, la tarea queda retomable y la respuesta también sobrevive a la compactación
+  const r = T.answerQuestion(d, q.pregunta.id, 'Sí, solo lectura en esta entrega');
+  assert.deepStrictEqual(r.liberadas.map(x => x.id), ['T-02']);
+  assert.match(T.summary(d), /ya respondida.*Sí, solo lectura/);
+  assert.strictEqual(T.startTask(d, 'T-02').tarea.estado, 'en_curso');
+  assert.ok(!T.status(d).faltan.some(f => /sin responder/.test(f)), 'ya no falta responderla');
+
+  // Descartar deja registro y motivo; no se responde dos veces
+  const q2 = T.addQuestion(d, '¿El estado A pasó a llamarse B?', { para: 'analista' });
+  T.dropQuestion(d, q2.pregunta.id, 'se resolvió leyendo el código');
+  assert.throws(() => T.answerQuestion(d, q2.pregunta.id, 'x'), /ya está descartada/);
+  assert.strictEqual(T.openQuestions(T.load(d).trabajo).length, 0);
+  assert.throws(() => T.addQuestion(d, ''), /indica la pregunta/);
+});

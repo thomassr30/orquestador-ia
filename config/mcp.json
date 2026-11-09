@@ -24,6 +24,11 @@
       "chrome-devtools-mcp@latest"
     ]
   },
+  "azure-devops": {
+    "enabled": false,
+    "_nota": "Azure DevOps remoto de Microsoft (recomendado por sobre el local). Necesita TU organización: node install.js --mcp=azure-devops --org=<organización>, la de dev.azure.com/<organización>. Requiere iniciar sesión una vez en cada herramienta. El harness deja pasar la lectura (work items, wiki, backlog, WIQL) y pide confirmación para escribir; Azure Repos sigue bloqueado.",
+    "url": "https://mcp.dev.azure.com/{org}"
+  },
   "figma": {
     "enabled": false,
     "_nota": "Figma remoto (sirve con Figma en la web). Requiere iniciar sesión una vez en cada herramienta. Actívalo con node install.js --mcp=figma.",

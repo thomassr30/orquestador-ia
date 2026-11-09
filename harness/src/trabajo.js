@@ -192,14 +192,17 @@ function status(root) {
     const crits = r.criterios.map(c => ({ ...c, ...criterion(root, t, r, c) }));
     return { ...r, criterios: crits, tecnico: crits.filter(c => !c.manual).every(c => c.ok), completo: crits.every(c => c.ok) };
   });
-  const tecnico = !!t.congelado && requisitos.every(r => r.tecnico) && tareas.every(x => x.estado === 'verificada');
+  const preguntas = t.preguntas || [];
+  const abiertas = preguntas.filter(q => q.estado === 'abierta');
+  const tecnico = !!t.congelado && !abiertas.length && requisitos.every(r => r.tecnico) && tareas.every(x => x.estado === 'verificada');
   const estado = t.estado === 'cerrado' || t.estado === 'aceptado' ? t.estado : !t.congelado ? 'borrador' : tareas.some(x => x.estado === 'bloqueada') ? 'bloqueado' : tecnico ? 'tecnicamente_completo' : 'en_curso';
   const faltan = [];
   if (!t.congelado) faltan.push('el plan no está aprobado por el usuario');
   if (t.propuesta) faltan.push('hay un plan nuevo propuesto: necesita la aprobación del usuario');
   for (const r of requisitos) for (const c of r.criterios) if (!c.ok) faltan.push(`${r.id}/${c.id}: ${c.motivo}`);
   for (const x of tareas) if (x.estado !== 'verificada') faltan.push(`${x.id} ${ETAREA[x.estado] || x.estado}${x.motivo ? `: ${x.motivo}` : ''}`);
-  return { trabajo: t, estado, tecnico, requisitos, tareas, faltan };
+  for (const q of abiertas) faltan.push(`pregunta ${q.id} sin responder${q.para ? ` (${q.para})` : ''}: ${q.texto}`);
+  return { trabajo: t, estado, tecnico, requisitos, tareas, preguntas, abiertas, faltan };
 }
 
 const ETAREA = { pendiente: 'pendiente', en_curso: 'en curso', bloqueada: 'bloqueada', verificada: 'verificada', por_reverificar: 'por reverificar' };
@@ -214,6 +217,10 @@ function summary(root, { max = 8 } = {}) {
   const lines = [`Trabajo en curso: ${s.trabajo.objetivo} — ${ETRABAJO[s.estado]}`];
   lines.push(`Requisitos: ${s.requisitos.filter(r => r.tecnico).length}/${s.requisitos.length} con evidencia vigente · Tareas: ${s.tareas.map(x => `${x.id} ${ETAREA[x.estado]}${x.responsable ? ` (${x.responsable})` : ''}`).join(' · ')}`);
   if (s.faltan.length) lines.push(`Falta: ${s.faltan.slice(0, max).join(' · ')}${s.faltan.length > max ? ` (+${s.faltan.length - max} más)` : ''}`);
+  // Las preguntas sobreviven a la compactación acá: en el chat se perderían y se volverían a plantear de cero
+  for (const q of (s.abiertas || []).slice(0, 5)) lines.push(`Pregunta abierta ${q.id}${q.para ? ` para ${q.para}` : ''}${q.donde ? ` en ${q.donde}` : ''}: ${q.texto} — no la respondas tú ni la des por resuelta.`);
+  const resp = (s.preguntas || []).filter(q => q.estado === 'respondida').slice(-3);
+  for (const q of resp) lines.push(`Pregunta ${q.id} ya respondida: ${q.texto} → ${q.respuesta}`);
   lines.push('Estado verificable: «node "$HOME/.sdd-orquestador/bin/sdd-harness.js" trabajo». Decir «terminé» no completa nada: cada tarea se verifica con «trabajo verificar <tarea>».');
   return lines.join('\n');
 }
@@ -356,9 +363,71 @@ function close(root, { descartar = false } = {}) {
   });
 }
 
-function addDecision(root, texto, motivo) {
-  if (!String(texto || '').trim() || !String(motivo || '').trim()) throw new Error('indica la decisión y su motivo: trabajo decision "texto" --motivo "por qué"');
+// ---------- Preguntas abiertas ----------
+// Una duda que el agente no puede resolver solo vive acá, no en el chat: al compactar, el chat se pierde y la
+// duda se vuelve a plantear desde cero. Cada pregunta lleva a quién va dirigida, dónde se publica (un work item,
+// una página, el chat) y su respuesta cuando llega. El harness no publica nada: la pregunta queda lista para que
+// el usuario la copie. Una pregunta abierta nunca deja el trabajo por terminado.
+const EPREGUNTA = { abierta: 'abierta', respondida: 'respondida', descartada: 'descartada' };
+const corto = (s, n = 300) => redact(String(s || '')).trim().slice(0, n);
+
+const questionOf = (t, id) => {
+  const q = (t.preguntas || []).find(x => x.id === id);
+  if (!q) throw new Error(`no existe la pregunta ${id} (abiertas: ${(t.preguntas || []).filter(x => x.estado === 'abierta').map(x => x.id).join(', ') || 'ninguna'})`);
+  return q;
+};
+
+/**
+ * Registra una duda. Con «tarea», esa tarea queda bloqueada esperando la respuesta, así que el trabajo no avanza
+ * sobre lo que depende de ella y el resto sí puede seguir.
+ */
+function addQuestion(root, texto, { para = '', donde = '', tarea = null } = {}) {
+  if (!corto(texto)) throw new Error('indica la pregunta: trabajo preguntar "¿…?" --para "quién responde" --donde "AB#1234"');
+  return update(root, t => {
+    if (!t) throw new Error('no hay un trabajo registrado («trabajo plan»). Si todavía no hay plan, pregúntale al usuario en el chat.');
+    const q = { id: newId(), en: now(), estado: 'abierta', texto: corto(texto, 500), para: corto(para, 80), donde: corto(donde, 120), tarea: tarea || null, respuesta: '', respondida: null };
+    t.preguntas = [...(t.preguntas || []), q].slice(-50);
+    let x = null;
+    if (tarea) {
+      x = taskOf(t, tarea);
+      x.estado = 'bloqueada';
+      x.motivo = corto(`espera respuesta${q.para ? ` de ${q.para}` : ''} [${q.id}]: ${q.texto}`);
+    }
+    return { trabajo: t, pregunta: q, tarea: x };
+  });
+}
+
+/** Llegó la respuesta. Devuelve las tareas que la esperaban: el agente informa y las retoma con «trabajo iniciar». */
+function answerQuestion(root, id, respuesta) {
+  if (!corto(respuesta)) throw new Error('indica la respuesta: trabajo responder <id> --respuesta "…"');
+  return update(root, t => {
+    if (!t) throw new Error('no hay un trabajo registrado');
+    const q = questionOf(t, id);
+    if (q.estado !== 'abierta') throw new Error(`la pregunta ${id} ya está ${EPREGUNTA[q.estado]}`);
+    q.estado = 'respondida'; q.respuesta = corto(respuesta, 500); q.respondida = now();
+    const liberadas = t.tareas.filter(x => x.estado === 'bloqueada' && String(x.motivo || '').includes(`[${q.id}]`));
+    for (const x of liberadas) x.motivo = corto(`respondida [${q.id}]: ${q.respuesta}. Retomar con «trabajo iniciar ${x.id}».`);
+    return { trabajo: t, pregunta: q, liberadas };
+  });
+}
+
+/** La duda dejó de aplicar (cambió el alcance, se resolvió leyendo el código). Queda registrada con su motivo. */
+function dropQuestion(root, id, motivo) {
+  if (!corto(motivo)) throw new Error('indica por qué se descarta: trabajo descartar-pregunta <id> --motivo "…"');
+  return update(root, t => {
+    if (!t) throw new Error('no hay un trabajo registrado');
+    const q = questionOf(t, id);
+    if (q.estado !== 'abierta') throw new Error(`la pregunta ${id} ya está ${EPREGUNTA[q.estado]}`);
+    q.estado = 'descartada'; q.respuesta = corto(motivo, 300); q.respondida = now();
+    return { trabajo: t, pregunta: q };
+  });
+}
+
+/** Preguntas abiertas, de la más antigua a la más nueva. */
+const openQuestions = t => (t && t.preguntas || []).filter(q => q.estado === 'abierta');
+
+function addDecision(root, texto, motivo) {  if (!String(texto || '').trim() || !String(motivo || '').trim()) throw new Error('indica la decisión y su motivo: trabajo decision "texto" --motivo "por qué"');
   return update(root, t => { if (!t) throw new Error('no hay un trabajo registrado'); t.decisiones = [...(t.decisiones || []), { en: now(), texto: redact(String(texto)).slice(0, 300), motivo: redact(String(motivo)).slice(0, 300) }].slice(-50); return { trabajo: t }; });
 }
 
-module.exports = { load, status, summary, normalizePlan, setPlan, freeze, startTask, blockTask, verifyTask, recordRun, accept, close, addDecision, planHash, ETAREA, ETRABAJO };
+module.exports = { load, status, summary, normalizePlan, setPlan, freeze, startTask, blockTask, verifyTask, recordRun, accept, close, addDecision, addQuestion, answerQuestion, dropQuestion, openQuestions, planHash, ETAREA, ETRABAJO, EPREGUNTA };

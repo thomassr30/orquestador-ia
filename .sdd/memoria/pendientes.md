@@ -2,7 +2,7 @@
 
 Resuelto en 3.0.0 (2026-11-03): resultado de evaluaciones, fallo que persiste tras reintentos, vínculo requisitos-evidencias, aprobaciones MCP exactas y conjuntas, modo estricto y concurrencia del estado.
 
-Resuelto en 3.1.0 (2026-11-06 y 2026-11-08): GATE invertido con banco de frases, «~» y variables de home en comandos, «sin sdd» en contenido pegado, tickets de Azure Boards en el GATE, clasificación MCP de Azure DevOps y runner de tests por proyecto (Karma fuera de Angular, modo observación, Mocha y Jasmine).
+Resuelto en 3.1.0 (2026-11-06 y 2026-11-08): GATE invertido con banco de frases, «~» y variables de home en comandos, «sin sdd» en contenido pegado, tickets de Azure Boards en el GATE, clasificación MCP de Azure DevOps, runner de tests por proyecto (Karma fuera de Angular, modo observación, Mocha y Jasmine), registro de preguntas abiertas, aviso de contexto recortado y Azure DevOps (registro del MCP remoto, wiki, planes de prueba y pipelines, escritura por «action», flujo del work item al plan y MCP por proyecto con un servidor por organización).
 
 ## Abierto (11)
 

@@ -59,3 +59,32 @@ test('--mcp con un nombre desconocido avisa y sigue', () => {
   assert.strictEqual(r.status, 0, r.stderr + r.stdout);
   assert.match(r.stdout, /servidores desconocidos en config\/mcp\.json: noexiste/);
 });
+
+test('MCP por proyecto: dos repos con dos organizaciones no se pisan', () => {
+  const run = (cwd, ...args) => spawnSync(process.execPath, [path.join(REPO, 'install.js'), ...args], { cwd, encoding: 'utf8', env: { ...process.env, HOME: tmp('home-'), USERPROFILE: tmp('home-') } });
+  const repo = () => tmp('repo-'); // sin .git: repoRoot cae al directorio actual, que es lo que se quiere acá
+  const leer = d => JSON.parse(fs.readFileSync(path.join(d, '.mcp.json'), 'utf8')).mcpServers;
+
+  const junji = repo(); const sag = repo();
+  assert.strictEqual(run(junji, '--mcp=azure-devops', '--org=siigsa', '--proyecto').status, 0);
+  assert.strictEqual(run(sag, '--mcp=azure-devops', '--org=SAG', '--proyecto').status, 0);
+
+  // El nombre lleva la organización: con el mismo nombre, el inicio de sesión de una pisaría el de la otra
+  assert.deepStrictEqual(Object.keys(leer(junji)), ['azure-devops-siigsa']);
+  assert.deepStrictEqual(Object.keys(leer(sag)), ['azure-devops-sag'], 'la organización se normaliza a minúsculas');
+  assert.strictEqual(leer(junji)['azure-devops-siigsa'].url, 'https://mcp.dev.azure.com/siigsa');
+  assert.strictEqual(leer(sag)['azure-devops-sag'].url, 'https://mcp.dev.azure.com/SAG');
+
+  // Solo se registra lo pedido: los servidores de siempre quedan a nivel de usuario, no duplicados en el repo
+  assert.ok(!Object.keys(leer(junji)).includes('playwright'));
+
+  // Sin organización no se registra nada, y lo dice
+  const sinOrg = repo();
+  const r = run(sinOrg, '--mcp=azure-devops', '--proyecto');
+  assert.notStrictEqual(r.status, 0);
+  assert.match(r.stdout + r.stderr, /necesita tu organización|No quedó ningún servidor/);
+  assert.strictEqual(fs.existsSync(path.join(sinOrg, '.mcp.json')), false);
+
+  // Sin --mcp tampoco: pedirlo explícito evita duplicar los globales por descuido
+  assert.match(run(repo(), '--proyecto').stdout + run(repo(), '--proyecto').stderr, /Indica qué servidor registrar/);
+});

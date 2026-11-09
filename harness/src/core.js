@@ -100,7 +100,14 @@ function spaceOf(ev, fresh = false) { try { return W.load(ev.root, { fresh }); }
 /** Memoria + mapa del espacio. Tras compactar, también la memoria de los proyectos en que se estaba trabajando. */
 function contextFor(ev, st, source, ws = spaceOf(ev)) {
   const loaded = source === 'compact' && ws ? (st.memoriasCargadas || []).map(r => ws.proyectos.find(p => p.ruta === r)).filter(Boolean) : [];
-  const mem = memory.contextBlock(ev.root, { source, mapa: ws ? W.mapBlock(ws) : '', espacio: ws && ws.espacio, proyectos: loaded });
+  // Si la memoria no se puede leer, el agente recibe qué hacer. Antes no recibía nada y reconstruía el contexto
+  // explorando el proyecto completo, que es el doble de tokens por un archivo ilegible.
+  let mem = '';
+  try { mem = memory.contextBlock(ev.root, { source, mapa: ws ? W.mapBlock(ws) : '', espacio: ws && ws.espacio, proyectos: loaded }); }
+  catch (e) {
+    logEv(ev, { evento: 'memoria', decision: 'error', detalle: e.message });
+    mem = tag(`No se pudo leer la memoria del proyecto (${e.message}). Lee .sdd/memoria/MEMORIA.md y sesion.md antes de seguir y avísale al usuario; no reconstruyas el contexto explorando todo el proyecto.`);
+  }
   // El estado verificable del trabajo va junto a la memoria: tras compactar, la sesión sabe qué falta y por qué
   let work = '';
   try { work = T.summary(ev.root); } catch { work = ''; }
