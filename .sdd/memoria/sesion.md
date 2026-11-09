@@ -1,9 +1,8 @@
 Proyecto: C:/dev/orquestador-ia
 <!-- harness:inicio (bloque automático del harness; no editar) -->
-Última actividad: 2026-11-04 12:37 (claude) · Plan: aprobado
-Pedido en curso: pero para que detecte mejor debemos añadir skill de figma para que funcione y tambien agrega mas informacion sobre instalar mcp
-Archivos modificados en la sesión: harness/test/fixtures/adaptadores/gemini/before-tool-deny.json, harness/test/fixtures/adaptadores/opencode/tool-before-commit.json, harness/test/git-sdd.test.js, harness/test/hook.e2e.test.js, harness/test/install.test.js, harness/test/opencode.test.js, harness/test/output.test.js, harness/test/policy.test.js, install.js, core/skills/design-quality/SKILL.md, core/skills/design-context/SKILL.md, README.md, harness/test/install-mcp.test.js, config/mcp.json, core/skills/figma-design/SKILL.md (+13 más)
-Sensores: aprobado — ✓ tests
+Última actividad: 2026-11-09 03:57 (claude) · Plan: sin cambio en curso
+Archivos modificados en la sesión: vscode/src/extension.ts, vscode/src/harness.ts, vscode/src/panel.ts, vscode/src/vista.ts, vscode/tsconfig.json, config/mcp.json, harness/src/core.js, harness/src/mcp.js, harness/src/memory.js, harness/src/trabajo.js, harness/test/install-mcp.test.js, harness/test/mcp.test.js, harness/test/trabajo.test.js, install.js, harness/test/contexto.test.js (+6 más)
+Sensores: sin ejecutar
 <!-- harness:fin -->
 
 Objetivo actual: plan de mejora del harness (análisis del 2026-11-06). 3.1.0 entregada; lo que queda está en pendientes.md.

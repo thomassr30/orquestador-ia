@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Diagnóstico del harness SDD (solo lectura, salvo que "sensores" ejecuta los chequeos del proyecto).
 // Uso:
-//   node sdd-harness.js estado   [ruta]   GATE, archivos modificados y últimos sensores de este proyecto
+//   node sdd-harness.js estado   [ruta] [--json]   GATE, archivos modificados y últimos sensores de este proyecto
+//                                          con --json: contrato público del estado (lo consume la extensión de VS Code)
 //   node sdd-harness.js doctor   [ruta] [--json]   evidencia por cliente (configuración, hook, prueba sintética, eventos reales),
 //                                          capacidades y límites, estado del harness y sensores detectados
 //   node sdd-harness.js sensores [ruta]   ejecuta ahora los sensores sobre lo modificado (git status)
@@ -58,7 +59,85 @@ function changedFiles() {
   return last ? last.cambios.filter(f => !f.startsWith('.sdd/')) : [];
 }
 
+/**
+ * Estado de la sesión en JSON: contrato público y estable para integraciones (la extensión de VS Code y
+ * cualquier panel propio), para que nadie tenga que leer los archivos internos del estado. No expone prompts
+ * ni contenido de archivos: el mensaje del usuario y el objetivo vienen ya recortados y redactados por el
+ * estado. «v» sube solo si la forma cambia de manera incompatible.
+ */
+function estadoJson() {
+  const G = require(path.join(SRC, 'gate'));
+  const sessions = S.listSessions(root);
+  const cfg = loadConfig(root);
+  const s = sessions.find(x => !x.danado) || sessions[0] || null;
+  const version = f => { try { return require(f).version || null; } catch { return null; } };
+  const instalado = () => { try { return JSON.parse(fs.readFileSync(path.join(SDD_HOME, 'manifest.json'), 'utf8')).version || null; } catch { return null; } };
+  let espacio = null;
+  try {
+    const W = require(path.join(SRC, 'workspace'));
+    const ws = W.load(root);
+    if (W.isMulti(ws)) espacio = { raiz: fwd(ws.raiz), proyectos: ws.proyectos.map(x => ({ nombre: x.nombre, ruta: fwd(x.ruta) })) };
+  } catch { espacio = null; }
+  let trabajo = null;
+  try {
+    const T = require(path.join(SRC, 'trabajo'));
+    const st = T.status(root);
+    if (st && st.problema) trabajo = { problema: st.problema };
+    else if (st) trabajo = {
+      estado: st.estado,
+      tecnico: st.tecnico,
+      objetivo: st.trabajo.objetivo || '',
+      congelado: st.trabajo.congelado ? st.trabajo.congelado.en : null,
+      tareas: st.tareas.map(x => ({ id: x.id, titulo: x.titulo, estado: x.estado, motivo: x.motivo || '' })),
+      preguntas: (st.preguntas || []).map(q => ({ id: q.id, texto: q.texto, para: q.para || '', donde: q.donde || '', estado: q.estado })),
+      faltan: st.faltan,
+    };
+  } catch { trabajo = null; }
+  const lb = validBaseline(root);
+  const sens = s && !s.danado ? s.sensores : null;
+  const apr = s && !s.danado && s.aprobaciones ? s.aprobaciones : { pendientes: [], aprobadas: [] };
+  const etiqueta = x => ({ id: x.id, tipo: x.tipo || null, etiqueta: x.etiqueta || x.clave || '', vence: x.vence || null });
+  return {
+    v: 1,
+    generado: new Date().toISOString(),
+    proyecto: { ruta: fwd(root), nombre: path.basename(root) },
+    espacio,
+    harness: { repo: version(path.join(__dirname, '..', 'package.json')), instalado: instalado(), sddHome: fwd(SDD_HOME), estadoDir: fwd(S.projectDir(root)) },
+    config: { gate: cfg.gate, modo: cfg.modo, presupuesto: cfg.presupuesto, problemas: cfg.problemas || [] },
+    sesiones: sessions.length,
+    sesion: s ? { id: s.sesion, herramienta: s.herramienta || null, actualizado: s.actualizado || null, turno: s.turno || 0, danado: !!s.danado, compactado: !!s.compactado, recuperacion: s.recuperacion || null } : null,
+    gate: s && !s.danado ? {
+      estado: s.gate.estado,
+      desde: s.gate.desde || null,
+      via: s.gate.via || null,
+      sdd: s.sdd === 'off' ? 'off' : 'on',
+      bloqueaEdiciones: !!G.editBlockReason(s, cfg),
+      mensajeUsuario: s.mensajeUsuario || '',
+      objetivo: s.objetivo || '',
+    } : null,
+    cambios: s && !s.danado ? s.cambios.filter(f => !f.startsWith('.sdd/')) : [],
+    sucio: !!(s && !s.danado && s.sucio),
+    punto: s && !s.danado && s.punto ? { id: s.punto.id || null, en: s.punto.en || null, error: !!s.punto.error } : null,
+    sensores: sens ? {
+      estado: sens.estado || null,
+      ok: !!sens.ok,
+      motivo: sens.motivo || '',
+      en: sens.en || null,
+      pausado: !!sens.pausado,
+      huella: sens.huella || null,
+      controles: (sens.resumen || []).map(r => ({ control: idControl(r), nombre: r.nombre, modulo: r.modulo || '.', estado: r.estado, obligatorio: !!r.obligatorio, motivo: r.motivo || '', ms: r.ms || 0 })),
+    } : null,
+    excepciones: s && !s.danado && s.excepciones ? s.excepciones.map(e => ({ control: e.control, en: e.en, motivo: e.motivo || '' })) : [],
+    lineaBase: lb.lb ? { commit: lb.lb.commit, en: lb.lb.en, motivo: null } : { commit: null, en: null, motivo: lb.motivo },
+    subagentes: s && !s.danado && s.subagentes ? { lanzados: s.subagentes.lanzados || 0, libre: !!s.subagentes.libre } : null,
+    aprobaciones: { pendientes: (apr.pendientes || []).map(etiqueta), vigentes: (apr.aprobadas || []).map(etiqueta) },
+    consumo: s && !s.danado && s.consumo ? s.consumo : null,
+    trabajo,
+  };
+}
+
 function estado() {
+  if (flags.has('--json')) { console.log(JSON.stringify(estadoJson(), null, 2)); return; }
   const sessions = S.listSessions(root);
   console.log(`Proyecto: ${fwd(root)}`);
   const sl = spaceLine(); if (sl) console.log(sl);
@@ -365,6 +444,7 @@ function worktree() {
   try {
     if (sub === 'listar') {
       const ws = W.list(root);
+      if (flags.has('--json')) { console.log(JSON.stringify({ v: 1, worktrees: ws.map(w => ({ rama: w.rama, dir: fw2(w.dir), principal: w.principal, existe: w.existe, detached: !!w.detached, sucio: w.sucio.length, sinSubir: w.sinSubir })) }, null, 2)); return; }
       for (const w of ws) {
         const estado = [!w.existe ? 'la carpeta no existe' : null, w.sucio.length ? `${w.sucio.length} sin commitear` : null, w.sinSubir.length ? `${w.sinSubir.length === 1 && w.sinSubir[0].startsWith('(') ? w.sinSubir[0] : `${w.sinSubir.length} commit(s) sin subir`}` : null].filter(Boolean);
         console.log(`${w.principal ? '▸' : '•'} ${w.rama || '(sin rama)'}${w.principal ? ' (principal)' : ''} → ${fw2(w.dir)}${estado.length ? ` · ${estado.join(' · ')}` : ' · limpio'}`);
