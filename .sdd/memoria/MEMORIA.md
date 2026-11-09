@@ -2,7 +2,7 @@
 _Actualizada: 2026-11-03_
 
 ## Qué es
-Harness local de hooks y guías SDD para varios asistentes de programación (Claude Code, Codex, Gemini CLI, Cursor, Copilot, OpenCode). Versión 3.0.0.
+Harness local de hooks y guías SDD para varios asistentes de programación (Claude Code, Codex, Gemini CLI, Cursor, Copilot, OpenCode). Versión 3.1.0.
 
 ## Stack
 JavaScript CommonJS en Node.js ≥18, sin dependencias; comandos y pruebas en package.json.
@@ -29,7 +29,7 @@ JavaScript CommonJS en Node.js ≥18, sin dependencias; comandos y pruebas en pa
 - Leer stdin en scripts: como stream hasta «end», nunca fs.readFileSync(0) después de tocar process.stdin (en Linux/macOS queda no bloqueante y falla con EAGAIN si la entrada llega tarde; en Windows no se ve).
 - Tests de hooks de Claude que pasan por la compactación dependen de ~/.claude/settings.json del equipo (claude-permisos.js): en CI no existe. Usar HOME/USERPROFILE y SDD_CLAUDE_MANAGED_DIR temporales (claudeEnv en hook.e2e.test.js). Para simular CI en local: HOME vacío fuera de %TEMP% y ruta de TEMP con las mayúsculas reales (si no, fallan sensors/corpus por artefacto).
 - Commit = confirmación crítica (no bloqueo) desde 2026-11-03; bloqueado solo si el -m trae atribución de IA. La prueba sintética de bloqueo de doctor y de los fixtures `*-deny.json` es `gh pr create`. Git envuelto (cmd /c, bash -c, $(…)) no lleva gitRule: las reglas nativas por prefijo de Codex/OpenCode no lo ven.
-- El repo no tiene etiquetas y la 3.0.0 no está publicada: los cambios nuevos van en su entrada del CHANGELOG; no reescribir entradas de versiones anteriores (2.8.0 salió con 3 niveles).
+- El repo no tiene etiquetas y ni la 3.0.0 ni la 3.1.0 están publicadas: los cambios nuevos van en su entrada del CHANGELOG; no reescribir entradas de versiones anteriores (2.8.0 salió con 3 niveles).
 
 ## Contexto relevante
 Decisiones de diseño 3.0.0 en `decisiones.md`; pendientes y riesgos residuales en `pendientes.md`.

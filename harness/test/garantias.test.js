@@ -12,7 +12,7 @@ process.env.SDD_HOME = tmp('sdd-home-');
 const core = require('../src/core');
 const S = require('../src/state');
 const { loadConfig } = require('../src/config');
-const { Policy, writeTargets } = require('../src/policy');
+const { Policy, writeTargets, expandPath } = require('../src/policy');
 
 const NODE = process.execPath;
 // Credenciales falsas armadas en tiempo de ejecución (el propio harness no deja escribirlas literales en el código)
@@ -138,6 +138,36 @@ test('APR-5/6/7: Bash no se salta las protecciones de las ediciones ni las decis
   assert.strictEqual(new Policy({ root: d }).checkCommand('echo hola > nota.txt').decision, 'ask', 'dentro del proyecto sigue igual');
 });
 
+test('APR-8: «~» y las variables de home no esquivan las rutas protegidas; un destino sin resolver es crítico', async () => {
+  const d = project({});
+  const p = new Policy({ root: d });
+  // El shell expande «~» y path.resolve no: sin expandir, «~/.claude/settings.json» se tomaba por un archivo
+  // interno llamado «~» y la escritura quedaba en «ask» no crítico (la decidía el cliente, no el usuario).
+  for (const c of ['echo {} > ~/.claude/settings.json', 'tee ~/.cursor/hooks.json', 'cp evil.json ~/.claude/settings.json',
+    "sed -i 's/a/b/' ~/.codex/config.toml", 'bash -lc "echo {} > ~/.claude/settings.json"',
+    'echo {} > $HOME/.claude/settings.json', 'echo {} > %USERPROFILE%/.claude/settings.json',
+    'echo {} > $env:USERPROFILE/.gemini/settings.json']) {
+    const r = p.checkCommand(c);
+    assert.strictEqual(r.decision, 'ask', c);
+    assert.ok(r.critical, `${c}: debe ser decisión del usuario`);
+  }
+  // El estado del harness se deniega por nombre, con o sin expandir
+  assert.strictEqual(p.checkCommand('echo {} > ~/.sdd-orquestador/estado/x.json').decision, 'deny');
+  // Un destino que no se puede resolver aquí no se omite en silencio: se trata como escritura fuera del proyecto
+  assert.ok(p.checkCommand('echo x > $LOG_DIR/out.txt').critical, 'variable desconocida');
+  assert.strictEqual(expandPath('$LOG_DIR/out.txt'), null);
+  assert.strictEqual(expandPath('nota.txt'), 'nota.txt');
+  assert.strictEqual(expandPath('~'), os.homedir());
+  // Lo que ya funcionaba no se endurece: temporal del sistema y archivos del proyecto
+  assert.ok(!p.checkCommand(`echo x > "${path.join(os.tmpdir(), 'borrador.txt')}"`).critical, 'temporal del sistema no es crítico');
+  assert.strictEqual(new Policy({ root: d }).checkPath(path.join(os.tmpdir(), 'borrador.txt'), 'write').decision, 'allow');
+  assert.strictEqual(p.checkCommand('echo hola > nota.txt').decision, 'ask');
+  assert.ok(!p.checkCommand('echo hola > nota.txt').critical, 'dentro del proyecto no es crítico');
+  // Y por el núcleo completo, con el GATE ya aprobado (antes se permitía sin más)
+  await E(d, 's', 'prompt', { prompt: 'directo' });
+  const o = await E(d, 's', 'pre', shell('echo {} > ~/.claude/settings.json'));
+  assert.match(o.reason, /configuración del harness|servidores MCP|fuera del proyecto|no puede resolver/);
+});
 // ---------- Lote 2: estado resistente ----------
 
 test('EST-1: estado corrupto → GATE requerido, sin aprobaciones, contenido externo marcado y archivo en cuarentena', async () => {

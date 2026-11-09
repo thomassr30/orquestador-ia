@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "tema": "gate-modo-pedido",
+  "nombre": "gate «pedido» conserva el criterio anterior: solo abre el GATE un pedido reconocido por su texto",
+  "cliente": "codex",
+  "config": {
+    "gate": "pedido"
+  },
+  "archivos": {
+    "src/header.ts": "export const Header = () => null;\n"
+  },
+  "pasos": [
+    {
+      "evento": "prompt",
+      "sesion": "a",
+      "texto": "pon el logo arriba",
+      "nota": "redacción natural: con «pedido» no abre el GATE (es la válvula para volver al criterio 3.0)",
+      "espera": {
+        "estado": {
+          "gate.estado": "inicial"
+        }
+      }
+    },
+    {
+      "evento": "pre",
+      "sesion": "a",
+      "herramienta": {
+        "kind": "edit",
+        "name": "Write",
+        "paths": [
+          "src/header.ts"
+        ],
+        "contents": [
+          "x"
+        ]
+      },
+      "espera": {
+        "decision": "permitido"
+      }
+    },
+    {
+      "evento": "prompt",
+      "sesion": "b",
+      "texto": "agrega el logo arriba",
+      "nota": "con verbo reconocido sí abre",
+      "espera": {
+        "estado": {
+          "gate.estado": "requerido"
+        }
+      }
+    },
+    {
+      "evento": "pre",
+      "sesion": "b",
+      "herramienta": {
+        "kind": "edit",
+        "name": "Write",
+        "paths": [
+          "src/header.ts"
+        ],
+        "contents": [
+          "x"
+        ]
+      },
+      "espera": {
+        "decision": "deny",
+        "motivo": "GATE del harness"
+      }
+    }
+  ]
+}

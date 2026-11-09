@@ -157,3 +157,43 @@ test('chequeos rápidos: JSON estricto, JSONC tolerado, YAML con tabs y conflict
   assert.match(quickCheck(w('a.ts', '<<<<<<< HEAD\na\n=======\nb\n>>>>>>> rama\n'))[0], /conflicto/);
   assert.strictEqual(quickCheck(w('ok.json', '{"a":[1,2]}')), null);
 });
+
+test('runner de tests: Karma fuera de Angular, modo observación neutralizado y runner a la vista', () => {
+  const pkg = t => JSON.stringify({ scripts: { test: t } });
+  // Karma sin angular.json: antes no se detectaba ningún control de tests y el cambio quedaba sin verificar
+  const karma = project({ 'package.json': pkg('karma start'), 'src/a.js': '' });
+  bin(karma, 'karma');
+  const k = detect(karma, karma, ['src/a.js']).tests;
+  assert.strictEqual(k.runner, 'karma');
+  assert.match(k.cmd, /karma start --single-run --browsers=ChromeHeadless/);
+
+  // El modo observación no se descarta: se corre el mismo runner en una sola pasada
+  const watch = project({ 'package.json': pkg('jest --watch'), 'src/a.js': '' });
+  const w = detect(watch, watch, ['src/a.js']).tests;
+  assert.strictEqual(w.runner, 'jest');
+  assert.doesNotMatch(w.cmd, /--watch/);
+
+  for (const [script, runner, binario] of [['mocha --watch', 'mocha', 'mocha'], ['jasmine', 'jasmine', 'jasmine']]) {
+    const d = project({ 'package.json': pkg(script), 'src/a.js': '' });
+    bin(d, binario);
+    const r = detect(d, d, ['src/a.js']).tests;
+    assert.strictEqual(r.runner, runner, script);
+    assert.doesNotMatch(r.cmd, /--watch/, script);
+  }
+
+  // Lo que no se puede correr sin observar no se ejecuta: queda sin control (nunca aprobado)
+  for (const script of ['nodemon --exec mocha', 'ng test']) {
+    const d = project({ 'package.json': pkg(script), 'src/a.js': '' });
+    assert.strictEqual(detect(d, d, ['src/a.js']).tests, undefined, script);
+  }
+
+  // La suite completa no es «scoped»: un test ajeno que falla necesita línea base para atribuirse al cambio
+  const ng = project({ 'package.json': pkg('ng test'), 'angular.json': '{}', 'src/a.ts': '' });
+  bin(ng, 'ng');
+  assert.strictEqual(detect(ng, ng, ['src/a.ts']).tests.scoped, false);
+  const vi = project({ 'package.json': pkg('vitest'), 'src/a.js': '' });
+  assert.strictEqual(detect(vi, vi, ['src/a.js']).tests.scoped, true, 'vitest sí corre solo lo relacionado');
+
+  // El runner viaja en el plan, para que doctor y sensores lo muestren
+  assert.strictEqual(plan(karma, ['src/a.js'], cfg({ alTerminar: ['tests'] }))[0].runner, 'karma');
+});

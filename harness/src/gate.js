@@ -2,6 +2,8 @@
 // GATE por código: en un pedido de cambio, las ediciones quedan bloqueadas hasta que el USUARIO
 // aprueba el plan en el chat. El modelo no puede abrirlo: solo cambia con los mensajes del usuario.
 //   inicial ──(pedido de cambio)──► requerido ──(el agente pregunta)──► pendiente ──(usuario: "sí")──► aprobado
+// Un mensaje abre el GATE salvo que se reconozca como consulta, saludo, aprobación o pedido directo: reconocer la
+// consulta tiene formas acotadas y reconocer el pedido de cambio no (medido en evals/gate/frases.json).
 //   cualquier estado ──("directo" / "sin plan")──► libre
 
 const A = require('./aprobaciones');
@@ -19,7 +21,8 @@ const SDD_OFF = words('sin sdd|sin (?:el )?orquestador|(?:desactiva|desactivar|a
 const SDD_ON = words('con sdd|(?:activa|activar|reactiva|reactivar|enciende|usa|usar|vuelve a usar) (?:el )?(?:sdd|orquestador)');
 const CHANGE = words(`agreg${W}*|añad${W}*|anad${W}*|incorpor${W}*|cre(?:a|ar|ame|alo|ala|ate|en|emos)|implement${W}*|desarroll${W}*|constru${W}*|codific${W}*|corrig${W}*|corrij${W}*|arregl${W}*|solucion${W}*|repar${W}*|refactori${W}*|reorganiz${W}*|reestructur${W}*|reescrib${W}*|migr[ae]${W}*|actualiz${W}*|modific${W}*|cambi[ae]${W}*|elimin${W}*|borr[ae]${W}*|quit[ae]${W}*|renombr${W}*|muev[ae]${W}*|integr[ae]${W}*|conect[ae]${W}*|configur[ae]${W}*|optimiz${W}*|ajust[ae]${W}*|add|create|implement${W}*|build|fix${W}*|refactor${W}*|migrate|update|upgrade|change|remove|delete|rename|rewrite|optimi[sz]e`);
 const FIX = words("no funciona|no anda|no carga|no compila|no levanta|no guarda|falla|fallan|fallando|error|errores|bug|bugs|se rompe|se cae|roto|rota|rompi[oó]|se ve mal|crash\\w*|excepci[oó]n|exception|stack ?trace|traceback|broken|not working|doesn'?t work");
-const TICKET = /(?<![A-Za-z0-9_])[A-Z][A-Z0-9]{1,9}-\d+(?![A-Za-z0-9_])/; // LAB-123: trabajar un ticket
+// Ticket referido por su identificador: Jira (LAB-123), Azure Boards (AB#1234, PBI 4521) o el enlace del work item.
+const TICKET = /(?<![A-Za-z0-9_])(?:[A-Z][A-Z0-9]{1,9}-\d+|AB#\d+|PBI[ #-]?\d+)(?![A-Za-z0-9_])|_workitems\/edit\/\d+/;
 const WORK = words(`resuelv${W}*|resolv${W}*|trabaj[ae]${W}*`);
 const CONTINUE = words('sigue|segu[ií]|contin[uú]a|continuar|contin[uú]e|termina|terminar|falta|faltan|lo que queda|el resto|tambi[eé]n|adem[aá]s|retoma|relanza|reintenta');
 const NON_CODE = words('prototipo|prototipos|maqueta|maquetas|mockup|mockups|wireframe|wireframes'); // solo genera el prototipo
@@ -84,6 +87,17 @@ const WEAK_RE = new RegExp(`^[\\s¡!"'«(]*(?:${WEAK})(?:[\\s,.!;:]+(?:${AFFIRM}
 const APPROVE_RE = new RegExp(`^[\\s¡!"'«(]*${LEAD}(?:si (?:puedes|quieres|podes|queres|te parece)[\\s,]+)?(?:${PROCEED})(?![\\p{L}\\p{N}])[\\s,.!;:]*${PLAN_REF}[\\s,.!;:)»"']*$`, 'u');
 const HOLD = /(?<![\p{L}])(?:no (?:desarroll|implement|ejecut|apliqu|avanc|sig|continu|empiec|comienc|arranqu|lo hag|hag|toques|edites|cambies|todavia|aun|aún|ahora|por ahora)|todavia no|aun no|mejor no|espera|esperate|aguanta|alto|detente|para(?: ahi)?$|stop|cancel|pero antes|antes de (?:implementar|desarrollar|seguir|continuar|avanzar|empezar)|primero (?:explica|dime|aclara|revisa|muestra|responde))/u;
 
+// ---------- Apagar o encender el orquestador: solo como instrucción, no dentro de contenido pegado ----------
+// Un log con la frase apagó el orquestador: la instrucción tiene que ser el mensaje, no aparecer en lo pegado.
+const SWITCH_MAX = 160;
+const LOOKS_PASTED = /```|^\s*(?:at |Error\b|error:|Exception|Traceback|FAIL\b|PASS\b|not ok \d|ok \d|#\s|[✓✗×√]|\d+\)|[[{<]|(?:test|it|describe|assert)\s*\()/m;
+/** Parte del mensaje donde «sin sdd»/«con sdd» cuentan: mensajes cortos que no parecen pegados. */
+const switchScope = text => {
+  const t = String(text || '').trim();
+  if (!t || t.length > SWITCH_MAX || LOOKS_PASTED.test(t)) return '';
+  return t.split('\n')[0].slice(0, 120);
+};
+
 const isApproval = text => {
   const t = fold(text).trim();
   if (!t || HOLD.test(t) || NEGATED.test(t)) return false;
@@ -92,6 +106,59 @@ const isApproval = text => {
   return WEAK_RE.test(t) || APPROVE_RE.test(t);
 };
 const isChangeRequest = text => !NON_CODE.test(text) && (CHANGE.test(text) || FIX.test(text) || TICKET.test(text) || WORK.test(text));
+
+// Aprobación «limpia»: el mensaje es solo el sí, con o sin referencia al plan. «dale soporte a paginación»
+// empieza con una afirmación pero trae un pedido nuevo, así que no exime de presentar plan.
+const ONLY_APPROVAL_RE = new RegExp(`^[\\s¡!"'«(]*${LEAD}(?:${AFFIRM}|${PROCEED})(?![\\p{L}\\p{N}])[\\s,.!;:]*${PLAN_REF}[\\s,.!;:)»"']*$`, 'u');
+const isOnlyApproval = text => {
+  const t = fold(text).trim();
+  return !!t && !HOLD.test(t) && !NEGATED.test(t) && ONLY_APPROVAL_RE.test(t);
+};
+
+// ---------- Consulta: lo único que NO abre el GATE (además de aprobar, «directo» y saludar) ----------
+// Pide información. No incluye los modales de pedido cortés («¿puedes…?», «¿podrías…?», «¿me haces…?»),
+// que son pedidos de cambio con forma de pregunta.
+const CONSULT_WORD = 'qu[eé]|cu[aá]l(?:es)?|c[oó]mo|d[oó]nde|cu[aá]ndo|cu[aá]nt[oa]s?|qui[eé]n(?:es)?|por qu[eé]|para qu[eé]|hay|existen?|est[aá]n?|es|son|tienen?|sabes|sab[eé]s|conoces|se puede|se usa|se hace|what|which|how|where|when|why|who|whose|is|are|was|were|does|do|did|has|have';
+const CONSULT_VERB = `explic${W}*|descri[bv]${W}*|resum${W}*|list[ae]${W}*|enumera|muestr${W}*|mu[eé]stram${W}*|ens[eé][nñ]am${W}*|dime|cu[eé]ntame|indica|aclara|compar[ae]${W}*|analiz${W}*|revis${W}*|audit${W}*|inspeccion${W}*|busc${W}*|encuentr${W}*|ubic${W}*|identific${W}*|verific${W}*|investig${W}*|averigu${W}*|diagnostic${W}*|lee|leer|explain|describe|summari[sz]e|list|show|tell|compare|analy[sz]e|review|audit|find|search|locate|identify|check|inspect|read`;
+const CONSULTA_RE = new RegExp(`^[\\s¡¿"'«(]*(?:${CONSULT_WORD}|${CONSULT_VERB})(?!${W})`, 'iu');
+// Señal de cambio lo bastante fuerte para vetar una frase con forma de consulta: «revisa por qué falla» pide
+// arreglar, «resume los cambios» no. Son formas verbales completas, así que sustantivos que CHANGE y FIX
+// reconocen por prefijo («cambios», «errores», «configuración») no convierten una consulta en pedido.
+const CHANGE_VERB = words(`agrega|agregar|agr[eé]ga${W}*|a[nñ]ade|a[nñ]adir|crea|crear|implementa|implementar|desarrolla|desarrollar|corrige|corregir|arregla|arreglar|soluciona|solucionar|repara|reparar|refactoriza|refactorizar|reescribe|reescribir|migra|migrar|actualiza|actualizar|modifica|modificar|cambia|cambiar|c[aá]mbia${W}*|elimina|eliminar|borra|borrar|quita|quitar|renombra|renombrar|mueve|mover|integra|integrar|conecta|conectar|configura|configurar|optimiza|optimizar|ajusta|ajustar|add|create|implement|fix|refactor|migrate|update|change|remove|delete|rename|rewrite`);
+const BROKEN = words("no funciona|no anda|no carga|no compila|no levanta|no guarda|falla|fallan|fallando|se rompe|se cae|roto|rota|rompi[oó]|se ve mal|crash\\w*|excepci[oó]n|exception|stack ?trace|traceback|bug|bugs|broken|not working|doesn'?t work");
+
+// «qué» y «hay» son ambiguos: «qué hace este archivo» pregunta, pero «que el formulario valide el RUT» y
+// «hay que validar el RUT» piden un cambio. Solo cuentan como consulta con marca de pregunta o con tilde.
+const AMBIGUO_RE = new RegExp(`^[\\s¡¿"'«(]*(?:que|hay)(?!${W})`, 'iu');
+const PREGUNTA_RE = new RegExp(`^[\\s¡!"'«(]*¿|\\?\\s*$|^[\\s¡¿"'«(]*qu[éá]`, 'iu');
+
+/** Mensaje que pide información o revisar sin modificar. */
+const isConsulta = text => {
+  const t = String(text || '').trim();
+  // La marca de consulta se compara sin tildes («explícame» entra por «explic»); el veto, sobre el texto real.
+  const f = fold(t);
+  if (!CONSULTA_RE.test(f)) return false;
+  if (AMBIGUO_RE.test(f) && !PREGUNTA_RE.test(t)) return false;
+  return !CHANGE_VERB.test(t) && !BROKEN.test(t) && !TICKET.test(t);
+};
+
+// Saludos y cortesías: no son pedidos ni consultas, y no deben abrir el GATE.
+const SMALL_TALK = /^[\s¡!¿?"'«(]*(?:hola|holi|buenas|buen[oa]s (?:d[ií]as|tardes|noches)|hey|hi|hello|qu[eé] tal|c[oó]mo (?:est[aá]s|vas)|(?:muchas |mil )?gracias|ok(?:ey)? gracias|dale gracias|chao|chau|adi[oó]s|nos vemos|hasta luego|bienvenid[oa])[\s.,!?]*(?:[\s¡!¿?"'«(]*(?:hola|buenas|gracias|ok(?:ey)?|bien|todo bien|y t[uú]|c[oó]mo (?:est[aá]s|vas))[\s.,!?]*)*$/iu;
+
+/**
+ * ¿Este mensaje exige plan aprobado antes de editar? Por defecto SÍ. La excepción es lo que se reconoce con
+ * precisión: consulta, saludo, aprobación o pedido directo. Antes la pregunta era la inversa («¿parece un
+ * pedido de cambio?») y dejaba pasar sin plan la mayoría de las redacciones naturales (banco: 59,5%).
+ */
+const requiresPlan = text => {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  if (isConsulta(t)) return false;          // consulta reconocida (su veto cubre el pedido con forma de pregunta)
+  if (isChangeRequest(t)) return true;      // señal explícita de cambio
+  if (NON_CODE.test(t)) return false;       // prototipo o maqueta: no toca el código del proyecto
+  if (SMALL_TALK.test(t) || isOnlyApproval(t)) return false;
+  return true;                              // no se reconoció: se exige plan (ver encabezado)
+};
 
 /** ¿El último mensaje del agente termina pidiendo algo al usuario? */
 function asksUser(lastMessage) {
@@ -121,13 +188,14 @@ function onPrompt(state, prompt, cfg) {
 
   // Orquestador apagado por el usuario para esta conversación: sin GATE ni flujos hasta que diga «con sdd».
   const wasOff = state.sdd === 'off';
-  if (wasOff && SDD_ON.test(text)) {
+  const sw = switchScope(text);
+  if (wasOff && SDD_ON.test(sw)) {
     state.sdd = 'on';
     state.gate = { estado: 'inicial', desde: now };
     notes.push('El usuario reactivó el orquestador SDD: vuelve a usar los flujos, y en pedidos de cambio presenta el plan y espera su aprobación.');
     return notes;
   }
-  if (wasOff || SDD_OFF.test(text)) {
+  if (wasOff || SDD_OFF.test(sw)) {
     state.sdd = 'off';
     state.gate = { estado: 'libre', desde: now };
     notes.push(wasOff
@@ -139,6 +207,8 @@ function onPrompt(state, prompt, cfg) {
   if (cfg.gate === 'nunca') return notes;
   // Un "sí" a un comando no aprueba el plan, salvo que el agente haya mostrado la pregunta del GATE.
   const approvesPlan = approval && ((g.estado === 'pendiente' && (g.conPlan || !commandsPending)) || (g.estado === 'requerido' && !commandsPending && !state.conMensajes));
+  // gate 'pedido' conserva el criterio anterior: solo abre el GATE un pedido reconocido por su texto.
+  const pide = cfg.gate === 'pedido' ? isChangeRequest(text) : requiresPlan(text);
   if (ESCAPE.test(text)) {
     state.gate = { estado: 'libre', desde: now };
     state.objetivo = redact(text.replace(/\s+/g, ' ').trim()).slice(0, 300);
@@ -146,10 +216,12 @@ function onPrompt(state, prompt, cfg) {
   } else if (approvesPlan) {
     state.gate = { estado: 'aprobado', desde: now };
     notes.push('Plan aprobado por el usuario: puedes implementar. Los sensores revisarán el código al terminar.');
-  } else if (isChangeRequest(text) && !(approval && (g.estado === 'aprobado' || commandsPending)) && !(g.estado === 'aprobado' && CONTINUE.test(text))) {
+  } else if (pide && !(approval && (g.estado === 'aprobado' || commandsPending)) && !(g.estado === 'aprobado' && CONTINUE.test(text))) {
     state.gate = { estado: 'requerido', desde: now };
     state.objetivo = redact(text.replace(/\s+/g, ' ').trim()).slice(0, 300);
-    notes.push('Pedido de cambio: las ediciones de código quedan bloqueadas hasta que presentes el plan y el usuario lo apruebe («¿Apruebo la implementación? (sí / no / ajustes)»); explorar, leer y correr tests sí puedes. Si es trivial, pregunta si lo aplicas directo.');
+    notes.push(isChangeRequest(text)
+      ? 'Pedido de cambio: las ediciones de código quedan bloqueadas hasta que presentes el plan y el usuario lo apruebe («¿Apruebo la implementación? (sí / no / ajustes)»); explorar, leer y correr tests sí puedes. Si es trivial, pregunta si lo aplicas directo.'
+      : 'Este mensaje no es una consulta ni un saludo: si implica modificar código, presenta el plan y espera la aprobación del usuario («¿Apruebo la implementación? (sí / no / ajustes)»). Si solo hay que responder o explorar, hazlo: leer, buscar e inspeccionar está permitido; editar, no. Si es trivial, pregunta si lo aplicas directo.');
   }
   return notes;
 }
@@ -168,7 +240,9 @@ function onStop(state, lastMessage) {
 }
 
 /** Tipo de mensaje, para el registro (sin guardar el texto). */
-const classify = text => SDD_OFF.test(text) ? 'sin sdd' : SDD_ON.test(text) ? 'con sdd' : ESCAPE.test(text) ? 'directo' : isApproval(text) ? 'aprobación' : isChangeRequest(text) ? 'pedido de cambio' : 'otro';
+const classify = text => SDD_OFF.test(switchScope(text)) ? 'sin sdd' : SDD_ON.test(switchScope(text)) ? 'con sdd' : ESCAPE.test(text) ? 'directo'
+  : isApproval(text) ? 'aprobación' : isChangeRequest(text) ? 'pedido de cambio' : SMALL_TALK.test(text) ? 'saludo'
+  : isConsulta(text) ? 'consulta' : 'pedido sin verbo reconocido';
 
 /** Aprobación pura: "sí", "dale", "desarrolla", "ok, implementa todo"… sin pedidos nuevos (respaldo desde la conversación). */
 const isPureApproval = text => {
@@ -194,4 +268,4 @@ function editBlockReason(state, cfg) {
   return null;
 }
 
-module.exports = { onPrompt, onStop, editBlockReason, approveFromTranscript, classify, isApproval, isPureApproval, isChangeRequest, asksUser, userText, GATE_QUESTION };
+module.exports = { onPrompt, onStop, editBlockReason, approveFromTranscript, classify, isApproval, isPureApproval, isOnlyApproval, isChangeRequest, isConsulta, requiresPlan, switchScope, asksUser, userText, GATE_QUESTION };

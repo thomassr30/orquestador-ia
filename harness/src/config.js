@@ -7,7 +7,7 @@ const { GLOBAL_CONFIG, STATE_DIR } = require('./paths');
 const { shortHash } = require('./util');
 
 const DEFAULTS = {
-  gate: 'auto',                    // auto: pedidos de cambio requieren plan aprobado · siempre · nunca
+  gate: 'auto',                    // auto: todo exige plan salvo consulta, saludo o aprobación · pedido: solo pedidos reconocidos (anterior) · siempre · nunca
   modo: 'normal',                  // normal · estricto: falla cerrada salvo lecturas, herramientas desconocidas y "ask" no críticos piden aprobación
   sensores: {
     alEditar: true,                // chequeos rápidos por archivo (JSON, YAML, conflictos de merge, gofmt)
@@ -86,7 +86,7 @@ function loadConfig(root, projectDir) {
   const lists = k => layers.flatMap(l => (l && l.permisos && l.permisos[k]) || []);
   cfg.permisos = { ...cfg.permisos, permitir: lists('permitir'), preguntar: lists('preguntar'), denegar: lists('denegar'), mcpLibres: lists('mcpLibres'), mcpBloquear: lists('mcpBloquear') };
   cfg.reglas = layers.flatMap(l => (l && l.reglas) || []);
-  if (!['auto', 'siempre', 'nunca'].includes(cfg.gate)) cfg.gate = 'auto';
+  if (!['auto', 'pedido', 'siempre', 'nunca'].includes(cfg.gate)) cfg.gate = 'auto';
   if (!Array.isArray(cfg.sensores.alTerminar)) cfg.sensores.alTerminar = [];
   return cfg;
 }

@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "tema": "gate-no-detectado",
+  "nombre": "pedido con redacción natural: abre el GATE igual; la consulta no, y «sin sdd» dentro de un log no apaga nada",
+  "cliente": "codex",
+  "archivos": {
+    "src/header.ts": "export const Header = () => null;\n"
+  },
+  "pasos": [
+    {
+      "evento": "prompt",
+      "sesion": "a",
+      "texto": "pon el logo arriba en el header",
+      "nota": "sin verbo canónico (antes quedaba en «inicial» y se podía editar sin plan)",
+      "espera": {
+        "contexto": "no es una consulta ni un saludo",
+        "estado": {
+          "gate.estado": "requerido"
+        }
+      }
+    },
+    {
+      "evento": "pre",
+      "sesion": "a",
+      "herramienta": {
+        "kind": "edit",
+        "name": "Write",
+        "paths": [
+          "src/header.ts"
+        ],
+        "contents": [
+          "x"
+        ]
+      },
+      "espera": {
+        "decision": "deny",
+        "motivo": "GATE del harness"
+      }
+    },
+    {
+      "evento": "pre",
+      "sesion": "a",
+      "herramienta": {
+        "kind": "shell",
+        "name": "Bash",
+        "command": "cat src/header.ts"
+      },
+      "nota": "explorar sigue libre antes de aprobar",
+      "espera": {
+        "decision": "permitido"
+      }
+    },
+    {
+      "evento": "prompt",
+      "sesion": "a",
+      "texto": "dale",
+      "espera": {
+        "contexto": "Plan aprobado",
+        "estado": {
+          "gate.estado": "aprobado"
+        }
+      }
+    },
+    {
+      "evento": "pre",
+      "sesion": "a",
+      "herramienta": {
+        "kind": "edit",
+        "name": "Write",
+        "paths": [
+          "src/header.ts"
+        ],
+        "contents": [
+          "x"
+        ]
+      },
+      "espera": {
+        "decision": "permitido"
+      }
+    },
+    {
+      "evento": "prompt",
+      "sesion": "b",
+      "texto": "¿cómo funciona el guard de auth?",
+      "nota": "una consulta no exige plan",
+      "espera": {
+        "estado": {
+          "gate.estado": "inicial"
+        }
+      }
+    },
+    {
+      "evento": "pre",
+      "sesion": "b",
+      "herramienta": {
+        "kind": "edit",
+        "name": "Write",
+        "paths": [
+          "src/header.ts"
+        ],
+        "contents": [
+          "x"
+        ]
+      },
+      "espera": {
+        "decision": "permitido"
+      }
+    },
+    {
+      "evento": "prompt",
+      "sesion": "c",
+      "texto": "hola",
+      "espera": {
+        "estado": {
+          "gate.estado": "inicial"
+        }
+      }
+    },
+    {
+      "evento": "prompt",
+      "sesion": "c",
+      "texto": "gracias",
+      "espera": {
+        "estado": {
+          "gate.estado": "inicial"
+        }
+      }
+    },
+    {
+      "evento": "prompt",
+      "sesion": "d",
+      "texto": "revisa este log:\n  not ok 143 - sin sdd apaga el orquestador\n  at Object.<anonymous> (gate.test.js:12:3)",
+      "nota": "la frase viene en contenido pegado: no apaga el orquestador",
+      "espera": {
+        "estado": {
+          "gate.estado": "inicial"
+        }
+      }
+    },
+    {
+      "evento": "prompt",
+      "sesion": "d",
+      "texto": "pon el logo arriba",
+      "nota": "si «sin sdd» hubiera contado, el GATE quedaría en «libre»",
+      "espera": {
+        "estado": {
+          "gate.estado": "requerido"
+        }
+      }
+    },
+    {
+      "evento": "prompt",
+      "sesion": "e",
+      "texto": "trabajemos sin sdd un rato",
+      "nota": "la misma frase como instrucción sí apaga",
+      "espera": {
+        "estado": {
+          "gate.estado": "libre",
+          "sdd": "off"
+        }
+      }
+    },
+    {
+      "evento": "prompt",
+      "sesion": "f",
+      "texto": "AB#1234",
+      "espera": {
+        "estado": {
+          "gate.estado": "requerido"
+        }
+      }
+    },
+    {
+      "evento": "prompt",
+      "sesion": "g",
+      "texto": "PBI 4521",
+      "espera": {
+        "estado": {
+          "gate.estado": "requerido"
+        }
+      }
+    },
+    {
+      "evento": "prompt",
+      "sesion": "h",
+      "texto": "https://dev.azure.com/siigsa/plataforma/_workitems/edit/1234",
+      "espera": {
+        "estado": {
+          "gate.estado": "requerido"
+        }
+      }
+    }
+  ]
+}

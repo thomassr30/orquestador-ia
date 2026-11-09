@@ -56,8 +56,35 @@ function fileArgs(files, max = 40) {
   return list.length > 6000 ? files.slice(0, 10).map(quote).join(' ') : list;
 }
 
-/** Comandos detectados para un módulo y sus archivos cambiados. */
-function detect(root, modRoot, files) {
+// Formas que quedan observando cambios y no terminan solas: el harness las cortaría por tiempo, así que nunca
+// se ejecutan tal cual. «ng test» y «karma» entran acá porque su modo por defecto es observar.
+const WATCH = /(?:^|\s)(?:--watch|--watchAll|-w)(?=$|[\s=])|\bwatch:|\bng test\b|\bkarma\b|\bnodemon\b/i;
+
+/**
+ * Runner de tests del módulo y cómo correrlo UNA sola vez. El script «test» del package.json dice cuál es; si no
+ * se puede correr sin modo observación, se devuelve null y el control queda «no verificado» (nunca aprobado).
+ * `scoped: false` en los runners que corren la suite completa: un test ajeno que falla no se atribuye al cambio
+ * sin línea base (ver runSensors y takeBaseline).
+ * @returns {{runner:string, cmd:string, scoped:boolean}|null}
+ */
+function testRunner(root, modRoot, { test, pm, js, angular }) {
+  if (!js.length || !test || /no test specified/i.test(test)) return null;
+  const has = name => localBin(root, modRoot, name);
+  const headless = '--browsers=ChromeHeadless';
+  // Angular y Karma: una pasada y Chrome headless. Sin Chrome el control queda omitido, no aprobado.
+  if (/\bng test\b/.test(test) && has('ng')) return { runner: 'angular/karma', cmd: `npx --no-install ng test --watch=false ${headless}`, scoped: false };
+  if (/\bkarma\b/.test(test) && has('karma')) return { runner: 'karma', cmd: `npx --no-install karma start --single-run ${headless}`, scoped: false };
+  if (angular && has('ng')) return { runner: 'angular/karma', cmd: `npx --no-install ng test --watch=false ${headless}`, scoped: false };
+  if (/\bvitest\b/.test(test)) return { runner: 'vitest', cmd: `npx --no-install vitest related --run --passWithNoTests ${fileArgs(js)}`, scoped: true };
+  if (/\bjest\b/.test(test)) return { runner: 'jest', cmd: `npx --no-install jest --ci --passWithNoTests --findRelatedTests ${fileArgs(js)}`, scoped: true };
+  if (/\bmocha\b/.test(test) && has('mocha')) return { runner: 'mocha', cmd: 'npx --no-install mocha', scoped: false };
+  if (/\bjasmine\b/.test(test) && has('jasmine')) return { runner: 'jasmine', cmd: 'npx --no-install jasmine', scoped: false };
+  // Script propio: sirve tal cual, salvo que quede observando cambios.
+  if (WATCH.test(test)) return null;
+  return { runner: 'script test', cmd: pm === 'npm' ? 'npm test' : `${pm} test`, scoped: false };
+}
+
+/** Comandos detectados para un módulo y sus archivos cambiados. */function detect(root, modRoot, files) {
   const out = {};
   const relFiles = files.map(f => relPosix(modRoot, path.resolve(root, f)));
   const pkg = readJson(path.join(modRoot, 'package.json'));
@@ -83,15 +110,8 @@ function detect(root, modRoot, files) {
         if (app) out.tipos = { cmd: `npx --no-install tsc --noEmit -p ${app}`, scoped: false };
       }
     }
-    const test = String(scripts.test || '');
-    if (angular && js.length && /\b(ng test|karma)\b/.test(test) && localBin(root, modRoot, 'ng')) {
-      // Karma sin modo watch y con Chrome headless (si no hay Chrome, queda omitido)
-      out.tests = { cmd: 'npx --no-install ng test --watch=false --browsers=ChromeHeadless', scoped: true };
-    } else if (js.length && test && !/no test specified/i.test(test) && !/\b(ng test|karma|--watch)\b/.test(test)) {
-      if (/\bvitest\b/.test(test)) out.tests = { cmd: `npx --no-install vitest related --run --passWithNoTests ${fileArgs(js)}`, scoped: true };
-      else if (/\bjest\b/.test(test)) out.tests = { cmd: `npx --no-install jest --ci --passWithNoTests --findRelatedTests ${fileArgs(js)}`, scoped: true };
-      else out.tests = { cmd: pm === 'npm' ? 'npm test' : `${pm} test`, scoped: true };
-    }
+    const t = testRunner(root, modRoot, { test: String(scripts.test || ''), pm, js, angular });
+    if (t) out.tests = t;
     return out;
   }
   if (exists(path.join(modRoot, 'go.mod'))) {
@@ -122,7 +142,7 @@ function plan(root, changed, cfg) {
     for (const f of files) { const m = moduleRootFor(root, f); if (!groups.has(m)) groups.set(m, []); groups.get(m).push(f); }
     for (const [mod, gfiles] of groups) {
       const det = detect(root, mod, gfiles);
-      for (const n of pending) if (det[n]) steps.push({ nombre: n, cmd: det[n].cmd, scoped: det[n].scoped, cwd: mod, modulo: relPosix(root, mod), files: gfiles.map(f => relPosix(mod, path.resolve(root, f))) });
+      for (const n of pending) if (det[n]) steps.push({ nombre: n, cmd: det[n].cmd, runner: det[n].runner, scoped: det[n].scoped, cwd: mod, modulo: relPosix(root, mod), files: gfiles.map(f => relPosix(mod, path.resolve(root, f))) });
     }
   }
   return steps;
@@ -284,4 +304,4 @@ function quickCheck(abs) {
   return issues.length ? issues : null;
 }
 
-module.exports = { runSensors, takeBaseline, validBaseline, errorLines, failureSignature, summarize, quickCheck, plan, detect, moduleRootFor, CODE_EXT, relevantLines };
+module.exports = { testRunner, runSensors, takeBaseline, validBaseline, errorLines, failureSignature, summarize, quickCheck, plan, detect, moduleRootFor, CODE_EXT, relevantLines };

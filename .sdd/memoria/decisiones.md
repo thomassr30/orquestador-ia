@@ -1,5 +1,13 @@
 # Decisiones
 
+## 2026-11-06 · harness 3.1.0 (plan de mejora aprobado por el usuario)
+- **El GATE se abre por defecto** y solo se abstiene con consulta, saludo, aprobación limpia o pedido directo. Motivo: la clase difícil de reconocer es el pedido de cambio (formas infinitas), no la consulta (formas acotadas). Medido antes del cambio en evals/gate/frases.json: 59,5% de falsos negativos y 0% de falsos positivos; después, 0% y 0%. Se agrega `gate: "pedido"` para conservar el criterio de 3.0.0, porque es un cambio de comportamiento por defecto y debe poder revertirse por configuración.
+- **Los modales de pedido cortés no son consulta**: «¿puedes dejar el header fijo?» pide un cambio. «que…» y «hay que…» solo son consulta con marca de pregunta o tilde, que es lo que separa «¿qué hace este archivo?» de «que el formulario valide el RUT».
+- **El veto de la consulta usa formas verbales completas**, no prefijos: así «resume los cambios» o «muéstrame la configuración» no se convierten en pedidos por contener «cambi» o «configur».
+- **Un destino de escritura que no se puede resolver es crítico**, no se omite. Motivo: omitirlo en silencio era la opción permisiva, y contradice D2 (escribir fuera del proyecto lo decide el usuario).
+- **El gestor de tickets no es el repositorio**: escribir un work item de Azure Boards pide confirmación y escribir en Azure Repos se bloquea. Motivo: es lo que ya decían tracker-common y tracker-azure-boards; denegarlo todo por el nombre del servidor era clasificar por proveedor en vez de por acción. GitHub y GitLab quedan como estaban: sus nombres de herramienta no distinguen tracker de código y es una garantía declarada en SECURITY.md.
+- **Medir siempre en disco local**: sobre una carpeta montada por el puente cada spawn de node cuesta 19,4 s contra 98 ms en disco. Una medición de rendimiento hecha sobre el montaje no es evidencia.
+
 ## 2026-11-03 · harness 3.0.0 (aprobadas por el usuario, opción «a» en D1-D8)
 - D1 Controles: `sensores.obligatorios` = ["tests"] si el proyecto los tiene; nada se ve verde sin al menos un control aprobado. Motivo: una omisión no puede contar como aprobación.
 - D2 «ask» no crítico: escribir fuera del proyecto (salvo temporal del sistema) y Bash sobre rutas protegidas son críticos; comandos/herramientas desconocidos se delegan al cliente salvo `modo: estricto`. Motivo: evitar diálogos por cada comando sin dejar huecos en lo protegido.

@@ -1,6 +1,6 @@
 {
   "_comentario": "Configuración global del harness SDD. Cada proyecto puede sobrescribirla con .sdd/harness.json (mismas claves). El agente no puede modificar estos archivos sin tu permiso.",
-  "_gate": "auto: un pedido de cambio bloquea las ediciones hasta que apruebas el plan en el chat · siempre: toda edición requiere plan aprobado · nunca: sin GATE por código",
+  "_gate": "auto: todo mensaje bloquea las ediciones hasta que apruebas el plan, salvo los que el harness reconoce como consulta, saludo, aprobación o pedido directo (reconocer la consulta es acotado; reconocer el pedido de cambio, no) · pedido: solo bloquea cuando reconoce un pedido de cambio por su texto, como hasta 3.0.0 · siempre: toda edición requiere plan aprobado, también tras una consulta · nunca: sin GATE por código",
   "gate": "auto",
   "_modo": "normal: ante un error interno del harness, falla cerrada solo para acciones críticas (git que escribe, dependencias, infraestructura, MCP que escribe, rutas protegidas); lo demás sigue y queda registrado. estricto: falla cerrada para todo salvo lecturas, las herramientas que el harness no reconoce piden confirmación y los comandos no reconocidos como seguros también. Ninguno de los dos es un sandbox: el aislamiento de archivos, procesos y red depende del cliente.",
   "modo": "normal",

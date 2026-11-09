@@ -22,7 +22,7 @@ const { loadConfig } = require('../src/config');
 const NODE = process.execPath;
 const CORPUS = path.join(REPO, 'evals', 'corpus');
 const HOSTS = { claude: { nativeAsk: true }, copilot: { nativeAsk: true }, codex: { nativeAsk: false, nativeGitAsk: true }, opencode: { nativeAsk: false, nativeGitAsk: true }, gemini: { nativeAsk: false }, cursor: { nativeAsk: false } };
-const TEMAS = ['cambio-sencillo', 'correccion-con-regresion', 'accion-critica', 'argumentos-cambiados', 'sensor-fallido-u-omitido', 'compactacion-y-reanudacion', 'concurrencia', 'estado-corrupto', 'herramienta-desconocida', 'fallo-de-hook', 'recuperacion-de-checkpoint'];
+const TEMAS = ['cambio-sencillo', 'correccion-con-regresion', 'accion-critica', 'argumentos-cambiados', 'sensor-fallido-u-omitido', 'compactacion-y-reanudacion', 'concurrencia', 'estado-corrupto', 'herramienta-desconocida', 'fallo-de-hook', 'recuperacion-de-checkpoint', 'gate-no-detectado', 'gate-modo-pedido'];
 
 /** «{node}» en el escenario = ruta de este Node (los comandos de sensores no dependen del PATH). */
 const expand = v => JSON.parse(JSON.stringify(v).split('{node}').join(JSON.stringify(NODE).slice(1, -1)));

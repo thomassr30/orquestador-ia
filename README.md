@@ -36,7 +36,7 @@ Se instala **una vez** y queda activo en **todos tus proyectos**.
 - [Arquitectura](#arquitectura)
 - [Diagnóstico y problemas frecuentes](#diagnóstico-y-problemas-frecuentes)
 - [Preguntas frecuentes](#preguntas-frecuentes)
-- [Migración a 3.0.0](#migración-a-300)
+- [Migración a 3.1.0](#migración-a-310) · [Migración a 3.0.0](#migración-a-300)
 - [Actualizar, personalizar y desinstalar](#actualizar-personalizar-y-desinstalar)
 - [Contribuir](#contribuir) · [Seguridad](#seguridad) · [Licencia](#licencia)
 
@@ -86,9 +86,9 @@ Para algo trivial no hace falta plan: `cambia el título a "Clientes", directo`.
 
 | | |
 |---|---|
-| **Permisos por código** | Nada de PR ni issues en GitHub/GitLab, tampoco por MCP. Commit y el resto de git (push, merge, rebase, reset, stash…) solo con tu confirmación, para ese comando exacto. Secretos protegidos y comandos destructivos bloqueados. Pide confirmación para infraestructura, bases de datos, borrados, dependencias y configurar servidores MCP. |
+| **Permisos por código** | Nada de PR ni issues en GitHub/GitLab/Azure Repos, tampoco por MCP (los work items de Azure Boards se escriben con tu confirmación: son tickets, no código). Commit y el resto de git (push, merge, rebase, reset, stash…) solo con tu confirmación, para ese comando exacto. Secretos protegidos y comandos destructivos bloqueados. Pide confirmación para infraestructura, bases de datos, borrados, dependencias y configurar servidores MCP. |
 | **Commits sin firma de IA** | Los mensajes de commit sugeridos van sin `Co-Authored-By: Claude`, `Generated with…` ni `Made-with: Cursor`: si aparecen, el harness pide reescribirlos, y un `git commit` que los trae se bloquea. En Claude Code, además, se desactiva la atribución. |
-| **Plan antes de editar (GATE)** | En un pedido de cambio, las ediciones y los comandos que el harness reconoce como escritura quedan bloqueados hasta que respondas `sí`. |
+| **Plan antes de editar (GATE)** | Las ediciones y los comandos que el harness reconoce como escritura quedan bloqueados hasta que respondas `sí`. Se exceptúa lo que el harness reconoce como consulta, saludo, aprobación o pedido directo. |
 | **Verificación al terminar** | Lint, tipos, tests y reglas propias sobre lo que cambió, también por comandos de shell. Cada control queda aprobado, fallido o **no verificado**; lo que no corrió nunca cuenta como aprobado. Node/TS, Angular y Go automáticos; plantillas para Android, iOS y SCSS. |
 | **Trabajo verificable** | Plan con requisitos, criterios y tareas guardado fuera del repo. Una tarea se da por hecha solo con evidencia del harness sobre el contenido actual; la aceptación funcional la marcas tú. |
 | **Aprobaciones exactas** | En las herramientas que confirman en el chat, cada «sí» vale para esa acción exacta, una vez y por 30 minutos. |
@@ -107,7 +107,7 @@ Cada protección cae en una de cuatro categorías. Lo que figura como implementa
 
 **Implementado por el harness (código):**
 
-- Decisión sobre cada acción que la herramienta le pasa al hook: escritura en GitHub/GitLab bloqueada; archivos con secretos, comandos destructivos y commits con atribución de IA bloqueados; confirmación para `git commit` (con aviso en `--amend`), el resto de git, infraestructura, bases de datos, borrados, dependencias, MCP que escriben, configuración del harness o de los hooks y escrituras fuera del proyecto (salvo la carpeta temporal del sistema).
+- Decisión sobre cada acción que la herramienta le pasa al hook: escritura en el repositorio de GitHub/GitLab/Azure Repos bloqueada (los work items de Azure Boards piden confirmación); archivos con secretos, comandos destructivos y commits con atribución de IA bloqueados; confirmación para `git commit` (con aviso en `--amend`), el resto de git, infraestructura, bases de datos, borrados, dependencias, MCP que escriben, configuración del harness o de los hooks y escrituras fuera del proyecto (salvo la carpeta temporal del sistema).
 - Las mismas protecciones de rutas para los comandos de shell cuando el destino es reconocible (redirecciones, `sed -i`, `cp`/`mv`, `tee`, cmdlets de PowerShell…). Es de mejor esfuerzo.
 - GATE: sin plan aprobado se bloquean las ediciones y los comandos reconocidos como escritura.
 - Verificación al terminar el turno con resultados explícitos (aprobado, fallido, no verificado, bloqueado, excepción). Lo omitido nunca cuenta como aprobado. Los cambios hechos por shell se detectan con git.
@@ -127,7 +127,7 @@ Cada protección cae en una de cuatro categorías. Lo que figura como implementa
 
 **Recomendado por instrucciones (depende de que el modelo las siga):**
 
-- Clasificar el pedido, presentar el plan y escalar el esfuerzo. El GATE se activa al reconocer un pedido de cambio por su texto; si no lo reconoce (por ejemplo, un mensaje que es solo contenido pegado), presentar el plan depende de la instrucción.
+- Clasificar el pedido, presentar el plan y escalar el esfuerzo. El GATE se activa por defecto y solo se abstiene con lo que reconoce como consulta, saludo, aprobación o pedido directo: así una redacción que no usa los verbos habituales («pon el logo arriba», «necesito que el botón quede a la derecha») exige plan igual.
 - Registrar el plan verificable (`trabajo plan`) en pedidos medianos y grandes. Sin ese registro no hay modelo de trabajo que congelar.
 - Mostrar el comando o cambio exacto antes de pedir un «sí» en el chat.
 - Usar solo la memoria del proyecto en curso y guardar ahí lo durable.
@@ -539,7 +539,7 @@ Hay una configuración global en `~/.sdd-orquestador/harness.json` y otra por pr
 
 | Clave | Valores |
 |---|---|
-| `gate` | `auto` (por defecto: los pedidos de cambio requieren plan) · `siempre` (toda edición) · `nunca` (sin GATE por código) |
+| `gate` | `auto` (por defecto: exige plan salvo consulta, saludo, aprobación o pedido directo) · `pedido` (solo con un pedido de cambio reconocido por su texto, como hasta 3.0.0) · `siempre` (toda edición, también tras una consulta) · `nunca` (sin GATE por código) |
 | `modo` | `normal` (por defecto) · `estricto`. Ver [Modo estricto y fallas internas](#modo-estricto-y-fallas-internas). |
 | `sensores.alEditar` | Chequeo instantáneo de cada archivo editado (por defecto sí). |
 | `sensores.alTerminar` | Controles al terminar el turno (`lint`, `tipos`, `tests`). Vacío = sin sensores; lo modificado queda «no verificado». |
@@ -728,6 +728,15 @@ No. Garantiza que lo que informa como verificado corrió y pasó sobre el conten
 **¿Funciona si mi equipo usa herramientas distintas?**
 Sí. Cada persona lo instala en la suya; la memoria del proyecto (`.sdd/memoria/`) es la misma para todos.
 
+## Migración a 3.1.0
+
+Actualiza la instalación (`npm run update` o `node install.js`). No cambia el estado ni tu `harness.json`.
+
+| Qué cambia | Qué hacer |
+|---|---|
+| **El GATE se abre por defecto** y solo se abstiene con lo que reconoce como consulta, saludo, aprobación o pedido directo. Antes se abría únicamente al reconocer un pedido de cambio por su texto, y el 59,5% de los pedidos redactados de forma natural pasaban sin plan (medido en `evals/gate/frases.json`). | Nada, salvo que notes que pide plan donde no corresponde. Si prefieres el criterio anterior: `"gate": "pedido"`. Para un pedido puntual sigue valiendo «directo». |
+| **`~` y las variables de home en comandos** pasan por las mismas protecciones que una edición, y un destino que no se puede resolver pide tu confirmación. | Nada. Puede aparecer alguna confirmación nueva en comandos que escriben con una variable en la ruta. |
+| **«sin sdd» dentro de contenido pegado** ya no apaga el orquestador. | Nada. Para apagarlo, escribe la instrucción sola. |
 ## Migración a 3.0.0
 
 El repositorio en 3.0.0 no cambia lo instalado en tu equipo: para que los hooks usen esta versión, actualiza la instalación (`npm run update` o `node install.js`).

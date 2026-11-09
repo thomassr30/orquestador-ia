@@ -1,5 +1,36 @@
 # Cambios
 
+## 3.1.0 — El GATE por defecto y las rutas de home en comandos
+
+No cambia el formato del estado ni la configuración existente: basta `npm run update` (o `node install.js`) para que los hooks instalados usen esta versión.
+
+### Cambio de comportamiento por defecto
+- **El GATE se abre salvo que el mensaje sea una consulta.** Antes se abría solo al reconocer un pedido de cambio por su texto. Medido sobre `evals/gate/frases.json`, ese criterio dejaba pasar sin plan el **59,5%** de los pedidos redactados como se escriben en la práctica («pon el logo arriba», «necesito que el botón quede a la derecha», «el deploy quedó malo»), con 0% de falsos positivos: la clase difícil de reconocer era el pedido, no la consulta. Invertida la pregunta, el banco queda en 100% de detección y 0% de falsos positivos.
+  - Se abstienen: consulta o pedido de solo lectura, saludo y cortesía, aprobación «limpia» y pedido directo («directo», «sin plan»). Un pedido con forma de pregunta («¿puedes dejar el header fijo?») sí abre el GATE: los modales de pedido cortés no cuentan como consulta.
+  - **`gate: "pedido"`** conserva el criterio anterior para quien lo prefiera. `siempre` y `nunca` no cambian.
+
+### Correcciones
+- **`~` y las variables de home ya no esquivan las rutas protegidas.** `policy.js` expande `~`, `$HOME`, `${HOME}`, `%USERPROFILE%` y `$env:USERPROFILE` antes de resolver un destino (`expandPath`). Antes, `echo {} > ~/.claude/settings.json` se resolvía como un archivo del proyecto llamado `~` y quedaba en «ask» no crítico, así que la decisión la tomaba el cliente y no el usuario, pese a que `writeTargets` sí reconocía el destino.
+- **Un destino que no se puede resolver ya no se omite en silencio.** Un comando que escribe en una ruta con otra variable o un comodín (`> $LOG_DIR/out.txt`) se trata como escritura fuera del proyecto: decisión del usuario. Antes se saltaba el chequeo de rutas por completo.
+- **«sin sdd» dentro de contenido pegado ya no apaga el orquestador** (`gate.js`, `switchScope`): la frase solo cuenta en mensajes cortos que no parecen un log o un fragmento de código.
+- **Tickets de Azure Boards abren el GATE**: `AB#1234`, `PBI 4521` y el enlace `…/_workitems/edit/1234`, además del formato Jira `LAB-123`.
+
+### Sensores: runner de tests por proyecto
+- **Karma fuera de Angular ya se detecta.** Un proyecto con `"test": "karma start"` y sin `angular.json` no obtenía ningún control de tests, así que el cambio quedaba «no verificado» sin decir por qué. Ahora corre `karma start --single-run --browsers=ChromeHeadless`.
+- **El modo observación se neutraliza en vez de descartar el control.** Antes, cualquier script `test` con `--watch` quedaba fuera por completo; ahora se reconoce el runner y se corre en una sola pasada (`jest --watch` → `jest --ci --findRelatedTests`, `mocha --watch` → `mocha`). Lo que no se puede correr sin observar (`nodemon`, o `ng test` sin la CLI instalada) sigue sin control, que es lo correcto: nunca se da por aprobado.
+- **Mocha y Jasmine se reconocen por nombre** en vez de caer en el `npm test` genérico.
+- **La suite completa deja de marcarse como «scoped»** (`ng test`, `karma`, `mocha`, `jasmine`, `npm test`): un test ajeno que falla ya no se atribuye al cambio sin línea base. Antes se marcaba como fallo del cambio; ahora queda «no verificado» y el aviso apunta a `sdd-harness linea-base`. Los runners que sí corren solo lo relacionado (vitest, jest) siguen scoped.
+- **El runner detectado se muestra** en `sdd-harness doctor` y en `sdd-harness sensores`, que ahora imprime los controles detectados antes de correrlos y, si no hay ninguno, dice dónde mirar.
+
+### Azure DevOps por MCP- **Los work items de Azure Boards se escriben con tu confirmación, no se bloquean.** Antes el servidor caía en la regla de forja y se denegaba todo, incluso comentar un avance o mover un estado, en contra de lo que dicen `tracker-common` y `tracker-azure-boards`. Escribir en Azure **Repos** (pull requests) sigue bloqueado, igual que GitHub y GitLab.
+- **`query` deja de contar como verbo de escritura**: una consulta WIQL (`wit_query`) es lectura. Lo que sí ejecuta (`run_query`, `execute_query`, `sql_query`) sigue cubierto por `run`, `execute` y `sql`.
+- **La decisión ya no depende del nombre del servidor**: `azure-devops`, `ado`, `azdo`, `vsts` y `tfs` se reconocen igual.
+- `tracker-azure-boards` indica qué registrar una vez por proyecto: organización, proyecto, equipo, area path, iteration path y proceso (los estados válidos dependen de Agile, Scrum o CMMI).
+- Pruebas nuevas en `harness/test/mcp.test.js` con los nombres reales del MCP oficial (`@azure-devops/mcp`).
+
+### Pruebas- `evals/gate/frases.json`: banco de 126 pedidos, 64 consultas, 41 aprobaciones y 20 negativas, con umbrales en `harness/test/gate-banco.test.js`. Corre en `npm test`, sin modelos.
+- Corpus: temas nuevos `gate-no-detectado` y `gate-modo-pedido`.
+- `garantias.test.js`: prueba `APR-8` para «~», las variables de home y los destinos sin resolver.
 ## 3.0.0 — Resultados verificables, aprobaciones exactas y estado resistente
 
 Para que los hooks instalados usen esta versión hay que actualizar la instalación (`npm run update` o `node install.js`). Guía en el README → *Migración a 3.0.0*.

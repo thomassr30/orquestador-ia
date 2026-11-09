@@ -9,7 +9,7 @@
 6. **Todo en español** (mensajes al usuario y a la IA).
 
 ## Estructura
-- `core/`: reglas globales, 22 agentes, 104 skills y comandos (lo que lee la IA).
+- `core/`: reglas globales, 22 agentes, 105 skills y comandos (lo que lee la IA).
 - `harness/src/`: núcleo común (política, GATE, sensores, memoria, presupuesto, reglas propias) y un adaptador por herramienta en `adapters/`.
 - `harness/opencode/`: plugin de OpenCode.
 - `bin/`: hooks (`sdd-hook.js`), compactador de salidas, diagnóstico, evaluaciones y scripts de memoria.
@@ -17,7 +17,7 @@
 
 ## Antes de enviar un cambio
 ```bash
-npm test                      # 70+ pruebas: política, GATE, sensores, adaptadores, instalación
+npm test                      # 214 pruebas (~65 s): política, GATE, banco de frases, sensores, corpus, adaptadores, instalación
 node install.js --dry-run     # revisa qué escribiría
 ```
 Si cambias cómo se comporta la IA (agentes, skills, reglas), mide con `node bin/sdd-eval.js` sobre tareas reales antes y después.

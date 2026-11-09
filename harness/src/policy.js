@@ -244,6 +244,29 @@ function segmentMayWrite(seg, extra) {
   return false; // lectura, búsqueda e inspección (jq, awk, fd, tree, file, du, ps, Get-Item, Test-Path…)
 }
 
+// Variables de entorno que apuntan a una carpeta del usuario y que el shell expande (path.resolve no).
+const ENV_PATHS = new Set(['TMPDIR', 'TEMP', 'TMP', 'APPDATA', 'LOCALAPPDATA', 'XDG_CONFIG_HOME']);
+const HOME_PREFIX = /^(?:~|\$(\w+)|\$\{(\w+)\}|%(\w+)%|\$env:(\w+))(?=$|[\\/])/i;
+const UNRESOLVED = /[$`*?%]/;
+
+/**
+ * Expande al inicio de una ruta lo que el shell sí expande y `path.resolve` no: "~" y las variables de home,
+ * temporal o configuración del usuario. Sin esto "~/.claude/settings.json" se resuelve como un archivo DENTRO
+ * del proyecto llamado "~" y se salta las protecciones de rutas (ver checkPath).
+ * @returns {string|null} la ruta expandida, o null si el destino no se puede resolver aquí (variable
+ *   desconocida o comodín): quien la use debe fallar cerrada, no darla por interna.
+ */
+function expandPath(target) {
+  let t = String(target || '').trim().replace(/^(["'])([\s\S]*)\1$/, '$2');
+  const m = HOME_PREFIX.exec(t);
+  if (m) {
+    const name = (m[1] || m[2] || m[3] || m[4] || 'HOME').toUpperCase();
+    const value = m[0] === '~' || name === 'HOME' || name === 'USERPROFILE' ? HOME : (ENV_PATHS.has(name) ? process.env[name] : null);
+    if (!value) return null;
+    t = path.join(value, t.slice(m[0].length));
+  }
+  return UNRESOLVED.test(t) ? null : t;
+}
 /** Destinos de redirecciones (> y >>) fuera de comillas, sin descartes (/dev/null, nul) ni duplicaciones (>&2). */
 function redirectTargets(seg) {
   const out = [];
@@ -408,8 +431,13 @@ class Policy {
     if (r.decision === 'deny') return r;
     // Lo que el comando escribe de forma reconocible pasa por las mismas protecciones que una edición
     for (const target of writeTargets(command)) {
-      if (/[$`*?%]/.test(target)) continue; // variables o comodines: no se pueden resolver aquí
-      const p = this.checkPath(target, 'write');
+      const resolved = expandPath(target);
+      if (!resolved) {
+        // No se puede saber dónde escribe: se trata como escritura fuera del proyecto (decisión del usuario).
+        if (r.decision === 'ask' && r.critical) continue;
+        return { decision: 'ask', critical: true, reason: `el comando escribe en un destino que el harness no puede resolver (${target}): puede caer fuera del proyecto o en una ruta protegida. Muéstrale al usuario la ruta final exacta antes de confirmar` };
+      }
+      const p = this.checkPath(resolved, 'write');
       if (p.decision === 'deny') return { decision: 'deny', reason: `${p.reason} (tampoco por comandos)` };
       if (p.decision === 'ask' && p.critical && !(r.decision === 'ask' && r.critical)) {
         return { decision: 'ask', critical: true, reason: `${p.reason} — el comando escribe ${p.inside ? p.rel : p.abs}` };
@@ -424,7 +452,7 @@ class Policy {
    * @param {'read'|'write'} mode
    */
   checkPath(p, mode) {
-    const abs = path.resolve(this.root, String(p || '.'));
+    const abs = path.resolve(this.root, expandPath(p) || String(p || '.'));
     const rel = relPosix(this.root, abs);
     const inside = this.folders.some(f => isInside(f, abs));
     if (this.isSecret(abs)) return { decision: 'deny', abs, rel, inside, reason: `archivo con secretos (${path.basename(abs)}): no se lee ni se escribe` };
@@ -448,4 +476,4 @@ class Policy {
   }
 }
 
-module.exports = { Policy, splitSegments, normalizeSegment, classifyCommand, matchPattern, tokenize, secretReference, mayWrite, writeTargets };
+module.exports = { Policy, splitSegments, normalizeSegment, classifyCommand, matchPattern, tokenize, secretReference, mayWrite, writeTargets, expandPath };

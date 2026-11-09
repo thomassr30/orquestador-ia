@@ -301,7 +301,7 @@ function doctor() {
   console.log(`Línea base de errores: ${lb.lb ? `commit ${lb.lb.commit.slice(0, 8)} (${String(lb.lb.en).slice(0, 10)})` : lb.motivo}`);
   console.log(`\nSensores ${files.length ? `para los ${files.length} archivo(s) modificados` : '(ejemplo con un archivo del proyecto)'}:`);
   if (!steps.length) console.log('  ninguno detectado: configura sensores.comandos en .sdd/harness.json');
-  for (const s of steps) console.log(`  • ${s.nombre}${s.modulo !== '.' ? ` [${s.modulo}]` : ''}: ${s.cmd}`);
+  for (const s of steps) console.log(`  • ${s.nombre}${s.modulo !== '.' ? ` [${s.modulo}]` : ''}${s.runner ? ` (${s.runner})` : ''}: ${s.cmd}`);
 }
 
 function guessSample() {
@@ -317,8 +317,11 @@ function guessSample() {
 async function sensores() {
   const files = changedFiles();
   if (!files.length) { console.log('No hay archivos modificados (git status) para verificar.'); return; }
-  const run = await runSensors(root, files, loadConfig(root));
-  if (!run.ran) { console.log('No hay sensores aplicables a los archivos modificados: quedan sin verificar.'); process.exitCode = 1; return; }
+  const cfg = loadConfig(root);
+  const pasos = plan(root, files, cfg);
+  if (pasos.length) console.log(`Controles detectados: ${pasos.map(p => `${p.nombre}${p.modulo && p.modulo !== '.' ? ` [${p.modulo}]` : ''}${p.runner ? ` (${p.runner})` : ''}`).join(' · ')}`);
+  const run = await runSensors(root, files, cfg);
+  if (!run.ran) { console.log('No hay sensores aplicables a los archivos modificados: quedan sin verificar. Revisa qué detecta el harness con «sdd-harness.js doctor» o fija el comando en .sdd/harness.json → sensores.comandos.'); process.exitCode = 1; return; }
   console.log(summarize(run, files.length));
   process.exitCode = run.ok ? 0 : 1;
 }
