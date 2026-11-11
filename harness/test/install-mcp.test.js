@@ -87,4 +87,53 @@ test('MCP por proyecto: dos repos con dos organizaciones no se pisan', () => {
 
   // Sin --mcp tampoco: pedirlo explícito evita duplicar los globales por descuido
   assert.match(run(repo(), '--proyecto').stdout + run(repo(), '--proyecto').stderr, /Indica qué servidor registrar/);
+
+  // El alcance se nombra, no se adivina: --proyecto NO lleva el nombre del proyecto (lo decide la carpeta).
+  // Con un valor caía en la instalación global sin avisar, que es lo peor que podía pasar.
+  const conValor = repo();
+  const r2 = run(conValor, '--mcp=azure-devops', '--org=siigsa', '--proyecto=JUNJI');
+  assert.strictEqual(r2.status, 2);
+  assert.match(r2.stdout + r2.stderr, /«--proyecto» no lleva valor/);
+  assert.match(r2.stdout + r2.stderr, /--alcance=proyecto/, 'dice el comando correcto');
+  assert.strictEqual(fs.existsSync(path.join(conValor, '.mcp.json')), false, 'no registró nada');
+
+  // --nombre: alias corto del servidor. El nombre aparece en cada nombre de herramienta MCP, así que uno largo
+  // («azure-devops-subdepartamentosolucionesti») se paga en tokens en todas las sesiones.
+  const conAlias = repo();
+  assert.strictEqual(run(conAlias, '--mcp=azure-devops', '--org=SubdepartamentoSolucionesTI', '--nombre=azure-sag', '--proyecto').status, 0);
+  assert.deepStrictEqual(Object.keys(leer(conAlias)), ['azure-sag']);
+  assert.strictEqual(leer(conAlias)['azure-sag'].url, 'https://mcp.dev.azure.com/SubdepartamentoSolucionesTI', 'la URL conserva las mayúsculas de la organización');
+
+  // La forma explícita y el alias hacen lo mismo
+  const porAlcance = repo();
+  assert.strictEqual(run(porAlcance, '--mcp=azure-devops', '--org=siigsa', '--alcance=proyecto').status, 0);
+  assert.deepStrictEqual(Object.keys(leer(porAlcance)), ['azure-devops-siigsa']);
+  const malAlcance = run(repo(), '--alcance=otro');
+  assert.strictEqual(malAlcance.status, 2);
+  assert.match(malAlcance.stdout + malAlcance.stderr, /--alcance desconocido/);
+});
+
+test('el instalador queda en ~/.sdd-orquestador: registrar un MCP no depende de dónde esté el repositorio', () => {
+  const H2 = tmp('sdd-copia-');
+  const env2 = { ...process.env, HOME: H2, USERPROFILE: H2, APPDATA: path.join(H2, 'AppData', 'Roaming') };
+  delete env2.SDD_HOME; delete env2.CODEX_HOME;
+  const node = (cwd, script, ...args) => spawnSync(process.execPath, [script, ...args], { cwd, env: env2, encoding: 'utf8' });
+
+  // Instalación normal desde el repositorio
+  assert.strictEqual(node(H2, path.join(REPO, 'install.js'), '--targets=claude', '--no-mcp', '--no-deps').status, 0);
+  const copia = path.join(H2, '.sdd-orquestador', 'install.js');
+  assert.ok(fs.existsSync(copia), 'el instalador se copia');
+  assert.ok(fs.existsSync(path.join(H2, '.sdd-orquestador', 'config', 'mcp.json')), 'y sus plantillas');
+
+  // Desde otro proyecto, con la copia: no se nombra el repositorio en ninguna parte
+  const proy = tmp('proy-');
+  const r = node(proy, copia, '--mcp=azure-devops', '--org=sag', '--alcance=proyecto');
+  assert.strictEqual(r.status, 0, r.stdout + r.stderr);
+  assert.deepStrictEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(proy, '.mcp.json'), 'utf8')).mcpServers), ['azure-devops-sag']);
+
+  // Esa copia no trae core/, así que una instalación completa se detiene diciendo qué hacer
+  const full = node(proy, copia, '--targets=claude');
+  assert.strictEqual(full.status, 2);
+  assert.match(full.stdout + full.stderr, /solo sirve para registrar servidores MCP de un proyecto/);
+  assert.match(full.stdout + full.stderr, /córrelo desde su repositorio/);
 });

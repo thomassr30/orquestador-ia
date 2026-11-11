@@ -18,6 +18,8 @@ function repo() {
   git(d, 'init', '-q', '-b', 'develop', '.');
   // Identidad en el repo: los comandos del módulo no la pasan por la línea de comandos, como en un repo real
   git(d, 'config', 'user.email', 't@t'); git(d, 'config', 'user.name', 't');
+  // Los runners Windows traen core.autocrlf=true: el checkout saldría con \r\n y los tests comparan bytes exactos
+  git(d, 'config', 'core.autocrlf', 'false');
   fs.writeFileSync(path.join(d, 'app.js'), 'v1\n');
   git(d, 'add', '-A'); git(d, 'commit', '-qm', 'base');
   return d;

@@ -172,6 +172,27 @@
     },
     {
       "evento": "prompt",
+      "sesion": "g2",
+      "texto": "HU 3310",
+      "nota": "así los nombra el equipo: HU, PBI o task",
+      "espera": {
+        "estado": {
+          "gate.estado": "requerido"
+        }
+      }
+    },
+    {
+      "evento": "prompt",
+      "sesion": "g3",
+      "texto": "task 8890",
+      "espera": {
+        "estado": {
+          "gate.estado": "requerido"
+        }
+      }
+    },
+    {
+      "evento": "prompt",
       "sesion": "g",
       "texto": "PBI 4521",
       "espera": {

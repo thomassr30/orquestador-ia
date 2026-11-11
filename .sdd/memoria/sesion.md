@@ -1,8 +1,9 @@
 Proyecto: C:/dev/orquestador-ia
 <!-- harness:inicio (bloque automático del harness; no editar) -->
-Última actividad: 2026-11-09 03:57 (claude) · Plan: sin cambio en curso
-Archivos modificados en la sesión: vscode/src/extension.ts, vscode/src/harness.ts, vscode/src/panel.ts, vscode/src/vista.ts, vscode/tsconfig.json, config/mcp.json, harness/src/core.js, harness/src/mcp.js, harness/src/memory.js, harness/src/trabajo.js, harness/test/install-mcp.test.js, harness/test/mcp.test.js, harness/test/trabajo.test.js, install.js, harness/test/contexto.test.js (+6 más)
-Sensores: sin ejecutar
+Última actividad: 2026-11-11 01:25 (claude) · Plan: aprobado
+Pedido en curso: no yo pense que no lo tenia
+Archivos modificados en la sesión: vscode/tsconfig.json, config/mcp.json, harness/src/core.js, harness/src/mcp.js, harness/src/memory.js, harness/src/trabajo.js, harness/test/install-mcp.test.js, harness/test/mcp.test.js, harness/test/trabajo.test.js, install.js, harness/test/contexto.test.js, evals/corpus/12-gate-no-detectado.json, evals/gate/frases.json, harness/src/gate.js, harness/test/worktree.test.js (+10 más)
+Sensores: aprobado — ✓ tests
 <!-- harness:fin -->
 
 Objetivo actual: plan de mejora del harness (análisis del 2026-11-06). 3.1.0 entregada; lo que queda está en pendientes.md.

@@ -16,6 +16,7 @@ Resuelto en 3.1.0 (2026-11-06 y 2026-11-08): GATE invertido con banco de frases,
 - [ ] Decisión del usuario · npm: package.json sigue con `private: true` y sin `bin` ni `files`, y existe la carpeta vacía changes/2026-10-30-publicar-orquestador-sdd-en-npm-sin-depe. Publicar (agregar bin y files, quitar private) o borrar la carpeta.
 - [ ] Decisión del usuario · partir README.md (798 líneas: portada, manual, referencia de configuración y seguridad en un solo archivo). Falta definir qué se va a docs/.
 - [ ] Decisión del usuario · issues de GitHub/GitLab: siguen denegados. Aplicarles el criterio de «tracker con confirmación, código bloqueado» que ya tiene Azure cambiaría una garantía declarada en SECURITY.md; sus nombres de herramienta (create_issue, add_issue_comment) no distinguen tracker de repositorio.
+- [ ] trabajo.js `verifyTask`: una tarea que solo toca documentación (.md) y cuyos criterios son todos `manual` nunca puede quedar verificada, porque no corre ningún control y `combinar([])` devuelve no_verificado (T-03 del trabajo de commit llegó a 13 intentos). Además, `trabajo verificar` imprime solo «en curso», sin el motivo. Visto 2026-11-10.
 - [ ] Decisión del usuario · Node 18 está fuera de soporte y sigue en engines y en la matriz de CI (3 SO x 4 versiones). La suite corre en 52 s, así que la matriz completa no es cara: es solo si vale la pena seguir probando 18.
 
 ## Resuelto (se conserva por el límite que dejó)

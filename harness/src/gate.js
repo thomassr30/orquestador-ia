@@ -21,8 +21,12 @@ const SDD_OFF = words('sin sdd|sin (?:el )?orquestador|(?:desactiva|desactivar|a
 const SDD_ON = words('con sdd|(?:activa|activar|reactiva|reactivar|enciende|usa|usar|vuelve a usar) (?:el )?(?:sdd|orquestador)');
 const CHANGE = words(`agreg${W}*|añad${W}*|anad${W}*|incorpor${W}*|cre(?:a|ar|ame|alo|ala|ate|en|emos)|implement${W}*|desarroll${W}*|constru${W}*|codific${W}*|corrig${W}*|corrij${W}*|arregl${W}*|solucion${W}*|repar${W}*|refactori${W}*|reorganiz${W}*|reestructur${W}*|reescrib${W}*|migr[ae]${W}*|actualiz${W}*|modific${W}*|cambi[ae]${W}*|elimin${W}*|borr[ae]${W}*|quit[ae]${W}*|renombr${W}*|muev[ae]${W}*|integr[ae]${W}*|conect[ae]${W}*|configur[ae]${W}*|optimiz${W}*|ajust[ae]${W}*|add|create|implement${W}*|build|fix${W}*|refactor${W}*|migrate|update|upgrade|change|remove|delete|rename|rewrite|optimi[sz]e`);
 const FIX = words("no funciona|no anda|no carga|no compila|no levanta|no guarda|falla|fallan|fallando|error|errores|bug|bugs|se rompe|se cae|roto|rota|rompi[oó]|se ve mal|crash\\w*|excepci[oó]n|exception|stack ?trace|traceback|broken|not working|doesn'?t work");
-// Ticket referido por su identificador: Jira (LAB-123), Azure Boards (AB#1234, PBI 4521) o el enlace del work item.
-const TICKET = /(?<![A-Za-z0-9_])(?:[A-Z][A-Z0-9]{1,9}-\d+|AB#\d+|PBI[ #-]?\d+)(?![A-Za-z0-9_])|_workitems\/edit\/\d+/;
+// Ticket referido por su identificador. Dos patrones, porque el de Jira DEBE ser sensible a mayúsculas: con /i,
+// «el archivo está en utf-8» pasaría por un ticket.
+const TICKET_CLAVE = /(?<![A-Za-z0-9_])(?:[A-Z][A-Z0-9]{1,9}-\d+|AB#\d+)(?![A-Za-z0-9_])|_workitems\/edit\/\d+/;
+// Como los nombra el equipo, sin importar mayúsculas: «PBI 4521», «HU 3310», «task 8890», «tarea 55».
+const TICKET_TIPO = /(?<![\p{L}\p{N}_])(?:pbi|hu|task|tarea)[ #-]?\d+(?![\p{L}\p{N}_])/iu;
+const TICKET = { test: t => TICKET_CLAVE.test(t) || TICKET_TIPO.test(t) };
 const WORK = words(`resuelv${W}*|resolv${W}*|trabaj[ae]${W}*`);
 const CONTINUE = words('sigue|segu[ií]|contin[uú]a|continuar|contin[uú]e|termina|terminar|falta|faltan|lo que queda|el resto|tambi[eé]n|adem[aá]s|retoma|relanza|reintenta');
 const NON_CODE = words('prototipo|prototipos|maqueta|maquetas|mockup|mockups|wireframe|wireframes'); // solo genera el prototipo
@@ -124,7 +128,7 @@ const CONSULTA_RE = new RegExp(`^[\\s¡¿"'«(]*(?:${CONSULT_WORD}|${CONSULT_VER
 // Señal de cambio lo bastante fuerte para vetar una frase con forma de consulta: «revisa por qué falla» pide
 // arreglar, «resume los cambios» no. Son formas verbales completas, así que sustantivos que CHANGE y FIX
 // reconocen por prefijo («cambios», «errores», «configuración») no convierten una consulta en pedido.
-const CHANGE_VERB = words(`agrega|agregar|agr[eé]ga${W}*|a[nñ]ade|a[nñ]adir|crea|crear|implementa|implementar|desarrolla|desarrollar|corrige|corregir|arregla|arreglar|soluciona|solucionar|repara|reparar|refactoriza|refactorizar|reescribe|reescribir|migra|migrar|actualiza|actualizar|modifica|modificar|cambia|cambiar|c[aá]mbia${W}*|elimina|eliminar|borra|borrar|quita|quitar|renombra|renombrar|mueve|mover|integra|integrar|conecta|conectar|configura|configurar|optimiza|optimizar|ajusta|ajustar|add|create|implement|fix|refactor|migrate|update|change|remove|delete|rename|rewrite`);
+const CHANGE_VERB = words(`arma|armar|armemos|planifica|planificar|plantea|plantear|agrega|agregar|agr[eé]ga${W}*|a[nñ]ade|a[nñ]adir|crea|crear|implementa|implementar|desarrolla|desarrollar|corrige|corregir|arregla|arreglar|soluciona|solucionar|repara|reparar|refactoriza|refactorizar|reescribe|reescribir|migra|migrar|actualiza|actualizar|modifica|modificar|cambia|cambiar|c[aá]mbia${W}*|elimina|eliminar|borra|borrar|quita|quitar|renombra|renombrar|mueve|mover|integra|integrar|conecta|conectar|configura|configurar|optimiza|optimizar|ajusta|ajustar|add|create|implement|fix|refactor|migrate|update|change|remove|delete|rename|rewrite`);
 const BROKEN = words("no funciona|no anda|no carga|no compila|no levanta|no guarda|falla|fallan|fallando|se rompe|se cae|roto|rota|rompi[oó]|se ve mal|crash\\w*|excepci[oó]n|exception|stack ?trace|traceback|bug|bugs|broken|not working|doesn'?t work");
 
 // «qué» y «hay» son ambiguos: «qué hace este archivo» pregunta, pero «que el formulario valide el RUT» y

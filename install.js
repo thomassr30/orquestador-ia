@@ -12,7 +12,12 @@
  *   node install.js --no-mcp             no registra servidores MCP
  *   node install.js --mcp=figma          registra también servidores MCP apagados en config/mcp.json (enabled:false)
  *   node install.js --mcp=azure-devops --org=<organización>   servidor remoto por organización (dev.azure.com/<organización>)
- *   node install.js --mcp=azure-devops --org=<org> --proyecto  registra el MCP SOLO en el proyecto actual (dos repos, dos organizaciones)
+ *   node install.js --mcp=azure-devops --org=<org> --alcance=proyecto   registra el MCP SOLO en este repositorio
+ *                                        (córrelo desde cualquier carpeta con ~/.sdd-orquestador/install.js)
+ *   node install.js --mcp=azure-devops --org=<org> --nombre=azure-sag --alcance=proyecto
+ *                                        --nombre: alias corto del servidor (si no, queda azure-devops-<organización>)
+ *                                        (para dos repos con dos organizaciones). «--proyecto» es un alias; no lleva
+ *                                        valor: la carpeta donde lo corres decide el proyecto.
  *   node install.js --skills=sdd-*,stack-angular    instala SOLO esas skills (patrones con * al final)
  *   node install.js --sin-skills=ci-*,tracker-jira  no instala esas (se suma a config/skills.json → excluir)
  *   node install.js --no-deps            no instala pdfjs-dist / mammoth
@@ -42,7 +47,14 @@ const IS_WIN = process.platform === 'win32';
 const SDD_HOME = path.join(HOME, '.sdd-orquestador');
 const SDD_HOME_FWD = SDD_HOME.replace(/\\/g, '/');
 const MANIFEST = path.join(SDD_HOME, 'manifest.json');
-const VERSION = require(path.join(ROOT, 'package.json')).version;
+// La copia que vive en ~/.sdd-orquestador no trae el package.json del repositorio: la versión se lee del manifiesto
+// de la última instalación, que es justamente de dónde viene esa copia.
+const VERSION = (() => {
+  for (const p of [path.join(ROOT, 'package.json'), MANIFEST]) {
+    try { const j = JSON.parse(fs.readFileSync(p, 'utf8')); if (j && j.version) return j.version; } catch { /* sigue */ }
+  }
+  return 'desconocida';
+})();
 const MARK_START = '<!-- sdd-orquestador:inicio -->';
 const MARK_END = '<!-- sdd-orquestador:fin -->';
 
@@ -237,14 +249,16 @@ function mcpServers() {
         // Servidor remoto por organización (Azure DevOps): sin --org no se puede armar la URL.
         if (!org) { warn(`${name}: necesita tu organización. Regístralo con: node install.js --mcp=${name} --org=<organización> [--proyecto]`); return null; }
         // El nombre lleva la organización: dos organizaciones distintas son dos cuentas, y con el mismo nombre
-        // el inicio de sesión de una pisaría el de la otra.
-        const slug = org.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
-        return { name: `${name}-${slug}`, url: v.url.replace('{org}', encodeURIComponent(org)) };
+        // el inicio de sesión de una pisaría el de la otra. Con --nombre se le pone un alias corto: ese nombre
+        // aparece en cada nombre de herramienta MCP, así que uno largo se paga en tokens en todas las sesiones.
+        const slug = x => String(x).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+        const alias = val('nombre');
+        return { key: name, name: alias ? slug(alias) : `${name}-${slug(org)}`, url: v.url.replace('{org}', encodeURIComponent(org)) };
       }
-      if (v.url) return { name, url: v.url }; // servidor remoto (HTTP)
+      if (v.url) return { key: name, name, url: v.url }; // servidor remoto (HTTP)
       // En Windows, npx es npx.cmd: se envuelve con cmd /c para que lo lancen todas las herramientas
       const wrap = IS_WIN && v.command === 'npx';
-      return { name, command: wrap ? 'cmd' : v.command, args: wrap ? ['/c', 'npx', ...v.args] : v.args };
+      return { key: name, name, command: wrap ? 'cmd' : v.command, args: wrap ? ['/c', 'npx', ...v.args] : v.args };
     }).filter(Boolean);
 }
 function readJson(file) {
@@ -543,13 +557,18 @@ function installProjectMcp() {
   // registrados a nivel de usuario y repetirlos en el proyecto solo duplicaría herramientas en el contexto.
   const pedidos = (val('mcp') || '').split(',').map(x => x.trim()).filter(Boolean);
   if (!pedidos.length) { console.error('Indica qué servidor registrar en este proyecto: --mcp=<nombre> (y --org=<organización> si lo pide). Los servidores de siempre ya están a nivel de usuario.'); process.exit(1); }
-  const servers = mcpServers().filter(s => (s.url || s.command) && pedidos.some(n => s.name === n || s.name.startsWith(`${n}-`)));
+  const servers = mcpServers().filter(s => (s.url || s.command) && pedidos.includes(s.key || s.name));
   if (!servers.length) { console.error(`No quedó ningún servidor que registrar de: ${pedidos.join(', ')}. Revisa el aviso de más arriba.`); process.exit(1); }
   const tkeys = (val('targets') === 'all' ? Object.keys(PROJECT_MCP) : (val('targets') || 'claude').split(',').map(s => s.trim()).filter(Boolean));
   const bad = tkeys.filter(k => !PROJECT_MCP[k]);
   if (bad.length) { console.error(`Destinos sin configuración de MCP por proyecto: ${bad.join(', ')}. Válidos: ${Object.keys(PROJECT_MCP).join(', ')}, all. Codex solo admite MCP globales.`); process.exit(1); }
-  log(`Orquestador SDD v${VERSION}${DRY ? ' (simulación)' : ''} · MCP solo para este proyecto`);
-  log(`Proyecto: ${root.replace(/\\/g, '/')}`);
+  // Puede ser un repositorio o una carpeta con varios: el servidor vale para lo que abras en la herramienta, así
+  // que si todos esos repos son de la misma organización, registrarlo acá los cubre a todos.
+  const esRepo = fs.existsSync(path.join(root, '.git'));
+  const repos = esRepo ? [] : fs.readdirSync(root, { withFileTypes: true }).filter(e => e.isDirectory() && fs.existsSync(path.join(root, e.name, '.git'))).map(e => e.name);
+  log(`Orquestador SDD v${VERSION}${DRY ? ' (simulación)' : ''} · MCP solo para esta carpeta (alcance: proyecto)`);
+  log(`${esRepo ? 'Repositorio' : 'Carpeta'}: ${root.replace(/\\/g, '/')}`);
+  if (repos.length) log(`Cubre los ${repos.length} repositorios de adentro: ${repos.slice(0, 8).join(', ')}${repos.length > 8 ? '…' : ''}`);
   for (const tkey of tkeys) {
     const m = PROJECT_MCP[tkey];
     const file = path.join(root, ...m.file);
@@ -570,7 +589,8 @@ function installProjectMcp() {
   log(DRY ? '\n✅ Simulación completa (no se escribió nada).' : '\n✅ MCP registrados en este proyecto.');
   for (const [name, tkeys2] of loginPending) notes.push(`MCP ${name} necesita que inicies sesión una vez:\n${tkeys2.map(k => `  ${MCP_LOGIN[k](name)}`).join('\n')}`);
   notes.push('Anota la organización en la memoria de este proyecto (.sdd/memoria) para que el agente sepa cuál usa: lo pide la skill tracker-azure-boards.');
-  notes.push('El archivo que se acaba de escribir va al repositorio: si no quieres compartirlo con el equipo, agrégalo al .gitignore.');
+  if (esRepo) notes.push('El archivo que se acaba de escribir va al repositorio: si no quieres compartirlo con el equipo, agrégalo al .gitignore.');
+  else notes.push('Se escribió en la carpeta que contiene los repositorios, así que vale para lo que abras ahí. Si abres un repositorio por separado, ese repositorio necesita su propio registro.');
   if (notes.length) { log('\nNotas:'); notes.forEach(n => log(`- ${n}`)); }
 }
 
@@ -630,6 +650,11 @@ function install() {
   copyDir(path.join(ROOT, 'bin'), path.join(SDD_HOME, 'bin'));
   rmrf(path.join(SDD_HOME, 'harness'));
   copyDir(path.join(ROOT, 'harness', 'src'), path.join(SDD_HOME, 'harness', 'src'));
+  // El propio instalador y sus plantillas quedan en ~/.sdd-orquestador: así registrar un MCP en otro proyecto no
+  // depende de dónde esté el repositorio (ni de que siga existiendo).
+  writeFile(path.join(SDD_HOME, 'install.js'), fs.readFileSync(path.join(ROOT, 'install.js'), 'utf8'));
+  rmrf(path.join(SDD_HOME, 'config'));
+  copyDir(path.join(ROOT, 'config'), path.join(SDD_HOME, 'config'));
   const userCfg = path.join(SDD_HOME, 'harness.json');
   if (!fs.existsSync(userCfg)) writeFile(userCfg, fs.readFileSync(path.join(ROOT, 'config', 'harness.json'), 'utf8'));
   if (!opt('no-deps')) {
@@ -721,4 +746,22 @@ function setupGitHooks() {
   if (r.status === 0) log('\n• Git: actualización automática activada (cada "git pull" reinstala lo que cambie).');
 }
 
-if (opt('uninstall')) uninstall(); else if (opt('proyecto')) installProjectMcp(); else install();
+// Alcance: «usuario» (por defecto, todo el equipo) o «proyecto» (solo los MCP de este repositorio). El nombre del
+// proyecto no se pasa: lo decide la carpeta donde se corre. Un «--proyecto=JUNJI» es el error natural, y antes caía
+// en la instalación global sin avisar, así que acá se detiene con el comando correcto a la vista.
+const alcance = val('alcance');
+// La copia que vive en ~/.sdd-orquestador no trae core/ (skills, agentes, reglas): sirve para registrar los MCP de
+// un proyecto y nada más. Decirlo es mejor que fallar a mitad de camino.
+if (!fs.existsSync(CORE) && alcance !== 'proyecto' && !opt('proyecto') && !opt('uninstall')) {
+  console.error(`Esta copia del instalador solo sirve para registrar servidores MCP de un proyecto:\n  node "${SDD_HOME_FWD}/install.js" --mcp=<servidor> [--org=<organización>] --alcance=proyecto\nPara instalar o actualizar el orquestador, córrelo desde su repositorio (donde está core/).`);
+  process.exit(2);
+}
+if (val('proyecto') !== undefined) {
+  console.error('«--proyecto» no lleva valor: la carpeta donde lo corres decide el proyecto.\nUsa: node install.js --mcp=azure-devops --org=<organización> --alcance=proyecto');
+  process.exit(2);
+}
+if (alcance !== undefined && alcance !== 'proyecto' && alcance !== 'usuario') {
+  console.error(`--alcance desconocido: «${alcance}». Valores: proyecto (solo este repositorio) o usuario (por defecto).`);
+  process.exit(2);
+}
+if (opt('uninstall')) uninstall(); else if (alcance === 'proyecto' || opt('proyecto')) installProjectMcp(); else install();

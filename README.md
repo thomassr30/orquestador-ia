@@ -277,7 +277,7 @@ Ver [Verificación de resultados](#verificación-de-resultados) y [Configuració
 **3. Si los work items de ese proyecto están en Azure DevOps**, registrar su organización solo para ese repositorio:
 
 ```bash
-node install.js --mcp=azure-devops --org=<organización> --proyecto
+node "$HOME/.sdd-orquestador/install.js" --mcp=azure-devops --org=<organización> --alcance=proyecto
 ```
 
 Ver [Azure DevOps](#azure-devops), que explica el caso de varios proyectos en organizaciones distintas.
@@ -397,13 +397,30 @@ Después inicia sesión una vez en cada herramienta (en Claude Code: `/mcp` → 
 Es el caso normal cuando trabajas para más de un cliente: un repositorio cuyos work items están en la organización de tu empresa y otro en la del cliente. Registra el servidor **dentro de cada repositorio** con `--proyecto`:
 
 ```bash
-cd C:/dev/proyecto-a && node install.js --mcp=azure-devops --org=miempresa --proyecto
-cd C:/dev/proyecto-b && node install.js --mcp=azure-devops --org=cliente   --proyecto
+cd C:/dev/proyecto-a && node "$HOME/.sdd-orquestador/install.js" --mcp=azure-devops --org=miempresa --alcance=proyecto
+cd C:/dev/proyecto-b && node "$HOME/.sdd-orquestador/install.js" --mcp=azure-devops --org=cliente   --alcance=proyecto
 ```
 
 Así cada ventana de tu herramienta de IA ve **solo** la organización de su repositorio. No tienes que aclararle de cuál leer: le dices «lee el PBI 4521» y esa ventana solo puede buscarlo donde corresponde. Y el contexto de cada sesión no carga las herramientas de las demás organizaciones.
 
-Detalles del modo `--proyecto`:
+No hace falta ningún token ni PAT: el servidor es remoto y la autenticación es por navegador, una vez por organización (en Claude Code, `/mcp` → el servidor → Authenticate). Y `--alcance=proyecto` no lleva el nombre del proyecto: lo decide la carpeta donde corres el comando.
+
+Con `--nombre=<alias>` le pones un nombre corto al servidor. Conviene: el nombre por defecto es `azure-devops-<organización>`, y si tu organización se llama `SubdepartamentoSolucionesTI` ese nombre aparece dentro de cada nombre de herramienta MCP, en todas las sesiones. Con `--nombre=azure-sag` queda corto.
+
+El instalador se copia a `~/.sdd-orquestador/install.js` al instalar, así que para registrar un MCP en un proyecto no necesitas tener a mano el repositorio del orquestador ni acordarte de dónde está. Esa copia sirve solo para esto: si intentas una instalación completa con ella, se detiene y te dice que la corras desde el repositorio.
+
+**Si abres un `.code-workspace` de VS Code, regístralo global.** Un workspace multi-raíz tiene varias carpetas, y el archivo de MCP por proyecto se lee de la que la herramienta tome como actual, que no es algo en lo que convenga apoyarse. Para ese caso registra cada organización a nivel de usuario con un alias corto, sin `--alcance`:
+
+```bash
+node "$HOME/.sdd-orquestador/install.js" --mcp=azure-devops --org=miempresa --nombre=azure-a
+node "$HOME/.sdd-orquestador/install.js" --mcp=azure-devops --org=cliente   --nombre=azure-b
+```
+
+Las dos conviven porque el nombre las distingue, y quedan disponibles en cualquier carpeta que abras. Lo que se paga es que las herramientas de las dos organizaciones entran en todas las sesiones; a cambio, nunca dependes de cómo abriste el proyecto. El mapa del espacio de trabajo del harness funciona igual en los dos casos: con un `.code-workspace`, detecta las carpetas del workspace y sus proyectos aunque abras una sola de ellas.
+
+**Dónde registrarlo: la organización manda, no el repositorio.** El servidor vale para la carpeta que abres en tu herramienta de IA. Si varios repositorios son de la **misma** organización (microservicios de un mismo producto, por ejemplo), registra el servidor una vez en la carpeta que los contiene y queda cubierto todo lo que abras ahí; el instalador te dice cuántos repositorios de adentro cubre. Si cada uno es de una organización distinta, uno por repositorio. Y ojo: si registras dentro de un repositorio pero después abres la carpeta padre, ese registro no aplica, porque se lee de la carpeta que abriste.
+
+Detalles del modo `--alcance=proyecto`:
 
 - Registra **solo** lo que pides con `--mcp`. Los servidores de siempre (`playwright`, `context7`, `chrome-devtools`) ya están a nivel de usuario y duplicarlos en el repositorio solo sumaría herramientas al contexto.
 - Escribe en el archivo de MCP **por proyecto** de cada herramienta: `.mcp.json` en Claude Code (el que se usa por defecto), y con `--targets=cursor,copilot,opencode,gemini` en las demás. Codex no admite MCP por proyecto: solo globales.
