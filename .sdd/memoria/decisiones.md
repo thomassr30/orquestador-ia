@@ -26,3 +26,9 @@
 
 ## 2026-11-04 · Figma por MCP (fuente: install.js registerMcp, config/mcp.json)
 - Figma remoto (https://mcp.figma.com/mcp) y no el de escritorio: sirve con Figma en la web, sin app abierta ni asiento de pago. Viene apagado (enabled:false) y se activa con `node install.js --mcp=figma`, para que quien no usa Figma no vea un servidor «pendiente de iniciar sesión». El enlace del archivo de cada proyecto vive en su memoria (diseno.md → «Fuente de diseño»); la conexión es por cuenta, no por proyecto. La desinstalación no quita MCP (como los locales). Aprobado por el usuario.
+
+## 2026-11-11 · Figma manda el valor, el proyecto la forma (fuente: core/skills/figma-design/SKILL.md)
+- Con un diseño de Figma, el valor dibujado (tamaño, espacio, tipografía, color) no se redondea a la escala 4/8 ni a la escala tipográfica de `design-quality`, y no se agregan hover, transiciones ni sombras no dibujados. Un token solo reemplaza al valor si es igual; si solo se parece, se conserva el de Figma y se reporta. Motivo: esas reglas genéricas y `design-polish` hacían que el agente redondeara e inventara estilos. La comparación final es numérica (estilos calculados contra el inventario), no solo visual. Aprobado por el usuario.
+
+## 2026-11-11 · Skills que trae el proyecto (fuente: harness/src/skills-proyecto.js)
+- El harness entrega al agente solo **nombre y ruta** de las skills del proyecto, nunca descripciones ni contenido: lo escribe el repositorio y no debe ganar la autoridad del canal del harness; el cliente ya muestra las descripciones. Orden de mando: AGENTS.md/CLAUDE.md, skills del proyecto, skills del orquestador; ninguna relaja el GATE, las confirmaciones ni los bloqueos. Choque de nombres: en Claude Code gana la skill personal (`~/.claude/skills`, donde viven las del orquestador), así que se marca con ⚠ y se lee la del proyecto por su ruta. `.agents/skills` se escanea aunque Claude Code no documenta que la cargue. Aprobado por el usuario.

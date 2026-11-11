@@ -39,6 +39,13 @@ No cambia el formato del estado ni la configuración existente: basta `npm run u
 - **«No añadir».** Solo se admite lo funcional mínimo (foco, cursor, estado deshabilitado nativo), listado como «añadido por accesibilidad»; hover, transiciones, sombras, estados y breakpoints no dibujados se preguntan como supuestos.
 - **Comparación en números.** Antes de entregar se miden los estilos calculados (`get_css_styles` o `getComputedStyle`) contra el inventario y se revisa que cada declaración nueva del diff tenga una fila que la respalde. `design-quality` y `design-polish` llevan una línea que remite a esta regla.
 
+### Skills que trae el proyecto
+- **El harness reconoce las skills de `<proyecto>/.claude/skills` y `<proyecto>/.agents/skills`** (módulo nuevo `harness/src/skills-proyecto.js`). Antes ningún paso del flujo las contemplaba: el explorer solo devolvía nombres del catálogo del orquestador, los implementers cargaban `stack-*` fijas y el orquestador no pasaba nada a los sub-agentes.
+- **Contexto de sesión**: al iniciar y tras compactar, el agente recibe «Skills del proyecto» con **nombre y ruta** (hasta 40, ~1.500 caracteres, antes de la memoria). No se copia contenido ni descripciones: lo escribe el repositorio y no debe ganar la autoridad del canal del harness; los nombres se validan y la lectura es solo del frontmatter. En un espacio con varios proyectos, el mapa lista las de cada uno.
+- **Choque de nombres**: en Claude Code una skill personal prevalece sobre una de proyecto con el mismo nombre, y las ~100 del orquestador viven en `~/.claude/skills`. Se marcan con ⚠ y se indica leer la del proyecto por su ruta. `doctor` (texto y `--json`: `proyecto.skills`) informa cuántas hay, cuáles chocan y su costo.
+- **Quién manda**: `AGENTS.md`/`CLAUDE.md`, luego las skills del proyecto, luego las del orquestador; ninguna relaja el GATE, las confirmaciones ni los bloqueos. `sdd-orchestrator` (regla 7 y `Skills del proyecto:` en la delegación), `sdd-explore` (`skillsProyecto`) y `sdd-apply` lo reflejan.
+- **Falla abierta**: si el descubrimiento falla, el contexto sigue sin ellas y ningún hook se rompe. `.agents/skills` se reconoce, pero Claude Code no documenta que la cargue: se leen por ruta.
+
 ### Varias tareas a la vez: worktrees
 - **`sdd-harness worktree`**: `listar`, `nuevo <rama>`, `sincronizar` y `cerrar`. Una carpeta por tarea, cada una con su rama, compartiendo el historial del repositorio: varias ventanas del agente en el mismo proyecto sin que cambiar de rama obligue a revertir lo que está en curso.
   - `nuevo` crea la carpeta hermana con la rama nacida de la base actualizada (`develop`, o `main`/`master`; `--desde` y `--ruta` para elegir). Sin red usa la base local y lo avisa.

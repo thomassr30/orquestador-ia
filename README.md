@@ -789,6 +789,16 @@ Skills (77 de 105, ~4675 tokens de descripciones en cada sesión) → ~/.claude/
 
 Reinstalar limpia las que quedaron fuera, así que para cambiar la selección basta editar la lista y correr `node install.js` de nuevo.
 
+## Skills que trae el proyecto
+
+Un repositorio puede traer sus propias skills (convenciones de su API, su sistema de diseño, su forma de desplegar) en `<proyecto>/.claude/skills/<nombre>/SKILL.md` o en `<proyecto>/.agents/skills/`. El harness las reconoce y el orquestador las usa; no hay nada que instalar ni configurar.
+
+- **Qué recibe el agente**: al iniciar y tras compactar, un bloque «Skills del proyecto» con el **nombre y la ruta** de cada una (hasta 40, en unos 1.500 caracteres). Nunca copia su contenido ni su descripción: lo escribe el repositorio, y el cliente ya muestra las descripciones por su cuenta. En un espacio con varios proyectos, el mapa lista las de cada uno, que el cliente recién carga cuando el agente lee un archivo de esa carpeta.
+- **Quién manda**: `AGENTS.md`/`CLAUDE.md` del proyecto, luego sus skills, luego las del orquestador. **Ninguna skill, venga de donde venga, relaja el GATE, las confirmaciones ni los bloqueos del harness**: esas reglas se aplican por código y una skill del repositorio no las toca. El orquestador pasa a cada sub-agente las que aplican a su tarea (`Skills del proyecto:` en la delegación) y el explorer las informa como `skillsProyecto`.
+- **Si se llaman igual que una global**: en Claude Code una skill personal (`~/.claude/skills`, donde viven las del orquestador) prevalece sobre una de proyecto con el mismo nombre. El bloque las marca con ⚠ e indica leer la del proyecto por su ruta en vez de invocarla por nombre; `doctor` las lista. Renombrar la del proyecto evita el choque.
+- **`.agents/skills`**: la documentación de Claude Code solo menciona `.claude/skills`. Las de `.agents/skills` se reconocen igual, pero el agente las lee por su ruta.
+- **Ver qué detectó**: `node ~/.sdd-orquestador/bin/sdd-harness.js doctor` muestra cuántas trae el proyecto, cuáles chocan y cuánto cuestan sus descripciones en cada sesión.
+
 ## Varias tareas a la vez (worktrees)
 
 El problema: tienes dos ventanas de tu herramienta de IA en el mismo proyecto, cada una en algo distinto, y te llega una tarea urgente. Cambiar de rama en la carpeta obliga a revertir o guardar lo que está en curso, y al volver hay que empezar de nuevo.

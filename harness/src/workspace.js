@@ -13,6 +13,7 @@ const path = require('path');
 const { isInside, relPosix, shortHash } = require('./util');
 const { STATE_DIR, fwd } = require('./paths');
 const { loadConfig, DEFAULTS } = require('./config');
+const SP = require('./skills-proyecto');
 
 const MAX_PROJECTS = 60;
 const CACHE_MS = 20 * 60000;
@@ -85,6 +86,7 @@ function describe(dir) {
 
 function projectInfo(dir, markers, base) {
   const pkg = markers.includes('package.json') ? readJson(path.join(dir, 'package.json')) : null;
+  const sk = SP.descubrir(dir); // skills que trae el proyecto (solo nombres; «⚠» si chocan con una global)
   return {
     nombre: path.basename(dir),
     paquete: pkg && pkg.name && pkg.name !== path.basename(dir) ? String(pkg.name) : undefined,
@@ -95,6 +97,8 @@ function projectInfo(dir, markers, base) {
     memoria: fs.existsSync(path.join(dir, '.sdd', 'memoria', 'MEMORIA.md')),
     config: fs.existsSync(path.join(dir, '.sdd', 'harness.json')),
     descripcion: describe(dir),
+    skills: sk.skills.map(s => s.colision ? `${s.nombre} ⚠` : s.nombre),
+    skillsOmitidas: sk.omitidas,
   };
 }
 
@@ -210,13 +214,22 @@ function mentioned(ws, text) {
     .some(n => new RegExp(`(?<![\\p{L}\\p{N}_-])${n.toLowerCase().replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}(?![\\p{L}\\p{N}_-])`, 'u').test(t)));
 }
 
+const MAX_SKILLS_EN_MAPA = 8;
+/** «skills: a, b, +3 más» de un proyecto del espacio (la raíz no: sus skills van en su propio bloque de contexto). */
+function skillsEnMapa(p, ws) {
+  const n = p.ruta === ws.raiz ? [] : (p.skills || []);
+  if (!n.length) return null;
+  const mas = n.length - MAX_SKILLS_EN_MAPA + (p.skillsOmitidas || 0);
+  return `skills: ${n.slice(0, MAX_SKILLS_EN_MAPA).join(', ')}${mas > 0 ? `, +${mas} más` : ''}`;
+}
+
 /** Mapa del espacio para la IA (una línea por proyecto; ~3.000 caracteres como máximo). */
 function mapBlock(ws, maxChars = 3000) {
   if (!isMulti(ws)) return '';
   let used = 0; let cut = 0;
   const lines = ws.proyectos.filter(p => p.ruta !== ws.raiz || p.stack.length).map(p => {
     const ruta = isInside(ws.raiz, p.ruta) ? (p.rel === '.' ? '(raíz)' : p.rel) : fwd(p.ruta);
-    const info = [p.stack.join(', ') || 'sin stack detectado', p.memoria ? 'con memoria' : null, p.git ? 'repo git' : null].filter(Boolean).join(' · ');
+    const info = [p.stack.join(', ') || 'sin stack detectado', p.memoria ? 'con memoria' : null, p.git ? 'repo git' : null, skillsEnMapa(p, ws)].filter(Boolean).join(' · ');
     return `- **${p.nombre}** — \`${ruta}\` — ${info}${p.descripcion ? ` — ${p.descripcion}` : ''}`;
   }).filter(l => { used += l.length + 1; if (used > maxChars) { cut++; return false; } return true; });
   const extra = ws.carpetas.slice(1).map(fwd);
@@ -228,6 +241,10 @@ function mapBlock(ws, maxChars = 3000) {
     ...lines,
     ...(ws.recortado || cut ? [`- … (${cut ? `${cut} proyecto(s) más` : 'hay más proyectos'}; el mapa se recortó${hint})`] : []),
     ...(extra.length ? [`Carpetas fuera de la raíz: ${extra.join(', ')}`] : []),
+    ...(ws.proyectos.some(p => skillsEnMapa(p, ws)) ? [
+      'Skills de cada proyecto: son convenciones de ESE proyecto (no valen en otro) y mandan sobre las del orquestador en su tema, sin relajar las reglas del harness. Antes de delegar trabajo en un proyecto, pásale al sub-agente las suyas con su ruta (`<proyecto>/.claude/skills/<nombre>/SKILL.md`, o en `.agents/skills`).',
+      ...(ws.proyectos.some(p => (p.skills || []).some(s => s.endsWith(' ⚠'))) ? ['⚠ en skills: hay una skill global con el mismo nombre y en Claude Code prevalece la global; aplica la del proyecto leyendo su SKILL.md.'] : []),
+    ] : []),
     'Cómo trabajar aquí: antes de responder, planificar o concluir que algo "no existe", busca en TODOS los proyectos que puedan estar involucrados (por ejemplo, rg sobre cada ruta), no solo en el primero. Cada proyecto tiene su propia memoria y reglas: antes de trabajar en uno, lee su `.sdd/memoria/MEMORIA.md` si existe. No mezcles la memoria de un proyecto con la de otro; lo que cruza proyectos (contratos, dependencias entre servicios) va en la memoria de la raíz del espacio. Al delegar, pasa a cada sub-agente este mapa y la ruta del proyecto que le toca.',
   ].join('\n');
 }

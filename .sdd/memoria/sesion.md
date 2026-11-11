@@ -1,8 +1,8 @@
 Proyecto: C:/dev/orquestador-ia
 <!-- harness:inicio (bloque automático del harness; no editar) -->
-Última actividad: 2026-11-11 01:25 (claude) · Plan: aprobado
-Pedido en curso: no yo pense que no lo tenia
-Archivos modificados en la sesión: vscode/tsconfig.json, config/mcp.json, harness/src/core.js, harness/src/mcp.js, harness/src/memory.js, harness/src/trabajo.js, harness/test/install-mcp.test.js, harness/test/mcp.test.js, harness/test/trabajo.test.js, install.js, harness/test/contexto.test.js, evals/corpus/12-gate-no-detectado.json, evals/gate/frases.json, harness/src/gate.js, harness/test/worktree.test.js (+10 más)
+Última actividad: 2026-11-11 18:10 (claude) · Plan: aprobado
+Pedido en curso: necesito que este harness tambien pueda trabajar con las skill que traen los proyectos
+Archivos modificados en la sesión: core/skills/figma-design/SKILL.md, core/skills/design-quality/SKILL.md, core/skills/design-polish/SKILL.md, CHANGELOG.md, harness/src/skills-proyecto.js, harness/test/skills-proyecto.test.js, harness/src/memory.js, harness/src/workspace.js, bin/sdd-harness.js, core/skills/sdd-orchestrator/SKILL.md, core/skills/sdd-explore/SKILL.md, core/skills/sdd-apply/SKILL.md, README.md
 Sensores: aprobado — ✓ tests
 <!-- harness:fin -->
 

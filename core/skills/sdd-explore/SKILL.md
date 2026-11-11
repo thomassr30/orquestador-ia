@@ -19,9 +19,11 @@ Lee SOLO manifiestos: `package.json` (incl. `react-native`, `expo`, `react-nativ
   "infra":    ["docker", "gitlab-ci", "kubernetes", "consul"],   // → skills container-docker, ci-gitlab, deploy-kubernetes, config-consul
   "testRunners": { "backend": "jest", "frontend": "vitest", "e2e": "playwright" },
   "commands": { "test": "npm test", "lint": "npm run lint", "build": "npm run build" },
-  "skills":   ["stack-nestjs", "stack-angular", "stack-tailwind", "stack-scss", "stack-postgres"]
+  "skills":   ["stack-nestjs", "stack-angular", "stack-tailwind", "stack-scss", "stack-postgres"],
+  "skillsProyecto": ["junji-api → .claude/skills/junji-api/SKILL.md: convenciones de la API"]
 }
 ```
+`skillsProyecto`: las que trae el propio repositorio (`.claude/skills/`, `.agents/skills/`; el contexto de sesión ya trae su lista). Léele a cada una solo el frontmatter de su `SKILL.md` para decir para qué sirve; no las mezcles con `skills`. Si una se llama igual que una del orquestador, dilo: en Claude Code gana la global.
 Versiones SIEMPRE desde los manifiestos, nunca de memoria. `skills` usa nombres existentes (infra: `ci-github-actions`, `ci-gitlab`, `ci-azure-pipelines`, `ci-jenkins`, `ci-bitbucket`, `container-docker`, `deploy-kubernetes`, `deploy-openshift`, `deploy-helm`, `deploy-kustomize`, `iac-terraform`, `config-consul`, `config-vault`, `ops-observability`): `stack-` go, nodejs, adonisjs, nestjs, angular, react, nextjs, html-css, tailwind, scss, postgres, sqlserver, react-native, expo, ios, swiftui, android, compose; además `rn-animations`, `ios-hardware`, `android-hardware`, `mobile-design`, `design-quality`, `figma-design` (si el pedido trae un enlace de figma.com o el proyecto tiene «Fuente de diseño» en Figma), `test-mobile` cuando apliquen.
 
 ## 2. Analizar (en tu respuesta, sin crear archivos)

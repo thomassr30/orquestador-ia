@@ -8,6 +8,7 @@ const path = require('path');
 const { fwd } = require('./paths');
 const { redact } = require('./secrets');
 const { ETIQUETA, SIMBOLO, idControl, verificado } = require('./resultado');
+const SP = require('./skills-proyecto');
 
 const MAX_CHARS = 9000; // los hooks de contexto admiten ~10.000 caracteres
 const MAX_LINES = { 'MEMORIA.md': 80, 'sesion.md': 60 };
@@ -42,6 +43,11 @@ function memoryBlock(dir, label) {
   return parts.length ? `### ${label}\n${parts.join('\n\n')}` : '';
 }
 
+/** Skills que trae el proyecto (nombre y ruta). Informativo: si algo falla, el contexto sigue sin ellas. */
+function skillsBlock(root, home) {
+  try { return SP.bloque(SP.descubrir(root, home ? { home } : {})); } catch { return ''; }
+}
+
 function workspaceBlock(root) {
   let d = path.dirname(root);
   while (true) {
@@ -70,22 +76,26 @@ function projectMemoryBlock(dir, name) {
 /**
  * Contexto al iniciar o tras compactar: memoria de la raíz, mapa del espacio de trabajo (si hay varios proyectos),
  * memoria del espacio y, tras compactar, la de los proyectos en que ya se estaba trabajando.
- * @param {{source?: string, mapa?: string, espacio?: string|null, proyectos?: {ruta:string, nombre:string}[]}} [o]
+ * `home` solo se pasa en pruebas (dónde buscar las skills globales con que comparar las del proyecto).
+ * @param {{source?: string, mapa?: string, espacio?: string|null, proyectos?: {ruta:string, nombre:string}[], home?: string}} [o]
  */
-function contextBlock(root, { source, mapa = '', espacio = null, proyectos = [] } = {}) {
+function contextBlock(root, { source, mapa = '', espacio = null, proyectos = [], home } = {}) {
   const own = memoryBlock(root, `Memoria del proyecto ${path.basename(root)}`);
   const ws = [workspaceBlock(root), espacio ? memoryBlock(espacio, `Memoria del espacio de trabajo (${path.basename(espacio)}): lo transversal a sus proyectos`) : ''].filter(Boolean).join('\n\n');
   const extra = proyectos.map(p => projectMemoryBlock(p.ruta, p.nombre)).filter(Boolean).join('\n\n').slice(0, 4000);
-  if (!own && !ws && !mapa && !extra) return '';
+  const skills = skillsBlock(root, home);
+  if (!own && !ws && !mapa && !extra && !skills) return '';
+  const hayMemoria = !!(own || ws || extra);
   const header = [
     `## Contexto SDD del proyecto: ${fwd(root)}`,
-    source === 'compact' ? 'La conversación se acaba de compactar: retoma el trabajo desde aquí (objetivo, plan aprobado, estado y próximos pasos de la sesión).' : 'Memoria cargada automáticamente al iniciar.',
-    mapa
+    source === 'compact' ? 'La conversación se acaba de compactar: retoma el trabajo desde aquí (objetivo, plan aprobado, estado y próximos pasos de la sesión).' : (hayMemoria || mapa ? 'Memoria cargada automáticamente al iniciar.' : 'Contexto cargado automáticamente al iniciar.'),
+    ...(!hayMemoria && !mapa ? [] : [mapa
       ? 'Cada memoria pertenece SOLO a su proyecto (o al espacio, si es la de la raíz): no la apliques a otros proyectos ni mezcles información entre ellos. Si el código la contradice, manda el código y corrige la memoria.'
-      : 'Esta memoria pertenece SOLO a este proyecto. No la apliques a otros proyectos ni mezcles información entre proyectos. Si el código la contradice, manda el código y corrige la memoria.',
+      : 'Esta memoria pertenece SOLO a este proyecto. No la apliques a otros proyectos ni mezcles información entre proyectos. Si el código la contradice, manda el código y corrige la memoria.']),
   ].join('\n');
-  // El mapa va primero (es lo que evita "perder la onda" en carpetas con varios proyectos); la memoria se recorta antes que el mapa
-  let out = [header, mapa, own, ws, extra].filter(Boolean).join('\n\n');
+  // El mapa va primero (es lo que evita "perder la onda" en carpetas con varios proyectos); las skills del proyecto
+  // (con su propio tope) van antes de la memoria, que se recorta antes que ellas
+  let out = [header, mapa, skills, own, ws, extra].filter(Boolean).join('\n\n');
   if (out.length > MAX_CHARS) out = `${out.slice(0, MAX_CHARS)}\n[… memoria recortada en ${MAX_CHARS} caracteres: lee .sdd/memoria/MEMORIA.md y sesion.md si necesitas más, y avísale al usuario que conviene acortarlos (lo terminado va a historial.md)]`;
   return out;
 }

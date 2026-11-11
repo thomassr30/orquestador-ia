@@ -352,6 +352,9 @@ function doctor() {
   const lb = validBaseline(root);
   const files = changedFiles();
   const steps = plan(root, files.length ? files : guessSample(), cfg);
+  const SPR = require(path.join(SRC, 'skills-proyecto'));
+  const sp = SPR.descubrir(root, { home: HOME });
+  const spChoques = sp.skills.filter(s => s.colision).map(s => s.nombre);
   if (rows.some(r => r.falla)) process.exitCode = 1;
   if (flags.has('--json')) {
     const cliente = r => ({ nombre: r.nombre, archivo: r.archivo, instalado: r.instalado, nivel: r.evaluacion.nivel, nivelTexto: r.evaluacion.nivelTexto, niveles: r.evaluacion.niveles, confirmacion: r.evaluacion.confirmacion, configuracion: r.configuracion || null, prueba: r.prueba || null, observado: r.evaluacion.observado, capacidades: r.evaluacion.capacidades, limitaciones: r.evaluacion.limitaciones, falla: r.falla });
@@ -359,7 +362,7 @@ function doctor() {
       node: process.version, sddHome: fwd(SDD_HOME), aviso: CAP.AVISO,
       clientes: Object.fromEntries(rows.map(r => [r.id, cliente(r)])),
       harness: { claveAprobaciones: clave, ultimoError },
-      proyecto: { ruta: fwd(root), modo: cfg.modo || 'normal', problemas: cfg.problemas || [], sesiones: { total: sesiones.length, danadas, recuperadas }, lineaBase: lb.lb ? { commit: lb.lb.commit, en: lb.lb.en } : { motivo: lb.motivo }, sensores: steps.map(s => ({ nombre: s.nombre, modulo: s.modulo, cmd: s.cmd })) },
+      proyecto: { ruta: fwd(root), modo: cfg.modo || 'normal', problemas: cfg.problemas || [], sesiones: { total: sesiones.length, danadas, recuperadas }, lineaBase: lb.lb ? { commit: lb.lb.commit, en: lb.lb.en } : { motivo: lb.motivo }, skills: { total: sp.total, nombres: sp.skills.map(s => s.nombre), colisiones: spChoques, descTokens: sp.descTokens }, sensores: steps.map(s => ({ nombre: s.nombre, modulo: s.modulo, cmd: s.cmd })) },
     }, null, 2));
     return;
   }
@@ -387,6 +390,12 @@ function doctor() {
     for (const n of ns) { const t = fs.readFileSync(path.join(skillsDir, n, 'SKILL.md'), 'utf8'); const m = /^description:\s*(.*)$/m.exec(t); chars += n.length + ((m && m[1]) || '').length + 2; }
     console.log(`Skills instaladas: ${ns.length} · ~${Math.round(chars / 4)} tokens de descripciones en cada sesión (el contenido solo se lee al usarlas). Para no instalar las que no usas: config/skills.json → excluir`);
   } catch { /* sin skills instaladas acá */ }
+  // Las que trae el propio proyecto: el agente recibe sus nombres y rutas al iniciar (sin su contenido)
+  if (!sp.skills.length) console.log(`Skills del proyecto: ninguna (${SPR.DIRS.join(', ')})`);
+  else {
+    console.log(`Skills del proyecto: ${sp.total} (${SPR.DIRS.map(d => `${d}: ${sp.skills.filter(s => s.origen === d).length}`).join(', ')}) · ~${sp.descTokens} tokens de descripciones en cada sesión · ${sp.skills.map(s => s.nombre).join(', ')}${sp.omitidas ? ` y ${sp.omitidas} más` : ''}`);
+    if (spChoques.length) console.log(`  ⚠ chocan con una skill global (en Claude Code prevalece la global; el harness le indica al agente leer la del proyecto): ${spChoques.join(', ')}. Renombrar la del proyecto evita el choque.`);
+  }
   console.log(`Sesiones del harness: ${sesiones.length}${danadas.length ? ` · ✗ con estado dañado: ${danadas.join(', ')}` : ''}${recuperadas.length ? ` · recuperadas en modo restrictivo: ${recuperadas.map(x => `${x.sesion} (${CAP.fecha(x.en)}: ${x.motivo})`).join(', ')}` : ''}`);
   console.log(`Línea base de errores: ${lb.lb ? `commit ${lb.lb.commit.slice(0, 8)} (${String(lb.lb.en).slice(0, 10)})` : lb.motivo}`);
   const ctx = require(path.join(SRC, 'memory')).contextStats(root);
