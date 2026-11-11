@@ -32,6 +32,13 @@ No cambia el formato del estado ni la configuración existente: basta `npm run u
 - **El costo queda a la vista**: el instalador dice cuántas skills puso y cuántos tokens cuestan sus descripciones, y `doctor` lo repite para lo que tienes instalado. Excluir los trackers y los CI que no usas, por ejemplo, baja de 6.400 a unos 4.700; quedarse con el flujo más un stack, a unos 1.900.
 - La reinstalación limpia las que quedaron fuera, así que basta con editar la lista y volver a correr `node install.js`.
 
+### Figma: valores exactos y sin estilos inventados
+- **`figma-design` ya no deja que el sistema del proyecto reescriba lo dibujado.** Las reglas de `design-quality` («escala 4/8», «escala tipográfica», «sin valores mágicos») y el pulido de `design-polish` empujaban a redondear (13 px → 12 o 16) y a agregar hover, transiciones o sombras que el diseño no trae. Ahora rige una regla de oro: Figma manda sobre el **valor** y el proyecto sobre la **forma** (el token o componente con que se expresa).
+- **Lectura más completa.** Además de `get_design_context`, se lee `get_variable_defs` (valores reales de espaciado, tamaño y tipografía) y, si el frame es denso o viene resumido, `get_metadata` (tamaños y posiciones exactos).
+- **Inventario como especificación.** Una fila por elemento con tipografía, espacio, tamaño, radio, borde, sombra y layout, cada valor con su origen; lo que no se pudo leer queda como «sin dato». Un token solo reemplaza al valor si es igual; si solo se parece, se conserva el de Figma y se reporta la diferencia.
+- **«No añadir».** Solo se admite lo funcional mínimo (foco, cursor, estado deshabilitado nativo), listado como «añadido por accesibilidad»; hover, transiciones, sombras, estados y breakpoints no dibujados se preguntan como supuestos.
+- **Comparación en números.** Antes de entregar se miden los estilos calculados (`get_css_styles` o `getComputedStyle`) contra el inventario y se revisa que cada declaración nueva del diff tenga una fila que la respalde. `design-quality` y `design-polish` llevan una línea que remite a esta regla.
+
 ### Varias tareas a la vez: worktrees
 - **`sdd-harness worktree`**: `listar`, `nuevo <rama>`, `sincronizar` y `cerrar`. Una carpeta por tarea, cada una con su rama, compartiendo el historial del repositorio: varias ventanas del agente en el mismo proyecto sin que cambiar de rama obligue a revertir lo que está en curso.
   - `nuevo` crea la carpeta hermana con la rama nacida de la base actualizada (`develop`, o `main`/`master`; `--desde` y `--ruta` para elegir). Sin red usa la base local y lo avisa.
