@@ -162,6 +162,9 @@ function classifySegment(seg, extra) {
   if (/sdd-harness\.js$/i.test(String(n.tokens[1] || '')) && /^workspace$/i.test(String(n.tokens[2] || '')) && n.tokens.some(t => /^--aplicar$/i.test(t))) {
     return { decision: 'ask', critical: true, reason: `cambia la configuración de la herramienta de IA (carpetas con acceso): decisión del usuario. ${ANUNCIA}` };
   }
+  if (/sdd-harness\.js$/i.test(String(n.tokens[1] || '')) && /^perfil$/i.test(String(n.tokens[2] || '')) && n.tokens.some(t => /^--confirmar$/i.test(t))) {
+    return { decision: 'ask', critical: true, reason: `aplica un perfil del harness al proyecto: reemplaza CLAUDE.md, archivos de .claude/ y la configuración del harness (.sdd/harness.json) por los del perfil (decisión del usuario). Muéstrale antes la vista previa, que es el mismo comando sin --confirmar. ${ANUNCIA}` };
+  }
   // Worktrees: «listar» y las vistas previas son lectura; crear, mezclar y quitar tocan ramas y carpetas, así que
   // valen lo mismo que el git equivalente (que ya es crítico) aunque se pidan por el script propio.
   if (/sdd-harness\.js$/i.test(String(n.tokens[1] || '')) && /^worktree$/i.test(String(n.tokens[2] || ''))) {

@@ -8,16 +8,21 @@ Carga antes `design-quality` (y `mobile-design` si es mobile). Lo que entrega Fi
 
 **Regla de oro**: lo dibujado en Figma manda sobre el **valor**; el proyecto manda sobre la **forma** (el token o componente con que se expresa). Cada tamaño, espacio, tipografía, color, radio, borde o sombra del código sale de un dato leído de Figma, nunca de una escala, una costumbre o «se vería mejor». No redondees (13 px no pasa a 12 ni a 14), no agregues (hover, transiciones, sombras, degradados, estados o breakpoints que no están dibujados) y, si un dato no se pudo leer, anota «sin dato» y pregunta.
 
+**Lo que no está en Figma no existe.** Ni un texto, un ícono, un color, un estado ni un espacio que no salga de un dato leído. **La captura no es fuente de valores**: sirve para reconocer elementos y para la comparación final, nunca para medir píxeles ni estimar un color o un tamaño. Sin el dato, la fila queda «sin dato» y se pregunta; no se completa con el sistema de diseño ni con lo que «suele ir».
+
 ## 1. Antes de leer
 1. **Enlace**: `figma.com/design/<fileKey>/<nombre>?node-id=<a>-<b>` → fileKey y nodeId `<a>:<b>`. En `/branch/<branchKey>/` usa branchKey; `/board/` es FigJam (`get_figjam`); `/make/` es Figma Make.
 2. **Sin enlace** («según el Figma»): busca el archivo en `.sdd/memoria/temas/diseno.md` → «Fuente de diseño» y pide el enlace del frame concreto. Sin `node-id` no leas: pide el enlace del frame (clic derecho → *Copy link to selection*).
 3. **MCP disponible**: si no hay herramientas `figma` o piden iniciar sesión, detente y explica cómo activarlo (`node install.js --mcp=figma` + inicio de sesión; README → «Servidores MCP»). Nunca adivines el diseño por el nombre del frame.
 4. **Sesión y guía oficial**: `create_session` con el fileKey y una descripción corta; carga la guía de Figma (skill `/figma-design-to-code` o el recurso `skill://figma/figma-design-to-code/SKILL.md`) antes de `get_design_context`, y pasa `skillNames` como pide.
 
-## 2. Leer (cada llamada cuenta)
-- `get_design_context` con fileKey, nodeId y sessionId, **con captura**: es la fuente principal (estructura, código de referencia, variables, descripciones de componentes, assets).
+## 2. Leer (cada llamada cuenta, pero para implementar la lectura es completa)
+Para implementar o modificar una pantalla, cada frame se lee **completo**; leer menos no ahorra: obliga a suponer.
+- `get_design_context` con fileKey, nodeId y sessionId, **con captura**: es la fuente principal (estructura, código de referencia, variables, descripciones de componentes, assets, textos).
+- `get_variable_defs` (mismo nodeId), **siempre**: valores reales de las variables de espaciado, tamaño, color y tipografía que el código de referencia solo nombra.
+- `get_metadata` cuando el frame es denso, vino resumido, tiene posiciones absolutas sin tamaños explícitos o hace falta derivar espacios entre elementos: da posición y tamaño exactos de cada nodo.
 - Si la respuesta viene resumida («sparse») por tamaño: identifica en la captura los hijos visibles y pídelos en un solo lote en paralelo; no implementes desde la versión resumida.
-- `get_variable_defs` (mismo nodeId): valores reales de las variables de espaciado, tamaño, color y tipografía. Si el frame es denso o vino resumido, `get_metadata` da tamaños y posiciones exactos de cada nodo. Una vez por sección.
+- Antes de leer, di cuántas llamadas vas a usar (≈3–4 por frame: contexto, variables, metadata y la sesión una vez por tarea). Si el plan de Figma tiene un cupo chico, cuéntalas y respeta el umbral de confirmación del proyecto. **Sin cupo, sin acceso o con la llamada fallida, no se implementa esa pantalla**: se pide el dato (enlace, permiso o los valores de Dev Mode) y se sigue con lo que no depende de ella.
 - Sin captura en la respuesta → `get_screenshot` antes de escribir código.
 - No repitas lecturas ya hechas en la conversación. En plan Starter o asiento View/Collab el límite es de pocas llamadas al mes: avisa cuántas usaste.
 
@@ -38,7 +43,14 @@ Más una **fila por elemento relevante** con valores exactos y su origen (códig
 - radio, borde, sombra y opacidad;
 - layout: dirección, alineación y distribución.
 
+- textos: el texto exacto, con mayúsculas, tildes y puntuación tal cual (no se corrigen ni se traducen: ver §4.6);
+- auto layout: dirección, modo de tamaño de cada hijo (fijo, *hug* o *fill*), alineación, distribución y *wrap*;
+- color con su opacidad y el modo (variable o hexadecimal) del que salió;
+- íconos e imágenes: nombre del asset o del componente de ícono, tamaño y color.
+
 Un valor que no se pudo leer va como «sin dato», no como una estimación.
+
+**Cobertura antes de seguir**: cada elemento visible en la captura tiene su fila, y cada fila tiene su origen. Si un elemento de la captura no aparece en los datos leídos, pide ese nodo (§2) antes de escribir código. El inventario completo es lo que recibe quien implementa y quien revisa: se pasa tal cual en la delegación (`Inventario Figma:`), sin resumirlo, para que nadie vuelva a leer Figma ni estime un valor.
 
 ## 4. Traducir al proyecto
 1. **Tokens**: cada variable de Figma → token existente (`diseno.md`, tema, variables CSS/SCSS, Tailwind) **solo si su valor es igual**. Si el token se parece pero no es igual, conserva el valor de Figma y reporta la diferencia («Figma 13 px · token `--space-3` = 12 px»). Si no hay token, propón el nuevo con su rol; no pegues valores sueltos ni los ajustes a la escala del proyecto (4/8, escala tipográfica).
@@ -54,7 +66,9 @@ Un valor que no se pudo leer va como «sin dato», no como una estimación.
 2. Captura la misma zona y compárala con la captura de Figma por secciones: posición de íconos dentro de sus contenedores, tamaños, tipografía (familia, peso, tamaño), colores, espaciado y alineación.
 3. **Compara en números**: con `get_css_styles` o `evaluate_script` (`getComputedStyle`) lee de cada elemento del inventario tamaño de fuente, interlineado, padding, gap, ancho, alto, radio y color, y contrástalos con la fila del inventario. Revisa también el diff de CSS o clases: cada declaración nueva debe tener una fila del inventario que la respalde; la que no, se quita o se reporta como supuesto.
 4. Corrige cada diferencia dentro del alcance y vuelve a medir. Entrega una tabla «elemento · propiedad · Figma · código · estado» y otra «sección · coincide / diferencia · acción».
-5. Si el usuario compara en su pantalla y ve todo más grande: la escala de Windows o el zoom del navegador (125 % es común en laptops) agrandan todo por igual; compara proporciones, no píxeles absolutos.
+5. **Sobrantes**: todo lo que se ve en el resultado y no está en el inventario (un texto, un ícono, un borde, un estado) es una diferencia: se quita o se reporta como supuesto pendiente de aprobación.
+6. La entrega no está terminada con filas «difiere» sin explicar: cada una se corrige o queda en el reporte con su motivo (un token aprobado distinto, un artefacto del frame, una limitación del navegador).
+7. Si el usuario compara en su pantalla y ve todo más grande: la escala de Windows o el zoom del navegador (125 % es común en laptops) agrandan todo por igual; compara proporciones, no píxeles absolutos.
 
 ## 6. Lo que Figma no trae
 Comportamiento, datos reales, validaciones, estados (carga, vacío, error, deshabilitado) y versión mobile, si no están dibujados. Pregunta o márcalos como supuesto en el plan; sigue `design-harden` para los estados. Nunca los presentes como parte del diseño.

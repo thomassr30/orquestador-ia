@@ -32,3 +32,15 @@
 
 ## 2026-11-11 · Skills que trae el proyecto (fuente: harness/src/skills-proyecto.js)
 - El harness entrega al agente solo **nombre y ruta** de las skills del proyecto, nunca descripciones ni contenido: lo escribe el repositorio y no debe ganar la autoridad del canal del harness; el cliente ya muestra las descripciones. Orden de mando: AGENTS.md/CLAUDE.md, skills del proyecto, skills del orquestador; ninguna relaja el GATE, las confirmaciones ni los bloqueos. Choque de nombres: en Claude Code gana la skill personal (`~/.claude/skills`, donde viven las del orquestador), así que se marca con ⚠ y se lee la del proyecto por su ruta. `.agents/skills` se escanea aunque Claude Code no documenta que la cargue. Aprobado por el usuario.
+
+## 2026-11-12 · Perfiles de proyecto (fuente: harness/src/perfiles.js, perfiles/sag-laboratorio-frontend)
+- La configuración de IA propia de un repo (CLAUDE.md, agentes, constitución, skills, settings nativos y fragmento de .sdd/harness.json) va en `perfiles/<nombre>/` y se aplica con `sdd-harness.js perfil aplicar`, no en `core/`. Motivo: `core/` se instala en todos los proyectos (costo de tokens y choques de nombres) y lo SAG es de un solo repo. Aplicar nunca borra (lo obsoleto se informa), no pisa semillas, se niega con cambios sin commitear y el agente solo lo hace con confirmación crítica. Aprobado por el usuario.
+- Perfil `sag-laboratorio-frontend`: sin `azdo.mjs` ni `read-pbi` (Azure DevOps por MCP, HU con `sdd-ticket`); el hook `check-normas` pasa a instrucciones de la skill `general-standards` (un hook no puede usar el MCP, que autentica por navegador); `lint-file` lo reemplaza la verificación al terminar el turno. Regla propia nueva `soloLectura` para el kit SAG. Aprobado por el usuario.
+
+## 2026-11-12 · Fin de turno sin esperas (fuente: harness/src/core.js onStop/verifyChanges/onSubagentStop)
+- Mientras haya sub-agentes en curso (Claude Code, contados con PreToolUse Agent y SubagentStop; se olvidan a los 30 min), el Stop no verifica ni bloquea: avisa «Verificación en espera». Motivo: el agente principal cede el turno para esperar sub-agentes en segundo plano y el Stop con sensores (minutos) impedía que le llegara el aviso de que terminaron (registro del BFF: turno de 17 min hasta que el usuario canceló). Aprobado por el usuario.
+- Misma huella que la última verificación → no se vuelve a correr (aprobado vale; fallido/no verificado se informa una vez y se pide la excepción). Motivo: tests de 241 s repetidos 3 veces sobre el mismo código. Cambia el patrón del corpus 05 y de SENS-6 (BN-- en vez de BBN-). Aprobado por el usuario.
+
+## 2026-11-12 · Ticket de punta a punta y Figma exacto (fuente: core/skills/sdd-ticket, core/skills/figma-design)
+- `sdd-ticket` = un ticket de punta a punta con una sola pausa (GATE); Figma se lee antes del plan; el ticket lo lee el hilo principal. Para implementar, Figma se lee completo y la captura no es fuente de valores; el inventario viaja completo en la delegación. En el perfil SAG el cupo de 20/mes se respeta con cuenta y umbral (10 llamadas por tarea), pero no se lee menos para implementar. Aprobado por el usuario.
+

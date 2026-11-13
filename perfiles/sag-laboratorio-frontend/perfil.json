@@ -1,0 +1,28 @@
+{
+  "nombre": "sag-laboratorio-frontend",
+  "version": "1.1.0",
+  "descripcion": "Frontend del Sistema de Laboratorios SAG (Next.js 16, React 19): constitución, agentes, skills y permisos del repo sag.laboratorio.app.frontend, adaptados al harness.",
+  "detectar": {
+    "archivo": "package.json",
+    "contiene": "\"name\": \"sag.laboratorio.app.frontend\""
+  },
+  "_semillas": "Archivos de proyecto/ que solo se crean si faltan: son del equipo y el perfil no los pisa.",
+  "semillas": [
+    ".sdd/memoria/MEMORIA.md"
+  ],
+  "_reemplaza": "Lo que el perfil deja obsoleto en el proyecto. No se borra: se informa para que la persona lo quite en una PR.",
+  "reemplaza": [
+    {
+      "ruta": ".claude/scripts",
+      "motivo": "azdo.mjs: el harness lee Azure DevOps por su MCP (flujo sdd-ticket y herramientas de wiki)"
+    },
+    {
+      "ruta": ".claude/hooks",
+      "motivo": "lint-file.mjs lo reemplaza la verificación del harness al terminar el turno; check-normas.mjs, la skill general-standards"
+    },
+    {
+      "ruta": ".claude/skills/read-pbi",
+      "motivo": "leer una HU es el flujo sdd-ticket del orquestador"
+    }
+  ]
+}

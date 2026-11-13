@@ -19,6 +19,8 @@
 //   node sdd-harness.js excepcion [control…] --motivo "por qué"   (tú, desde tu terminal) acepta controles fallidos o sin verificar
 //                                                                  de la última verificación; vale solo para ese contenido
 //   node sdd-harness.js linea-base [ruta]  toma la línea base de errores sobre el último commit (sin cambios de código)
+//   node sdd-harness.js perfil [listar] | perfil aplicar <nombre> [--ruta …] [--confirmar] [--forzar]
+//                                          configuración de IA de un repo concreto (perfiles/<nombre>): vista previa y, con --confirmar, la aplica
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -42,7 +44,7 @@ const motivo = opt('--motivo') || '';
 const positional = argv.filter((a, i) => !a.startsWith('--') && !VALUED.includes(argv[i - 1]));
 const flags = new Set(argv.filter(a => a.startsWith('--')));
 const [cmd = 'estado', arg] = positional;
-const root = findProjectRoot(['registro', 'eventos', 'puntos', 'deshacer', 'excepcion', 'excepción', 'trabajo'].includes(cmd) ? process.cwd() : (arg || process.cwd()));
+const root = findProjectRoot(cmd === 'perfil' ? (opt('--ruta') || process.cwd()) : ['registro', 'eventos', 'puntos', 'deshacer', 'excepcion', 'excepción', 'trabajo'].includes(cmd) ? process.cwd() : (arg || process.cwd()));
 const spaceLine = () => {
   try {
     const W = require(path.join(SRC, 'workspace'));
@@ -396,6 +398,8 @@ function doctor() {
     console.log(`Skills del proyecto: ${sp.total} (${SPR.DIRS.map(d => `${d}: ${sp.skills.filter(s => s.origen === d).length}`).join(', ')}) · ~${sp.descTokens} tokens de descripciones en cada sesión · ${sp.skills.map(s => s.nombre).join(', ')}${sp.omitidas ? ` y ${sp.omitidas} más` : ''}`);
     if (spChoques.length) console.log(`  ⚠ chocan con una skill global (en Claude Code prevalece la global; el harness le indica al agente leer la del proyecto): ${spChoques.join(', ')}. Renombrar la del proyecto evita el choque.`);
   }
+  const pf = require(path.join(SRC, 'perfiles')).estado(root);
+  if (pf) console.log(`Perfil: ${pf.nombre} ${pf.aplicada}${pf.error ? ` · ✗ ${pf.error}` : pf.pendientes ? ` · ⚠ ${pf.pendientes} cambio(s) respecto del perfil ${pf.disponible}: sdd-harness.js perfil aplicar ${pf.nombre}` : ' · al día'}`);
   console.log(`Sesiones del harness: ${sesiones.length}${danadas.length ? ` · ✗ con estado dañado: ${danadas.join(', ')}` : ''}${recuperadas.length ? ` · recuperadas en modo restrictivo: ${recuperadas.map(x => `${x.sesion} (${CAP.fecha(x.en)}: ${x.motivo})`).join(', ')}` : ''}`);
   console.log(`Línea base de errores: ${lb.lb ? `commit ${lb.lb.commit.slice(0, 8)} (${String(lb.lb.en).slice(0, 10)})` : lb.motivo}`);
   const ctx = require(path.join(SRC, 'memory')).contextStats(root);
@@ -717,6 +721,49 @@ function deshacer() {
   if (r.rehacer) console.log(`Para rehacer: sdd-harness.js deshacer ${r.rehacer} --confirmar`);
 }
 
+function perfil() {
+  const P = require(path.join(SRC, 'perfiles'));
+  const sub = String(arg || 'listar').toLowerCase();
+  const nombre = positional[2];
+  const bin = `node "${fwd(path.join(SDD_HOME, 'bin', 'sdd-harness.js'))}"`;
+  if (sub === 'listar') {
+    const ps = P.listar();
+    if (!ps.length) { console.log(`No hay perfiles en ${fwd(P.DIR)}.`); return; }
+    console.log(`Perfiles (${fwd(P.DIR)}):`);
+    for (const p of ps) console.log(`  • ${p.nombre} ${p.version}  ${p.descripcion}`);
+    const e = P.estado(root);
+    if (e) console.log(`\nEste proyecto tiene aplicado ${e.nombre} ${e.aplicada}${e.error ? ` (✗ ${e.error})` : e.pendientes ? ` · ${e.pendientes} cambio(s) pendientes respecto de la ${e.disponible}` : ' · al día'}.`);
+    console.log(`\nVista previa: ${bin} perfil aplicar <nombre>   ·   aplicarlo: agrega --confirmar`);
+    return;
+  }
+  if (sub !== 'aplicar' || !nombre) { console.error('Uso: sdd-harness.js perfil [listar] | perfil aplicar <nombre> [--ruta <proyecto>] [--confirmar] [--forzar]'); process.exitCode = 1; return; }
+  const confirma = flags.has('--confirmar');
+  let pl;
+  try { pl = confirma ? P.aplicar(root, nombre, { forzar: flags.has('--forzar') }) : P.planificar(root, nombre); } catch (e) { console.log(`✗ ${e.message}`); process.exitCode = 1; return; }
+  const ICON = { crear: '+', reemplazar: '↻', igual: '=', semilla: '·' };
+  console.log(`Perfil ${pl.perfil.nombre} ${pl.perfil.version} → ${fwd(pl.root)}${pl.previo ? ` (aplicado antes: ${pl.previo.version})` : ''}`);
+  if (pl.coincide === false) console.log(`⚠ Este proyecto no parece el del perfil: ${pl.perfil.detectar.archivo} no contiene ${pl.perfil.detectar.contiene || 'lo esperado'}.`);
+  const vis = pl.archivos.filter(a => a.accion !== 'igual');
+  for (const a of vis) console.log(`  ${ICON[a.accion]} ${a.rel}${a.accion === 'crear' ? ' (nuevo)' : a.accion === 'semilla' ? ' (ya existe: es del equipo y no se toca)' : ''}${a.sinCommitear ? '  ⚠ con cambios sin commitear' : ''}`);
+  const iguales = pl.archivos.length - vis.length;
+  if (iguales) console.log(`  = ${iguales} archivo(s) ya iguales al perfil`);
+  const c = pl.config;
+  console.log(`  ${c.accion === 'invalida' ? '✗' : c.accion === 'igual' ? '=' : c.accion === 'crear' ? '+' : '↻'} .sdd/harness.json${c.accion === 'invalida' ? ': JSON inválido, no se toca' : c.accion === 'igual' ? ' ya incluye el perfil' : ` (${c.accion === 'crear' ? 'nuevo' : 'se mezcla'}: ${c.claves.filter(k => !k.startsWith('_')).join(', ') || 'marca del perfil'}${c.accion === 'crear' ? '' : '; tus listas, reglas y demás claves se conservan'})`}`);
+  if (pl.obsoletos.length) {
+    console.log('\nEl perfil deja obsoleto (no se borra: quítalo tú en una PR):');
+    for (const o of pl.obsoletos) console.log(`  ✗ ${o.ruta}${o.motivo ? ` — ${o.motivo}` : ''}`);
+  }
+  if (!confirma) {
+    if (!P.pendientes(pl)) { console.log('\nEl proyecto ya está al día con el perfil.'); return; }
+    console.log(`\nPara aplicarlo: ${bin} perfil aplicar ${nombre}${opt('--ruta') ? ` --ruta "${fwd(pl.root)}"` : ''} --confirmar`);
+    console.log('Los archivos reemplazados quedan en git: revísalos con git diff y commitéalos como cualquier cambio.');
+    return;
+  }
+  if (pl.error) { console.log(`\n✗ No se aplicó nada: ${pl.error}`); process.exitCode = 1; return; }
+  S.log(root, { herramienta: 'terminal', evento: 'perfil', decision: 'aplicado', detalle: `${nombre} ${pl.perfil.version}: ${pl.escritos.length} archivo(s)` });
+  console.log(pl.escritos.length ? `\n✓ Perfil aplicado: ${pl.escritos.length} archivo(s) escritos. Revisa con git diff, commitea y abre una sesión nueva de tu IA para que tome skills, agentes y CLAUDE.md.` : '\nEl proyecto ya estaba al día con el perfil.');
+}
+
 function consumo() {
   const { sessionUsage } = require(path.join(SRC, 'usage'));
   const last = S.listSessions(root).find(x => x.consumo);
@@ -763,6 +810,6 @@ function reglas() {
   process.exitCode = hits.length ? 1 : 0;
 }
 
-const cmds = { estado, doctor, sensores, registro, eventos, aprobar, consumo, reglas, puntos, deshacer, workspace, worktree, excepcion, 'excepción': excepcion, 'linea-base': lineaBase, trabajo, hooks: () => { const rows = clientes(); imprimirClientes(rows); if (rows.some(r => r.falla)) process.exitCode = 1; } };
-if (!cmds[cmd]) { console.error('Comandos: estado | doctor | hooks | sensores | linea-base | trabajo | registro | eventos | consumo | reglas | workspace | puntos | deshacer | aprobar | excepcion'); process.exit(1); }
+const cmds = { estado, doctor, sensores, registro, eventos, aprobar, consumo, reglas, puntos, deshacer, workspace, worktree, perfil, excepcion, 'excepción': excepcion, 'linea-base': lineaBase, trabajo, hooks: () => { const rows = clientes(); imprimirClientes(rows); if (rows.some(r => r.falla)) process.exitCode = 1; } };
+if (!cmds[cmd]) { console.error('Comandos: estado | doctor | hooks | sensores | linea-base | trabajo | registro | eventos | consumo | reglas | workspace | perfil | puntos | deshacer | aprobar | excepcion'); process.exit(1); }
 Promise.resolve(cmds[cmd]()).catch(e => { console.error(e.message); process.exit(1); });

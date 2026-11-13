@@ -135,7 +135,7 @@ function onSession(ev) {
   const snap = S.readState(ev.root, ev.sessionId).huellas ? null : snapshot(ev, ws);
   const st = S.updateState(ev.root, ev.sessionId, s => {
     s.herramienta = ev.host; s.compactado = false;
-    if (ev.source !== 'compact' && ev.source !== 'resume') s.memoriasCargadas = [];
+    if (ev.source !== 'compact' && ev.source !== 'resume') { s.memoriasCargadas = []; s.enCurso = []; }
     if (!s.huellas && snap) s.huellas = snap;
     notes = diagnosticNotes(s, cfg);
   });
@@ -348,7 +348,11 @@ function onPre(ev) {
   }
   if (t.kind === 'agent') {
     let r = null;
-    S.updateState(ev.root, ev.sessionId, s => { r = budget.tryLaunch(s, cfg); });
+    S.updateState(ev.root, ev.sessionId, s => {
+      r = budget.tryLaunch(s, cfg);
+      // Solo donde la herramienta avisa cuando un sub-agente termina (SubagentStop): si no, nunca se descontaría
+      if (r.ok && ev.subagentStop) s.enCurso = [...enCurso(s), new Date().toISOString()];
+    });
     if (r.ok) return null;
     const what = [t.agente, t.descripcion].filter(Boolean).join(': ');
     const reason = `presupuesto de sub-agentes: este pedido ya lanzó ${r.usados} (tope ${r.tope}${(cfg.presupuesto || {}).modo === 'ahorro' ? ', modo ahorro' : ''})${what ? `. Quiere lanzar ${what}` : ''}`;
@@ -467,9 +471,12 @@ function rulesControl(ev, ws, files) {
     applies = true;
     const v = ruleViolation(ev, ws, abs, [text], { creating: false });
     if (!v) continue;
-    const head = spawnSync('git', ['-C', path.dirname(abs), 'show', `HEAD:./${path.basename(abs)}`], { encoding: 'utf8', windowsHide: true, timeout: 10000 });
-    const before = head.status === 0 ? ruleViolation(ev, ws, abs, [head.stdout], { creating: false }) : null;
-    if (before && before.regla === v.regla && before.coincidencia === v.coincidencia) continue;
+    // Solo lectura: el archivo está en la lista de cambios, así que modificarlo ya es la violación (no hay «lo que ya estaba»).
+    if (v.tipo !== 'soloLectura') {
+      const head = spawnSync('git', ['-C', path.dirname(abs), 'show', `HEAD:./${path.basename(abs)}`], { encoding: 'utf8', windowsHide: true, timeout: 10000 });
+      const before = head.status === 0 ? ruleViolation(ev, ws, abs, [head.stdout], { creating: false }) : null;
+      if (before && before.regla === v.regla && before.coincidencia === v.coincidencia) continue;
+    }
     found.push(`${v.archivo}: regla «${v.regla}» (encontré "${v.coincidencia}") — ${v.mensaje}`);
   }
   if (!applies) return null;
@@ -486,8 +493,21 @@ async function verifyChanges(ev, cfg, st) {
   if (!code.some(f => CODE_EXT.test(f))) { S.updateState(ev.root, ev.sessionId, s => { s.sucio = false; }); return {}; } // nada que verificar (documentación…)
   const huella = V.fingerprint(ev.root, code);
   const prev = st.sensores;
-  if (prev && prev.pausado && prev.huella === huella) return {}; // ya se informó para este mismo contenido
   const max = cfg.sensores.maxBloqueos;
+  if (prev && prev.huella === huella) {
+    if (prev.pausado) return {}; // ya se informó para este mismo contenido
+    if (verificado(prev.estado)) { S.updateState(ev.root, ev.sessionId, s => { s.sucio = false; s.bloqueos = 0; }); return {}; } // ya verificado tal cual
+    // Mismo contenido que la última verificación fallida o sin verificar: correrla otra vez da lo mismo y puede costar
+    // minutos (una suite completa que llega a su límite de tiempo). Se informa una vez y queda la excepción a mano.
+    const pend = V.pendingControls(prev);
+    S.updateState(ev.root, ev.sessionId, s => {
+      if (!s.sensores) return;
+      s.sensores.pausado = true;
+      if (pend.length) A.request(s, A.forException(ev, pend.join(','), huella), { vigenciaMin: vigencia(cfg), datos: { controles: pend, huella } });
+    });
+    logEv(ev, { evento: 'sensores', decision: 'sin cambios', detalle: `misma huella que la verificación anterior (${prev.estado}); no se repite` });
+    return { notice: `Sin cambios desde la última verificación (${ETIQUETA[prev.estado] || prev.estado}${pend.length ? `: ${pend.join(', ')}` : ''}): no se vuelve a correr. Los cambios siguen sin verificar. Para repetirla igual (un test inestable, un servicio que ya levantó): sdd-harness sensores; para seguir sin ella, el usuario puede autorizar una excepción respondiendo «sí» o con sdd-harness excepcion.` };
+  }
   let run;
   if (!cfg.sensores.alTerminar.length) run = { ran: false, motivo: 'sensores desactivados (sensores.alTerminar está vacío)', results: [] };
   else run = await runSpaceSensors(ev, code, cfg);
@@ -550,7 +570,15 @@ async function onStop(ev) {
   }
   const asks = gate.asksUser(last);
   const notes = [];
-  if (st.sucio && !ev.aborted && !asks) {
+  // Sub-agentes en segundo plano siguen trabajando: el agente principal solo cedió el turno mientras los espera.
+  // Verificar ahora mediría un trabajo a medias y, mientras corren los sensores (minutos), el cliente no puede
+  // entregarle al agente el aviso de que terminaron: se queda «verificando» hasta que el usuario cancela.
+  const esperando = enCurso(st).length;
+  if (st.sucio && esperando && !ev.aborted) {
+    result.notice = `Verificación en espera: ${esperando} sub-agente(s) siguen trabajando; lint, tipos y tests corren cuando terminen.`;
+    logEv(ev, { evento: 'sensores', decision: 'en espera', detalle: `${esperando} sub-agente(s) en curso` });
+  }
+  if (st.sucio && !esperando && !ev.aborted && !asks) {
     const v = await verifyChanges(ev, cfg, st);
     const time = budget.timeStatus(st, cfg);
     if (v.notice) result.notice = v.notice;
@@ -566,7 +594,7 @@ async function onStop(ev) {
     }
   }
   st = S.readState(ev.root, ev.sessionId);
-  if (!result.block && !ev.aborted && !ev.stopActive && !asks) {
+  if (!result.block && !esperando && !ev.aborted && !ev.stopActive && !asks) {
     let s = null;
     try { s = T.status(ev.root); } catch { s = null; }
     const sig = s && !s.problema && s.trabajo.congelado && !['tecnicamente_completo', 'aceptado', 'cerrado'].includes(s.estado) ? shortHash(JSON.stringify(s.faltan)) : null;
@@ -592,7 +620,7 @@ async function onStop(ev) {
       result.notice = [result.notice, `Presupuesto de tokens agotado: ${Math.round(spent.valor).toLocaleString('es-CL')} de ${Math.round(spent.tope).toLocaleString('es-CL')} (${spent.fuente}). Se frenan escrituras y sub-agentes hasta que confirmes otro tramo («sí»).`].filter(Boolean).join('\n');
     }
   }
-  logEv(ev, { evento: 'fin de turno', decision: result.block ? 'bloqueado' : 'terminado', turno: st.turno, terminacion: { motivo: ev.aborted ? 'interrumpido' : result.block ? 'faltan verificaciones o evidencia' : asks ? 'pregunta al usuario' : st.sucio ? 'cambios sin verificar' : 'sin pendientes de verificación' } });
+  logEv(ev, { evento: 'fin de turno', decision: result.block ? 'bloqueado' : 'terminado', turno: st.turno, terminacion: { motivo: ev.aborted ? 'interrumpido' : result.block ? 'faltan verificaciones o evidencia' : esperando ? 'sub-agentes en curso' : asks ? 'pregunta al usuario' : st.sucio ? 'cambios sin verificar' : 'sin pendientes de verificación' } });
   // Checkpoint de la sesión en la memoria del proyecto (solo si hubo trabajo y algo cambió)
   if (st.cambios.length) {
     const sig = shortHash(JSON.stringify([st.gate.estado, st.objetivo, st.cambios, st.sensores && st.sensores.resumen]));
@@ -601,6 +629,18 @@ async function onStop(ev) {
     }
   }
   return result;
+}
+
+/** Sub-agentes lanzados que todavía no avisan que terminaron (se olvidan a los 30 min por si un aviso se pierde). */
+const EN_CURSO_MAX_MS = 30 * 60 * 1000;
+function enCurso(s) { const now = Date.now(); return (s.enCurso || []).filter(t => now - Date.parse(t) < EN_CURSO_MAX_MS); }
+
+/** Un sub-agente terminó (Claude Code: SubagentStop): se descuenta el más antiguo de los que siguen en curso. */
+function onSubagentStop(ev) {
+  let quedan = 0;
+  S.updateState(ev.root, ev.sessionId, s => { s.enCurso = enCurso(s).slice(1); quedan = s.enCurso.length; });
+  logEv(ev, { evento: 'sub-agente', decision: 'terminó', detalle: `${quedan} en curso` });
+  return null;
 }
 
 function onCompact(ev) {
@@ -617,7 +657,7 @@ function onResponse(ev) {
   return null;
 }
 
-const HANDLERS = { session: onSession, prompt: onPrompt, pre: onPre, post: onPost, stop: onStop, compact: onCompact, response: onResponse };
+const HANDLERS = { session: onSession, prompt: onPrompt, pre: onPre, post: onPost, stop: onStop, compact: onCompact, response: onResponse, subagentStop: onSubagentStop };
 
 /** ¿La acción es crítica según la política? (sin tocar el estado: sirve aunque el estado haya fallado) */
 function isCriticalAction(ev, cfg) {

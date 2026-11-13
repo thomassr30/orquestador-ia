@@ -16,7 +16,8 @@ JavaScript CommonJS en Node.js ≥18, sin dependencias; comandos y pruebas en pa
 - `budget.js` (sub-agentes, minutos, tokens medidos), `capacidades.js` + `observado.js` (matriz por cliente, niveles de doctor), `adapters/` (contrato por cliente).
 - `workspace.js` (detección del espacio de trabajo, mapa de proyectos, caché de 20 min; límites en config `espacio`: `profundidad`, `maxCarpetas`).
 - `skills-proyecto.js`: descubre las skills del proyecto (`.claude/skills`, `.agents/skills`), marca las que chocan con una global y arma el bloque de contexto (solo nombre y ruta); lo usan `memory.js`, `workspace.js` y doctor.
-- `bin/sdd-harness.js` (estado, doctor, trabajo, eventos, excepcion, linea-base…), `bin/sdd-eval.js` (evals con modelos, solo con --confirmar), `bin/sdd-hook.js` (entrada de hooks).
+- `perfiles.js` + `perfiles/<nombre>/` (perfil.json, harness.json, proyecto/): configuración de IA de un repo concreto aplicada con `sdd-harness.js perfil aplicar <n> [--confirmar]`; nunca borra, semillas solo si faltan, mezcla .sdd/harness.json, se niega con cambios sin commitear. Perfil incluido: `sag-laboratorio-frontend`.
+- `bin/sdd-harness.js` (estado, doctor, trabajo, eventos, excepcion, linea-base, perfil…), `bin/sdd-eval.js` (evals con modelos, solo con --confirmar), `bin/sdd-hook.js` (entrada de hooks).
 - `core/`: agentes, skills y reglas distribuidas (`core/rules/global.md` = CLAUDE.md global instalado).
 
 ## Comandos

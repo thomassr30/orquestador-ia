@@ -45,9 +45,11 @@ test('Claude Code: GATE, permisos, sensores al terminar y checkpoint de sesión'
   const s1 = hook('claude', 'Stop', { ...base, last_assistant_message: 'Listo.' }).json;
   assert.strictEqual(s1.decision, 'block', 'con sensores en rojo no puede terminar');
   assert.match(s1.reason, /no-unused-vars/);
-  assert.strictEqual(hook('claude', 'Stop', { ...base, last_assistant_message: 'Corregido.', stop_hook_active: true }).json.decision, 'block');
-  const s3 = hook('claude', 'Stop', { ...base, last_assistant_message: 'Ese error ya existía.', stop_hook_active: true }).json;
-  assert.ok(s3.systemMessage && !s3.decision, 'tras el máximo de bloqueos avisa y deja terminar');
+  // Sin cambiar el contenido no se vuelve a correr (daría lo mismo y una suite lenta retendría el turno minutos):
+  // avisa una vez y deja terminar, con los cambios todavía sin verificar
+  const s2 = hook('claude', 'Stop', { ...base, last_assistant_message: 'Ese error ya existía.', stop_hook_active: true }).json;
+  assert.ok(s2.systemMessage && !s2.decision, 'mismo contenido: avisa y deja terminar');
+  assert.match(s2.systemMessage, /Sin cambios desde la última verificación/);
 
   const ses = fs.readFileSync(path.join(dir, '.sdd/memoria/sesion.md'), 'utf8');
   assert.match(ses, /^Proyecto: /);

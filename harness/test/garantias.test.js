@@ -47,8 +47,9 @@ test('SENS-6: al agotar reintentos el fallo sigue pendiente; la excepción del u
   await E(d, 's', 'post', edit('a.js'));
   const outs = [];
   for (let i = 0; i < 4; i++) outs.push(await E(d, 's', 'stop', { lastMessage: 'Listo.' }));
-  assert.deepStrictEqual(outs.map(o => (o && o.block ? 'B' : o && o.notice ? 'N' : '-')).join(''), 'BBN-');
-  assert.match(outs[2].notice, /siguen sin verificar/);
+  // Sin cambios de contenido no se vuelve a correr (daría lo mismo): un bloqueo, un aviso y la excepción a mano
+  assert.deepStrictEqual(outs.map(o => (o && o.block ? 'B' : o && o.notice ? 'N' : '-')).join(''), 'BN--');
+  assert.match(outs[1].notice, /siguen sin verificar/);
   let st = S.readState(d, 's');
   assert.strictEqual(st.sucio, true, 'agotar reintentos no libera el pendiente');
   assert.strictEqual(st.sensores.estado, 'fallido');

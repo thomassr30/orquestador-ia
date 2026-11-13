@@ -1,0 +1,95 @@
+{
+  "_comentario": "Fragmento que «sdd-harness.js perfil aplicar sag-laboratorio-frontend» mezcla en <proyecto>/.sdd/harness.json. Las listas se suman (las reglas, por nombre) y el resto lo fija el perfil. Traduce al harness los permisos de .claude/settings.json y la constitución del repo.",
+  "sensores": {
+    "_nota": "Constitución VII: nada está terminado sin type-check, lint y npm test. El harness los detecta solo (eslint sobre lo cambiado, npm run type-check, vitest related).",
+    "obligatorios": [
+      "lint",
+      "tipos",
+      "tests"
+    ]
+  },
+  "permisos": {
+    "_denegar": "Constitución V. Son prefijos: un --no-verify al final del comando no lo atrapa este patrón (sí la constitución y los hooks de Husky).",
+    "denegar": [
+      "git push --force",
+      "git push -f",
+      "git push --force-with-lease",
+      "git commit -n",
+      "git commit --no-verify"
+    ],
+    "_mcpBloquear": "Figma y Drive solo se leen (skill external-sources): escritura, descarga y exportación de Figma (conector de claude.ai y MCP «figma» del harness) y escritura de Drive y Docs.",
+    "mcpBloquear": [
+      "claude_ai_google_drive__copy_file",
+      "claude_ai_google_drive__create_file",
+      "claude_ai_google_drive__share_file",
+      "claude_ai_google_drive__trash_file",
+      "claude_ai_google_drive__update_file",
+      "claude_ai_google_docs__update_doc",
+      "claude_ai_figma__add_code_connect_map",
+      "figma__add_code_connect_map",
+      "claude_ai_figma__create_generative_plugin",
+      "figma__create_generative_plugin",
+      "claude_ai_figma__create_new_file",
+      "figma__create_new_file",
+      "claude_ai_figma__create_shader",
+      "figma__create_shader",
+      "claude_ai_figma__generate_diagram",
+      "figma__generate_diagram",
+      "claude_ai_figma__generate_figma_design",
+      "figma__generate_figma_design",
+      "claude_ai_figma__generate_image",
+      "figma__generate_image",
+      "claude_ai_figma__send_code_connect_mappings",
+      "figma__send_code_connect_mappings",
+      "claude_ai_figma__send_code_to_figma",
+      "figma__send_code_to_figma",
+      "claude_ai_figma__update_generative_plugin",
+      "figma__update_generative_plugin",
+      "claude_ai_figma__update_shader",
+      "figma__update_shader",
+      "claude_ai_figma__upload_assets",
+      "figma__upload_assets",
+      "claude_ai_figma__use_figma",
+      "figma__use_figma",
+      "claude_ai_figma__weave_run_model",
+      "figma__weave_run_model",
+      "claude_ai_figma__weave_run_tool",
+      "figma__weave_run_tool",
+      "claude_ai_figma__weave_upload_asset",
+      "figma__weave_upload_asset",
+      "claude_ai_figma__weave_cancel_tool_run",
+      "figma__weave_cancel_tool_run",
+      "claude_ai_figma__download_assets",
+      "figma__download_assets",
+      "claude_ai_figma__export_video",
+      "figma__export_video"
+    ]
+  },
+  "reglas": [
+    {
+      "nombre": "imports-sin-padre",
+      "archivos": "src/**/*.{ts,tsx}",
+      "excepto": "src/global/ui/sag/**",
+      "noImportar": [
+        ".."
+      ],
+      "mensaje": "Usa el alias @/ en lugar de rutas relativas con ../ (README → Imports; ./ solo entre archivos de la misma carpeta)."
+    },
+    {
+      "nombre": "kit-sag-solo-lectura",
+      "archivos": "src/global/ui/sag/**",
+      "soloLectura": true,
+      "mensaje": "El kit src/global/ui/sag es una copia de la plantilla SAG y no se modifica (constitución II). Crea o ajusta el componente en src/global/ui/custom y reutiliza el del kit."
+    },
+    {
+      "nombre": "sin-html-crudo",
+      "archivos": "src/**/*.tsx",
+      "excepto": [
+        "src/global/ui/sag/**",
+        "src/tests/**"
+      ],
+      "prohibido": "dangerouslySetInnerHTML",
+      "mensaje": "Sin dangerouslySetInnerHTML con datos externos (constitución IV, severidad ALTA): renderiza el texto como nodos de React."
+    }
+  ]
+}

@@ -24,7 +24,7 @@ Se instala **una vez** y queda activo en **todos tus proyectos**.
 - [Empezar en un proyecto nuevo](#empezar-en-un-proyecto-nuevo)
 - [Uso diario](#uso-diario)
 - [Servidores MCP](#servidores-mcp) · [Azure DevOps](#azure-devops) · [Del work item al plan](#del-work-item-al-plan)
-- [Cuánto cuestan las skills](#cuánto-cuestan-las-skills) · [Varias tareas a la vez (worktrees)](#varias-tareas-a-la-vez-worktrees)
+- [Cuánto cuestan las skills](#cuánto-cuestan-las-skills) · [Skills que trae el proyecto](#skills-que-trae-el-proyecto) · [Perfiles de proyecto](#perfiles-de-proyecto) · [Varias tareas a la vez (worktrees)](#varias-tareas-a-la-vez-worktrees)
 - [Cómo funciona el harness](#cómo-funciona-el-harness)
 - [Verificación de resultados](#verificación-de-resultados)
 - [Trabajo verificable](#trabajo-verificable)
@@ -545,6 +545,8 @@ Al terminar un turno con código modificado, cada control (lint, tipos, tests, r
 - **Lo omitido nunca es verde.** El resultado global es aprobado solo si al menos un control se aprobó y todos los obligatorios están aprobados o con excepción. Un control opcional que no corrió solo se informa.
 - **Obligatorios**: `sensores.obligatorios` (por defecto `["tests"]`). Si el proyecto tiene ese control, debe correr y pasar; si falla o queda sin verificar, el cambio no se da por verificado.
 - **Reintentos**: si algo falló o un obligatorio quedó sin verificar, el harness impide terminar el turno o pide reintentar (según la herramienta) hasta `sensores.maxBloqueos` veces seguidas (2). Después deja de insistir, pero el resultado sigue pendiente hasta que cambie el contenido de los archivos o autorices una excepción. Agotar los reintentos no aprueba nada.
+- **Sin repetir lo mismo**: la verificación se vuelve a correr solo si cambió el contenido de lo modificado. Con la misma huella, un resultado aprobado sigue valiendo y uno fallido o sin verificar se informa una vez (con la excepción disponible), sin volver a correr una suite que puede tardar minutos. Para repetirla igual (un test inestable, un servicio que ya levantó): `sdd-harness.js sensores`.
+- **Sub-agentes en segundo plano** (Claude Code): mientras siguen trabajando, el fin de turno no verifica ni retiene al agente: avisa «Verificación en espera» y verifica cuando terminan (el harness lo sabe por el hook `SubagentStop`). Antes, el agente principal cedía el turno para esperarlos, el hook corría los tests durante minutos y el aviso de que los sub-agentes habían terminado no le llegaba hasta que cancelabas.
 - **Excepciones**: responde `sí` en el chat a la solicitud que aparece tras los reintentos, o ejecuta desde tu terminal `node "$HOME/.sdd-orquestador/bin/sdd-harness.js" excepcion [control…] --motivo "por qué"`. El agente no puede ejecutar ese comando. La excepción vale solo para el contenido actual: si los archivos cambian, deja de valer.
 - **Cambios por shell**: al terminar el turno el harness compara `git status` con la foto anterior, así que lo que se modificó por comandos o scripts también se verifica. Fuera de un repositorio git solo cuentan las ediciones que pasan por los hooks.
 - **Reglas propias**: `prohibido` y `noImportar` se revisan también sobre lo cambiado por shell. Una violación que ya estaba en el último commit no se atribuye al cambio.
@@ -585,16 +587,17 @@ El agente usa además `trabajo plan | iniciar | bloquear | verificar | decision 
 
 ## Del work item al plan
 
-Si tu trabajo llega como una HU, un PBI, una task o una página de wiki, dale la clave o el enlace y el orquestador hace esto (skill `sdd-ticket`):
+Si tu trabajo llega como una HU, un PBI, una task o una página de wiki, dale la clave o el enlace y el orquestador lo lleva **de punta a punta** (skill `sdd-ticket`), con una sola pausa obligatoria: tu aprobación del plan.
 
-1. **Lee todo el contexto**, no solo la descripción: el work item con su padre y sus hijos, los comentarios (donde suele estar lo que se acordó después de escribirlo), los adjuntos y los enlaces a la wiki y a Figma. Si el punto de partida es una wiki, parte de ahí y busca el work item vinculado.
-2. **Lo cruza con tu proyecto**: qué de lo pedido ya existe, qué hay que construir y dónde va según tu arquitectura y tus reglas, con archivos y capas concretas.
-3. **Separa lo claro de lo dudoso**, y las dudas van a dos lugares distintos:
+1. **Lee todo el contexto** en el hilo principal, no solo la descripción: el work item con su padre y sus hijos, los comentarios (donde suele estar lo que se acordó después de escribirlo), los adjuntos y los enlaces a la wiki y a Figma. Si el punto de partida es una wiki, parte de ahí y busca el work item vinculado.
+2. **Lee el diseño antes de planificar**: cada frame de Figma completo (contexto, variables y medidas; `figma-design`) y arma un **inventario** con el valor exacto de cada tamaño, espacio, tipografía, color, radio, borde, sombra y texto, con su origen. Lo que no está dibujado no existe y lo que no se pudo leer queda «sin dato» y se pregunta: la captura no es fuente de valores.
+3. **Lo cruza con tu proyecto**: qué de lo pedido ya existe, qué hay que construir y dónde va según tu arquitectura y tus reglas, con archivos y capas concretas.
+4. **Separa lo claro de lo dudoso**, y las dudas van a dos lugares distintos:
    - **Técnicas** (dónde crear el módulo, qué patrón seguir): te las pregunta en el chat, una a la vez.
    - **De negocio o de alcance** (un estado que está en la wiki pero no en la HU, un campo que cambió de nombre, una regla que nadie definió): las registra como [preguntas abiertas](#preguntas-abiertas) y te las entrega listas, con dónde van y a quién etiquetar. **Las publicas tú**: el harness no escribe en Azure.
-4. **Registra el plan** y te lo presenta con sus tres partes: lo que está claro y se va a hacer, lo que queda bloqueado esperando respuesta, y lo que queda fuera del alcance.
-5. **Desarrolla solo con tu aprobación**, y solo lo que no depende de una pregunta abierta. No hay desarrollo automático.
-6. **Cuando llega una respuesta**, te informa qué cambió y qué tareas quedan listas. Si la respuesta cambia el alcance, el plan nuevo queda como propuesta hasta que lo apruebes otra vez.
+5. **Registra el plan** (un requisito por criterio de aceptación y uno de fidelidad por frame) y te lo presenta con sus tres partes: lo que está claro y se va a hacer, lo que queda bloqueado esperando respuesta, y lo que queda fuera del alcance.
+6. **Con tu «sí», lo desarrolla completo** sin más pausas (salvo decisiones críticas): todas las tareas que no dependen de una pregunta abierta, con el inventario completo en cada encargo de UI, tests por criterio, la comparación en el navegador y en números contra el inventario hecha por quien no implementó, revisión del diff y la verificación del harness. No hay desarrollo sin aprobación.
+7. **Cuando llega una respuesta**, te informa qué cambió y qué tareas quedan listas. Si la respuesta cambia el alcance, el plan nuevo queda como propuesta hasta que lo apruebes otra vez.
 
 Para que el agente sepa a quién etiquetar y qué estados son válidos, registra una vez en la memoria del proyecto la organización, el proyecto, el equipo, el area path y el proceso (Agile, Scrum o CMMI tienen estados distintos). Lo pide la skill `tracker-azure-boards`.
 
@@ -737,6 +740,7 @@ Si un `harness.json` (global o del proyecto) tiene JSON inválido, el harness us
 | `prohibido` | Una expresión regular que no puede aparecer en el contenido nuevo | Antes de escribir: bloquea |
 | `nombreArchivo` | El nombre que debe tener un archivo nuevo | Al crearlo: bloquea |
 | `maxLineas` | El tamaño máximo del archivo | Después de editar: avisa |
+| `soloLectura` | `true`: esos archivos no se crean ni se modifican (un kit copiado de una plantilla, código generado) | Antes de escribir: bloquea; por shell, al terminar el turno |
 
 `noImportar`, `prohibido` y `nombreArchivo` se revisan antes de escribir con las herramientas de edición. Lo que cambia un comando de shell se revisa al terminar el turno (`prohibido` y `noImportar`, sin atribuir lo que ya estaba en el último commit). `sdd-harness.js reglas` revisa todo el proyecto. Hay más ejemplos por stack (Angular, React, NestJS, Go) en `~/.sdd-orquestador/harness.json` → `_ejemplosReglas`.
 
@@ -798,6 +802,34 @@ Un repositorio puede traer sus propias skills (convenciones de su API, su sistem
 - **Si se llaman igual que una global**: en Claude Code una skill personal (`~/.claude/skills`, donde viven las del orquestador) prevalece sobre una de proyecto con el mismo nombre. El bloque las marca con ⚠ e indica leer la del proyecto por su ruta en vez de invocarla por nombre; `doctor` las lista. Renombrar la del proyecto evita el choque.
 - **`.agents/skills`**: la documentación de Claude Code solo menciona `.claude/skills`. Las de `.agents/skills` se reconocen igual, pero el agente las lee por su ruta.
 - **Ver qué detectó**: `node ~/.sdd-orquestador/bin/sdd-harness.js doctor` muestra cuántas trae el proyecto, cuáles chocan y cuánto cuestan sus descripciones en cada sesión.
+
+## Perfiles de proyecto
+
+Las skills de un repositorio viven en el repositorio. Pero cuando un equipo quiere mantener **toda** la configuración de IA de un repo en un solo lugar (su `CLAUDE.md`, sus agentes, su constitución, sus skills, los permisos nativos de Claude Code y las reglas del harness) y llevarla a cada clon o actualizarla de una vez, eso es un **perfil**: una carpeta en `perfiles/<nombre>/` de este repositorio que se aplica al proyecto con un comando. `core/` no cambia: lo propio de un equipo no se instala en todos tus proyectos.
+
+```bash
+cd C:/dev/mi-proyecto
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" perfil                                  # perfiles disponibles y el aplicado aquí
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" perfil aplicar <nombre>                 # vista previa: qué crea, reemplaza o deja obsoleto
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" perfil aplicar <nombre> --confirmar     # lo aplica
+```
+
+| Archivo del perfil | Qué es |
+|---|---|
+| `perfil.json` | `nombre`, `version`, `descripcion`; `detectar` (`archivo` y texto que debe `contener`, para no aplicarlo al proyecto equivocado); `semillas` (rutas que solo se crean si faltan, como la memoria, que después es del equipo); `reemplaza` (lo que el perfil deja obsoleto, con su motivo) |
+| `harness.json` | Fragmento que se **mezcla** en `<proyecto>/.sdd/harness.json`: las listas se suman, las reglas se reemplazan por nombre y el resto de tu configuración se conserva. Las claves que empiezan con `_` son notas y no pasan |
+| `proyecto/` | Archivos tal cual van en la raíz del proyecto (`CLAUDE.md`, `.claude/agents`, `.claude/rules`, `.claude/skills`, `.claude/settings.json`…) |
+
+- **Nunca borra.** Lo que el perfil deja obsoleto aparece en la vista previa para que lo quites tú en una PR.
+- **No pisa trabajo sin guardar.** Si un archivo que se reemplazaría tiene cambios sin commitear (o no está en git), no aplica nada; `--forzar` lo salta. Tampoco aplica si `detectar` no coincide (también con `--forzar`) ni si `.sdd/harness.json` es JSON inválido (eso nunca).
+- **Lo decides tú.** La vista previa es libre; si la IA pide `--confirmar`, el harness te pide la confirmación y ella debe anunciar antes qué va a hacer. El resultado queda en git: revísalo con `git diff` y commitéalo.
+- **Mantenerlo.** El cambio se hace en el perfil, no en el proyecto: si solo se corrige en el repo, la próxima aplicación lo vuelve atrás. `doctor` muestra el perfil aplicado y avisa cuando el proyecto quedó atrás de la versión del perfil. Los perfiles se aplican desde la copia instalada (`~/.sdd-orquestador/perfiles`): después de `git pull` el hook de git la actualiza solo; si editas un perfil en tu copia del repositorio, corre `node install.js`.
+
+**Perfiles incluidos:**
+
+| Perfil | Proyecto | Qué trae |
+|---|---|---|
+| `sag-laboratorio-frontend` | `sag.laboratorio.app.frontend` (Sistema de Laboratorios SAG, Next.js 16) | Constitución, agentes `frontend-expert` (implementa) y `frontend-reviewer` (revisión final), 11 skills de convenciones, `CLAUDE.md` adaptado al harness y la memoria inicial. En `.sdd/harness.json`: lint, tipos y tests obligatorios; `push --force` y `--no-verify` denegados; escritura, descarga y exportación de Figma y escritura de Drive y Docs bloqueadas; reglas `imports-sin-padre`, `kit-sag-solo-lectura` y `sin-html-crudo`. Reemplaza `azdo.mjs` (Azure DevOps va por el MCP), `read-pbi` (es `sdd-ticket`) y los hooks propios (lint al terminar el turno; la vigilancia de la wiki de Normas Generales, en la skill `general-standards`) |
 
 ## Varias tareas a la vez (worktrees)
 

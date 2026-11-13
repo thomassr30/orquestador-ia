@@ -655,6 +655,9 @@ function install() {
   writeFile(path.join(SDD_HOME, 'install.js'), fs.readFileSync(path.join(ROOT, 'install.js'), 'utf8'));
   rmrf(path.join(SDD_HOME, 'config'));
   copyDir(path.join(ROOT, 'config'), path.join(SDD_HOME, 'config'));
+  // Perfiles de proyecto (sdd-harness.js perfil): se aplican desde la copia instalada, como el resto del runtime.
+  rmrf(path.join(SDD_HOME, 'perfiles'));
+  if (fs.existsSync(path.join(ROOT, 'perfiles'))) copyDir(path.join(ROOT, 'perfiles'), path.join(SDD_HOME, 'perfiles'));
   const userCfg = path.join(SDD_HOME, 'harness.json');
   if (!fs.existsSync(userCfg)) writeFile(userCfg, fs.readFileSync(path.join(ROOT, 'config', 'harness.json'), 'utf8'));
   if (!opt('no-deps')) {

@@ -17,6 +17,7 @@ function claude(home) {
     PreToolUse: [{ matcher: 'Bash|Edit|Write|MultiEdit|NotebookEdit|Read|Grep|Task|Agent|WebFetch|WebSearch|mcp__.*', hooks: [h('PreToolUse', 15)] }],
     PostToolUse: [{ matcher: 'Edit|Write|MultiEdit|NotebookEdit', hooks: [h('PostToolUse', 30)] }],
     Stop: [{ hooks: [h('Stop', 900, { statusMessage: STOP_MSG })] }],
+    SubagentStop: [{ hooks: [h('SubagentStop', 10)] }],
     PreCompact: [{ hooks: [h('PreCompact', 15)] }],
   };
 }

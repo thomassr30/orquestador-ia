@@ -6,6 +6,7 @@
 //   noImportar     módulos o rutas que esos archivos no pueden importar      → ANTES de escribir (arquitectura por capas)
 //   nombreArchivo  regex que debe cumplir el nombre de un archivo nuevo      → al crearlo
 //   maxLineas      tamaño máximo del archivo                                → después de editar (aviso)
+//   soloLectura    true: esos archivos no se crean ni se modifican          → ANTES de escribir (p. ej. un kit copiado de una plantilla)
 // Ejemplos:
 //   { "nombre": "trusted-types", "archivos": "src/**/*.{ts,html}", "prohibido": "innerHTML|DOMParser", "mensaje": "…" }
 //   { "nombre": "dominio-sin-infra", "archivos": "src/domain/**", "noImportar": ["src/infra/**", "axios", "@angular/common/http"],
@@ -41,6 +42,7 @@ function compile(rules) {
     if (r.noImportar) return { ...base, tipo: 'noImportar', imports: [].concat(r.noImportar).map(String).filter(Boolean) };
     if (r.nombreArchivo) { const re = safeRe(r.nombreArchivo, ''); return re ? { ...base, tipo: 'nombreArchivo', re } : null; }
     if (Number(r.maxLineas) > 0) return { ...base, tipo: 'maxLineas', max: Number(r.maxLineas) };
+    if (r.soloLectura === true) return { ...base, tipo: 'soloLectura' };
     return null;
   }).filter(Boolean);
 }
@@ -95,6 +97,7 @@ function violation(root, file, contents, rules, { creating = false } = {}) {
   const rel = relPosix(root, abs);
   for (const r of compile(rules)) {
     if (!applies(r, rel)) continue;
+    if (r.tipo === 'soloLectura') return { regla: r.nombre, mensaje: r.mensaje, coincidencia: 'archivo de solo lectura', archivo: rel, tipo: r.tipo };
     if (r.tipo === 'nombreArchivo') {
       if (creating && !r.re.test(path.posix.basename(rel))) return { regla: r.nombre, mensaje: r.mensaje, coincidencia: path.posix.basename(rel), archivo: rel };
       continue;

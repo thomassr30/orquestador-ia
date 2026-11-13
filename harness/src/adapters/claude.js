@@ -3,13 +3,15 @@
 const { resolveRoot, toText, lastFromTranscript, normalizeTool, json, registrados } = require('./common');
 const { permite } = require('./claude-permisos');
 
-const EVENTS = { SessionStart: 'session', UserPromptSubmit: 'prompt', PreToolUse: 'pre', PostToolUse: 'post', Stop: 'stop', PreCompact: 'compact' };
+// SubagentStop: un sub-agente terminó. Con él se sabe cuándo quedan sub-agentes en segundo plano trabajando, para no
+// verificar (ni retener el fin de turno) a mitad de su trabajo.
+const EVENTS = { SessionStart: 'session', UserPromptSubmit: 'prompt', PreToolUse: 'pre', PostToolUse: 'post', Stop: 'stop', PreCompact: 'compact', SubagentStop: 'subagentStop' };
 
 function parse(native, input, env) {
   const event = EVENTS[native];
   if (!event) return null;
   return {
-    host: 'claude', event, nativeAsk: true, canRewrite: true, toolInput: input.tool_input,
+    host: 'claude', event, nativeAsk: true, canRewrite: true, subagentStop: true, toolInput: input.tool_input,
     root: resolveRoot(env.CLAUDE_PROJECT_DIR, input.cwd),
     sessionId: input.session_id,
     source: input.source,
