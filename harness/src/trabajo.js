@@ -54,9 +54,16 @@ function update(root, fn) {
 // ---------- Plan ----------
 
 const pad = (p, n) => `${p}-${String(n).padStart(2, '0')}`;
-/** Valida y normaliza un plan. Devuelve {plan, errores}. */
-function normalizePlan(p) {
+/**
+ * Valida y normaliza un plan. Devuelve {plan, errores}.
+ * Con `root`, además exige que el plan esté cruzado con el proyecto: cada tarea dice qué archivos toca y al menos
+ * uno de los declarados ya existe. Un plan armado solo con el ticket y el diseño no nombra ningún archivo real, y
+ * eso se nota acá y no al verificar, cuando ya se aprobó y se desarrolló. `sinBase` es la salida para lo que de
+ * verdad empieza de cero: pide un motivo, que queda registrado.
+ */
+function normalizePlan(p, { root = null, sinBase = '' } = {}) {
   const errores = [];
+  let nota = '';
   if (!p || typeof p !== 'object') return { plan: null, errores: ['el plan debe ser un objeto JSON'] };
   if (!String(p.objetivo || '').trim()) errores.push('falta «objetivo»');
   const reqs = Array.isArray(p.requisitos) ? p.requisitos : [];
@@ -85,6 +92,7 @@ function normalizePlan(p) {
     const rs = (Array.isArray(x.requisitos) ? x.requisitos : []).map(String);
     if (!String(x.titulo || '').trim()) errores.push(`${id}: falta «titulo»`);
     if (!rs.length) errores.push(`${id}: indica qué requisitos cubre («requisitos»)`);
+    if (!(Array.isArray(x.archivos) ? x.archivos : []).filter(f => String(f).trim()).length) errores.push(`${id}: indica los archivos que toca («archivos»). El plan tiene que decir dónde va cada cosa en ESTE proyecto, no solo qué pide el ticket.`);
     for (const r of rs) if (!reqIds.has(r)) errores.push(`${id}: el requisito ${r} no existe`);
     return { id, titulo: redact(String(x.titulo || '')).slice(0, 200), requisitos: rs, depende: (Array.isArray(x.depende) ? x.depende : []).map(String), archivos: (Array.isArray(x.archivos) ? x.archivos : []).map(f => String(f).replace(/\\/g, '/')), responsable: x.responsable ? String(x.responsable) : null };
   });
@@ -101,10 +109,19 @@ function normalizePlan(p) {
     seen.set(id, 'listo');
   };
   for (const t of tareas) visit(t.id, []);
+  // Cruce con el proyecto: si NINGUNO de los archivos declarados existe, el plan se armó sin mirar el código.
+  if (root && tareas.length) {
+    const decl = [...new Set(tareas.flatMap(t => t.archivos))];
+    const existen = decl.filter(f => { try { return fs.existsSync(path.resolve(root, f)); } catch { return false; } });
+    if (decl.length && !existen.length) {
+      if (String(sinBase || '').trim()) nota = `sin base en el proyecto: ${redact(String(sinBase)).slice(0, 300)}`;
+      else errores.push('ninguno de los archivos del plan existe todavía: no se cruzó con el proyecto. Lee el código que ya está y nombra los archivos reales que se tocan. Si de verdad arranca de cero, repite con --sin-base "motivo".');
+    }
+  }
   const dup = list => list.find((x, i) => list.indexOf(x) !== i);
   if (dup(requisitos.map(r => r.id))) errores.push(`id de requisito repetido: ${dup(requisitos.map(r => r.id))}`);
   if (dup(tareas.map(t => t.id))) errores.push(`id de tarea repetido: ${dup(tareas.map(t => t.id))}`);
-  return { plan: { objetivo: redact(String(p.objetivo || '')).slice(0, 400), alcance: redact(String(p.alcance || '')).slice(0, 600), requisitos, tareas }, errores };
+  return { plan: { objetivo: redact(String(p.objetivo || '')).slice(0, 400), alcance: redact(String(p.alcance || '')).slice(0, 600), requisitos, tareas, ...(nota ? { nota } : {}) }, errores };
 }
 
 /** Huella de lo que el usuario aprueba: requisitos, criterios y tareas (no los estados). */
@@ -114,8 +131,8 @@ const planHash = t => shortHash(canonical({ o: t.objetivo, a: t.alcance, r: t.re
  * Registra el plan. Antes de la aprobación lo reemplaza; ya aprobado, queda como PROPUESTA hasta que el usuario
  * vuelva a aprobar (así el agente no puede cambiar ni rebajar los criterios aprobados por su cuenta).
  */
-function setPlan(root, raw, { sesion } = {}) {
-  const { plan, errores } = normalizePlan(raw);
+function setPlan(root, raw, { sesion, sinBase = '' } = {}) {
+  const { plan, errores } = normalizePlan(raw, { root, sinBase });
   if (errores.length) return { ok: false, errores };
   return update(root, t => {
     if (t && t.congelado && t.estado !== 'cerrado') {
@@ -216,6 +233,7 @@ function summary(root, { max = 8 } = {}) {
   if (s.estado === 'cerrado') return '';
   const lines = [`Trabajo en curso: ${s.trabajo.objetivo} — ${ETRABAJO[s.estado]}`];
   lines.push(`Requisitos: ${s.requisitos.filter(r => r.tecnico).length}/${s.requisitos.length} con evidencia vigente · Tareas: ${s.tareas.map(x => `${x.id} ${ETAREA[x.estado]}${x.responsable ? ` (${x.responsable})` : ''}`).join(' · ')}`);
+  if (s.trabajo.nota) lines.push(`Aviso del plan: ${s.trabajo.nota}. El plan no se apoya en archivos que ya existan: antes de implementar, confirma dónde va cada cosa en este proyecto.`);
   if (s.faltan.length) lines.push(`Falta: ${s.faltan.slice(0, max).join(' · ')}${s.faltan.length > max ? ` (+${s.faltan.length - max} más)` : ''}`);
   // Las preguntas sobreviven a la compactación acá: en el chat se perderían y se volverían a plantear de cero
   for (const q of (s.abiertas || []).slice(0, 5)) lines.push(`Pregunta abierta ${q.id}${q.para ? ` para ${q.para}` : ''}${q.donde ? ` en ${q.donde}` : ''}: ${q.texto} — no la respondas tú ni la des por resuelta.`);

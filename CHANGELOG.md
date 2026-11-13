@@ -1,5 +1,18 @@
 # Cambios
 
+## Sin publicar
+
+### El plan se cruza con el proyecto, y las fuentes externas no fallan calladas
+- **`trabajo plan` exige el cruce con el código.** Cada tarea tiene que declarar los archivos que toca, y al menos uno de los declarados en todo el plan tiene que existir ya. Un plan armado solo con el ticket y el Figma no nombra ningún archivo real, y eso ahora se rechaza al registrarlo en vez de aparecer al verificar, cuando ya se aprobó y se desarrolló. Para lo que de verdad arranca de cero: `trabajo plan … --sin-base "motivo"`, que queda registrado y se muestra junto al plan y en el resumen que lee el agente.
+- **Aviso al mencionar un ticket o un Figma.** En el primer mensaje donde aparece una clave de ticket o un enlace de Figma, el harness recuerda tres cosas: confirmar el acceso con una llamada barata antes de la lectura completa, reportar de inmediato lo que no responda o vuelva vacío en vez de reintentar en silencio, y cruzar el plan con el código existente. Va en `UserPromptSubmit`, que ya corría: no agrega llamadas de hook.
+  - No se hizo en `PostToolUse` a propósito: en Claude Code, Codex, Cursor y Gemini el harness solo recibe resultados de ediciones (`resultados: 'ediciones'` en sus adaptadores), así que un chequeo de resultados de MCP sería código muerto justo en las herramientas más usadas.
+- **`sdd-ticket`**: paso 0 nuevo (confirmar acceso antes de leer) y paso 3 reescrito, que ahora pide una tabla por requisito con archivos reales en vez de un párrafo.
+
+### Azure DevOps: del servidor remoto al local
+- **`config/mcp.json` registra el servidor local (`@azure-devops/mcp`) por stdio**, no el remoto. El remoto no autentica con clientes que no son de Microsoft, porque Entra ID no admite el registro dinámico de clientes, y Claude Code es uno de ellos: registrarlo daba «Failed to connect». La organización va en los argumentos y conserva sus mayúsculas; solo el alias del servidor se normaliza.
+- **`--auth=azcli|pat`** para la autenticación no interactiva. Sin `--auth` queda la de navegador y el instalador **avisa**: dentro del agente esa pantalla puede no abrirse y la lectura se queda colgada sin avisar, que es la causa más común de una lectura eterna que después funciona al reintentar.
+- **README**: la sección de Azure DevOps explica las tres autenticaciones, el cuelgue silencioso y que un servidor recién registrado no existe para las sesiones abiertas hasta reiniciarlas.
+
 ## 3.1.0 — El GATE por defecto y las rutas de home en comandos
 
 No cambia el formato del estado ni la configuración existente: basta `npm run update` (o `node install.js`) para que los hooks instalados usen esta versión.

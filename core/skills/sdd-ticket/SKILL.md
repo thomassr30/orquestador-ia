@@ -8,7 +8,14 @@ Ticket: $ARGUMENTS
 (Si no ves la solicitud arriba, usa el mensaje del usuario y sus adjuntos.)
 
 El objetivo es entregar el ticket **desarrollado completo y verificado**, con una sola pausa obligatoria: la aprobación
-del plan (GATE). Si el usuario solo pidió leerlo o resumirlo, haz los pasos 1–4, entrega el resumen y detente.
+del plan (GATE). Si el usuario solo pidió leerlo o resumirlo, haz los pasos 0–4, entrega el resumen y detente.
+
+## 0. Confirmar el acceso antes de leer
+Antes de la lectura completa, **una llamada barata** al MCP del gestor y al de Figma (listar proyectos, listar wikis,
+abrir el archivo). Si no responde, vuelve vacía o da error: **díselo al usuario de inmediato**, con el nombre del
+servidor y lo que intentaste. No reintentes en silencio, no te quedes esperando y no sigas como si hubieras leído.
+Un servidor recién registrado no está cargado hasta reiniciar la sesión: si sus herramientas no aparecen, eso es lo
+primero que hay que decir.
 
 ## 1. Leer el ticket (tú mismo, sin delegar)
 Carga `tracker-common` y la skill del gestor del proyecto (si no se sabe, pregunta cuál usan). Lee el ticket **en el
@@ -33,10 +40,27 @@ se negocia). El resultado es el **inventario** de cada frame, con valores exacto
 - Si el ticket y el diseño se contradicen (un campo que está en uno y no en el otro, otro texto, otro orden), es una
   pregunta de negocio: no elijas tú.
 
-## 3. Cruzar con el proyecto
-Qué de lo pedido ya existe, qué hay que construir y dónde va según la arquitectura, las reglas y las **skills del
-proyecto**. Nombra archivos, capas y componentes concretos, y para cada elemento del inventario, el token o componente
-del proyecto que lo expresa (`figma-design` §4), con las diferencias de valor reportadas.
+## 3. Cruzar con el proyecto (obligatorio, y con lista en mano)
+El ticket y el diseño dicen **qué** se pide. No dicen dónde va ni qué ya existe. Este paso no es opcional ni se
+resume en una frase: produce una **lista concreta**, igual que el inventario de Figma produce la suya.
+
+Explora el código (`sdd-explorer` en paralelo) y entrega, por cada requisito del ticket:
+
+| Requisito | Ya existe | Archivos reales | Qué falta |
+|---|---|---|---|
+| CA-01 «guardar borrador» | parcial | `src/app/jardines/jardines.service.ts`, `…/jardines-form.component.ts` | el endpoint de confirmación |
+
+Reglas de este paso:
+- **Nombra rutas de archivo reales**, las que abriste, no capas en abstracto. «El servicio de jardines» no sirve;
+  `src/app/jardines/jardines.service.ts` sí.
+- Lo que ya existe y sirve **se reutiliza**: dí cuál es y por qué calza. Si hay algo parecido que NO sirve, dí por qué.
+- Para cada elemento del inventario de Figma, el token o componente del proyecto que lo expresa (`figma-design` §4),
+  con las diferencias de valor reportadas.
+- Si el ticket pide algo que el proyecto ya resuelve de otra forma, eso es una pregunta, no una decisión tuya.
+
+Esto no es burocracia: **`trabajo plan` rechaza el plan si ninguno de los archivos declarados existe todavía**, porque
+eso significa que se armó mirando solo el ticket. Si el trabajo de verdad arranca de cero, se registra con
+`trabajo plan … --sin-base "motivo"` y el motivo se le dice al usuario junto al plan.
 
 ## 4. Separar lo claro de lo dudoso
 - **Técnica** (dónde crear el módulo, qué patrón seguir, cómo nombrarlo): pregúntasela al usuario en el chat, concreta

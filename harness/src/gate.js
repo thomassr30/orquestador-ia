@@ -272,4 +272,8 @@ function editBlockReason(state, cfg) {
   return null;
 }
 
-module.exports = { onPrompt, onStop, editBlockReason, approveFromTranscript, classify, isApproval, isPureApproval, isOnlyApproval, isChangeRequest, isConsulta, requiresPlan, switchScope, asksUser, userText, GATE_QUESTION };
+/** ¿El mensaje apunta a una fuente externa (ticket del gestor o diseño en Figma)? */
+const FIGMA = /figma\.com\/(file|design|proto|board)\//i;
+const mencionaFuente = text => { const t = String(text || ''); return TICKET.test(t) || FIGMA.test(t); };
+
+module.exports = { mencionaFuente, onPrompt, onStop, editBlockReason, approveFromTranscript, classify, isApproval, isPureApproval, isOnlyApproval, isChangeRequest, isConsulta, requiresPlan, switchScope, asksUser, userText, GATE_QUESTION };

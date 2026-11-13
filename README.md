@@ -344,7 +344,7 @@ Los servidores MCP dan a la IA herramientas externas: navegador, documentación,
 | `chrome-devtools` | Consola, red, rendimiento y Lighthouse | local (`npx`) | activo |
 | `context7` | Documentación actualizada de librerías y frameworks | local (`npx`) | activo |
 | `figma` | Leer los diseños de Figma que debes implementar | remoto (`https://mcp.figma.com/mcp`) | apagado |
-| `azure-devops` | Leer work items (HU, PBI, task), wikis, backlog y WIQL de Azure DevOps | remoto, uno por organización | apagado |
+| `azure-devops` | Leer work items (HU, PBI, task), wikis, backlog y WIQL de Azure DevOps | local (stdio), uno por organización | apagado |
 
 `node install.js --no-mcp` no registra ninguno. Desinstalar el orquestador no los quita (pueden usarlos otras herramientas).
 
@@ -382,13 +382,27 @@ La conexión es a tu **cuenta**, no a un proyecto: ve los archivos a los que tu 
 
 Sirve para que el orquestador lea tus HU, PBI, task y wikis, y arme el plan de desarrollo a partir de eso (ver [Del work item al plan](#del-work-item-al-plan)).
 
-La URL del servidor incluye tu organización, la de `dev.azure.com/<organización>`, así que hay que indicarla:
+Se usa el servidor **local** de Microsoft (`@azure-devops/mcp`), que corre por stdio y necesita Node 20 o superior. El servidor remoto (`mcp.dev.azure.com`) **no sirve acá**: Entra ID no admite el registro dinámico de clientes, que es lo que necesitan los clientes que no son de Microsoft, y Claude Code es uno de ellos. Si lo registras igual, el cliente lo muestra como «Failed to connect».
+
+Hay que indicar tu organización, la de `dev.azure.com/<organización>`:
 
 ```bash
-node install.js --mcp=azure-devops --org=siigsa
+node install.js --mcp=azure-devops --org=siigsa --auth=azcli
 ```
 
-Después inicia sesión una vez en cada herramienta (en Claude Code: `/mcp` → `azure-devops-siigsa` → Authenticate). Sin `--org` el instalador avisa y no lo registra, porque no puede armar la URL.
+Sin `--org` el instalador avisa y no lo registra.
+
+**Elige la autenticación con `--auth`.** Son tres:
+
+| `--auth` | Qué necesita | Cuándo |
+|---|---|---|
+| *(sin `--auth`)* | nada | Abre el navegador. Dentro del agente esa pantalla puede no abrirse, y entonces la lectura **se queda colgada sin avisar**. El instalador te lo advierte al registrarlo. |
+| `azcli` | `az login` una vez | Lo más cómodo si ya tienes el CLI de Azure. |
+| `pat` | `PERSONAL_ACCESS_TOKEN` | Un token de lectura en Work Items y Wiki. El valor es el **base64 de `correo:token`**, no el token pelado. No lo pongas en un archivo que vaya a git. |
+
+El cuelgue silencioso del inicio de sesión interactivo es la causa más común de que una lectura parezca eterna y después funcione al reintentar: al cancelar, la autenticación alcanzó a terminar por detrás. Con `azcli` o `pat` no ocurre.
+
+**Un servidor recién registrado no existe para las sesiones abiertas.** Los MCP se cargan al iniciar la sesión: después de registrarlo, cierra la ventana y abre una nueva. `/mcp` no alcanza, porque reconecta los que ya estaban cargados.
 
 **El nombre del servidor lleva la organización** (`azure-devops-siigsa`). Eso no es un detalle: dos organizaciones son dos cuentas distintas, y si los dos servidores se llamaran igual, el inicio de sesión de una pisaría el de la otra.
 
@@ -403,7 +417,7 @@ cd C:/dev/proyecto-b && node "$HOME/.sdd-orquestador/install.js" --mcp=azure-dev
 
 Así cada ventana de tu herramienta de IA ve **solo** la organización de su repositorio. No tienes que aclararle de cuál leer: le dices «lee el PBI 4521» y esa ventana solo puede buscarlo donde corresponde. Y el contexto de cada sesión no carga las herramientas de las demás organizaciones.
 
-No hace falta ningún token ni PAT: el servidor es remoto y la autenticación es por navegador, una vez por organización (en Claude Code, `/mcp` → el servidor → Authenticate). Y `--alcance=proyecto` no lleva el nombre del proyecto: lo decide la carpeta donde corres el comando.
+`--alcance=proyecto` no lleva el nombre del proyecto: lo decide la carpeta donde corres el comando.
 
 Con `--nombre=<alias>` le pones un nombre corto al servidor. Conviene: el nombre por defecto es `azure-devops-<organización>`, y si tu organización se llama `SubdepartamentoSolucionesTI` ese nombre aparece dentro de cada nombre de herramienta MCP, en todas las sesiones. Con `--nombre=azure-sag` queda corto.
 
@@ -412,8 +426,8 @@ El instalador se copia a `~/.sdd-orquestador/install.js` al instalar, así que p
 **Si abres un `.code-workspace` de VS Code, regístralo global.** Un workspace multi-raíz tiene varias carpetas, y el archivo de MCP por proyecto se lee de la que la herramienta tome como actual, que no es algo en lo que convenga apoyarse. Para ese caso registra cada organización a nivel de usuario con un alias corto, sin `--alcance`:
 
 ```bash
-node "$HOME/.sdd-orquestador/install.js" --mcp=azure-devops --org=miempresa --nombre=azure-a
-node "$HOME/.sdd-orquestador/install.js" --mcp=azure-devops --org=cliente   --nombre=azure-b
+node "$HOME/.sdd-orquestador/install.js" --mcp=azure-devops --org=miempresa --nombre=azure-a --auth=azcli
+node "$HOME/.sdd-orquestador/install.js" --mcp=azure-devops --org=cliente   --nombre=azure-b --auth=azcli
 ```
 
 Las dos conviven porque el nombre las distingue, y quedan disponibles en cualquier carpeta que abras. Lo que se paga es que las herramientas de las dos organizaciones entran en todas las sesiones; a cambio, nunca dependes de cómo abriste el proyecto. El mapa del espacio de trabajo del harness funciona igual en los dos casos: con un `.code-workspace`, detecta las carpetas del workspace y sus proyectos aunque abras una sola de ellas.
@@ -589,9 +603,10 @@ El agente usa además `trabajo plan | iniciar | bloquear | verificar | decision 
 
 Si tu trabajo llega como una HU, un PBI, una task o una página de wiki, dale la clave o el enlace y el orquestador lo lleva **de punta a punta** (skill `sdd-ticket`), con una sola pausa obligatoria: tu aprobación del plan.
 
+0. **Confirma el acceso antes de leer**: una llamada barata al MCP del gestor y al de Figma. Si no responde, vuelve vacía o da error, te lo dice de inmediato con el nombre del servidor, en vez de reintentar en silencio o quedarse esperando. El harness se lo recuerda en el primer mensaje donde menciones un ticket o un enlace de Figma.
 1. **Lee todo el contexto** en el hilo principal, no solo la descripción: el work item con su padre y sus hijos, los comentarios (donde suele estar lo que se acordó después de escribirlo), los adjuntos y los enlaces a la wiki y a Figma. Si el punto de partida es una wiki, parte de ahí y busca el work item vinculado.
 2. **Lee el diseño antes de planificar**: cada frame de Figma completo (contexto, variables y medidas; `figma-design`) y arma un **inventario** con el valor exacto de cada tamaño, espacio, tipografía, color, radio, borde, sombra y texto, con su origen. Lo que no está dibujado no existe y lo que no se pudo leer queda «sin dato» y se pregunta: la captura no es fuente de valores.
-3. **Lo cruza con tu proyecto**: qué de lo pedido ya existe, qué hay que construir y dónde va según tu arquitectura y tus reglas, con archivos y capas concretas.
+3. **Lo cruza con tu proyecto**, y esto no es opcional: lee el código que ya existe y entrega una tabla con, por cada requisito, qué ya está, en qué **archivos reales** (rutas, no capas en abstracto) y qué falta. El ticket y el diseño dicen qué se pide; no dicen dónde va. **`trabajo plan` rechaza un plan en el que ninguno de los archivos declarados existe todavía**, porque eso significa que se armó mirando solo el ticket. Si el trabajo de verdad arranca de cero, se registra con `--sin-base "motivo"` y el motivo te lo dice junto al plan.
 4. **Separa lo claro de lo dudoso**, y las dudas van a dos lugares distintos:
    - **Técnicas** (dónde crear el módulo, qué patrón seguir): te las pregunta en el chat, una a la vez.
    - **De negocio o de alcance** (un estado que está en la wiki pero no en la HU, un campo que cambió de nombre, una regla que nadie definió): las registra como [preguntas abiertas](#preguntas-abiertas) y te las entrega listas, con dónde van y a quién etiquetar. **Las publicas tú**: el harness no escribe en Azure.

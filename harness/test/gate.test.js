@@ -178,3 +178,10 @@ test('caso real: el usuario responde "desarrollar" al plan → aprobado (no se r
   assert.strictEqual(gate.editBlockReason(s, cfg), null);
   assert.ok(gate.isPureApproval('desarrollar'), 'también sirve para el respaldo desde la conversación');
 });
+
+test('mencionaFuente detecta tickets y enlaces de Figma', () => {
+  for (const t of ['analiza el PBI 126859', 'revisa AB#1234', 'lee la HU 3310', 'mira https://www.figma.com/design/abc/Pantallas?node-id=1-2'])
+    assert.ok(gate.mencionaFuente(t), t);
+  for (const t of ['arregla el login', 'explícame el router', 'sube la versión a 2.1'])
+    assert.equal(gate.mencionaFuente(t), false, t);
+});

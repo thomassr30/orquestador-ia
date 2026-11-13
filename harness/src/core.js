@@ -219,6 +219,13 @@ function onPrompt(ev) {
         notes.push(`Excepción registrada para ${a.datos.controles.join(', ')}${ok ? ': la verificación de estos cambios queda aprobada con excepción' : ''}. Si los archivos vuelven a cambiar, la excepción deja de valer.`);
       }
     }
+    // Fuentes externas (ticket del gestor, Figma): una lectura que no responde se queda colgada sin avisar, y el
+    // harness no puede cortarla (en Claude Code solo ve resultados de ediciones). Lo que sí puede es dejar dicho,
+    // una vez por sesión, que un fallo se reporta en vez de reintentarse callado, y que el plan se cruza con el código.
+    if (!s.avisoFuentes && gate.mencionaFuente(said)) {
+      s.avisoFuentes = true;
+      notes.push('Vas a leer una fuente externa (ticket o diseño). Tres cosas, en orden: 1) confirma el acceso con UNA llamada barata antes de la lectura completa; 2) si no responde, vuelve vacía o da error, DÍSELO AL USUARIO DE INMEDIATO con el nombre del servidor, y no reintentes en silencio ni sigas como si hubieras leído; 3) el ticket y el diseño dicen QUÉ se pide, no dónde va: antes del plan lee el código que ya existe y nombra los archivos reales que se tocan, porque «trabajo plan» rechaza un plan en el que ningún archivo existe.');
+    }
     notes.push(...budget.onPrompt(s));
     if (s.subagentes.libre) notes.push('El usuario aprobó usar más sub-agentes en este pedido.');
     else if (s.gate.estado === 'requerido' && budget.modeNote(cfg)) notes.push(budget.modeNote(cfg));

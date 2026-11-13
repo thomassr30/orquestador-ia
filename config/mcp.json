@@ -26,8 +26,20 @@
   },
   "azure-devops": {
     "enabled": false,
-    "_nota": "Azure DevOps remoto de Microsoft (recomendado por sobre el local). Necesita TU organización: node install.js --mcp=azure-devops --org=<organización>, la de dev.azure.com/<organización>. Requiere iniciar sesión una vez en cada herramienta. El harness deja pasar la lectura (work items, wiki, backlog, WIQL) y pide confirmación para escribir; Azure Repos sigue bloqueado.",
-    "url": "https://mcp.dev.azure.com/{org}"
+    "_nota": "Azure DevOps LOCAL de Microsoft (@azure-devops/mcp). El remoto (mcp.dev.azure.com) NO sirve acá: Entra ID no admite el registro dinámico de clientes que necesitan los clientes que no son de Microsoft, y Claude Code es uno. Necesita TU organización: node install.js --mcp=azure-devops --org=<organización> [--nombre=<alias>] [--auth=azcli|pat]. Sin --auth usa el inicio de sesión por navegador, que dentro del agente puede quedarse colgado sin avisar: prefiere azcli (az login) o pat (PERSONAL_ACCESS_TOKEN = base64 de «correo:token»). El harness deja pasar la lectura (work items, wiki, backlog, WIQL) y pide confirmación para escribir; Azure Repos sigue bloqueado.",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@azure-devops/mcp",
+      "{org}",
+      "-d",
+      "core",
+      "work",
+      "work-items",
+      "wiki",
+      "repositories"
+    ],
+    "_auth": "-a"
   },
   "figma": {
     "enabled": false,

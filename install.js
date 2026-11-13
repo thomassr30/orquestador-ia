@@ -13,6 +13,7 @@
  *   node install.js --mcp=figma          registra también servidores MCP apagados en config/mcp.json (enabled:false)
  *   node install.js --mcp=azure-devops --org=<organización>   servidor remoto por organización (dev.azure.com/<organización>)
  *   node install.js --mcp=azure-devops --org=<org> --alcance=proyecto   registra el MCP SOLO en este repositorio
+ *   node install.js --mcp=azure-devops --org=<org> --auth=azcli            autenticacion no interactiva (recomendado)
  *                                        (córrelo desde cualquier carpeta con ~/.sdd-orquestador/install.js)
  *   node install.js --mcp=azure-devops --org=<org> --nombre=azure-sag --alcance=proyecto
  *                                        --nombre: alias corto del servidor (si no, queda azure-devops-<organización>)
@@ -256,9 +257,23 @@ function mcpServers() {
         return { key: name, name: alias ? slug(alias) : `${name}-${slug(org)}`, url: v.url.replace('{org}', encodeURIComponent(org)) };
       }
       if (v.url) return { key: name, name, url: v.url }; // servidor remoto (HTTP)
+      // Servidor local por organizacion (Azure DevOps): la organizacion va en los argumentos, no en una URL.
+      let args = v.args || [];
+      let alias = name;
+      if (args.some(x => String(x).includes('{org}'))) {
+        if (!org) { warn(`${name}: necesita tu organizacion. Registralo con: node install.js --mcp=${name} --org=<organizacion> [--nombre=<alias>] [--auth=azcli|pat]`); return null; }
+        const slug = x => String(x).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+        const puesto = val('nombre');
+        alias = puesto ? slug(puesto) : `${name}-${slug(org)}`;
+        args = args.map(x => String(x).split('{org}').join(org));
+        // Autenticacion: sin --auth queda la interactiva por navegador, que dentro del agente puede colgarse sin avisar.
+        const auth = val('auth');
+        if (auth && v._auth) args = [...args, v._auth, auth];
+        else if (v._auth) warn(`${alias}: sin --auth usa el inicio de sesion por navegador. Dentro del agente esa pantalla puede no abrirse y la lectura se queda colgada sin avisar. Si te pasa, vuelve a registrarlo con --auth=azcli (requiere «az login») o --auth=pat (requiere PERSONAL_ACCESS_TOKEN en base64 de «correo:token»).`);
+      }
       // En Windows, npx es npx.cmd: se envuelve con cmd /c para que lo lancen todas las herramientas
       const wrap = IS_WIN && v.command === 'npx';
-      return { key: name, name, command: wrap ? 'cmd' : v.command, args: wrap ? ['/c', 'npx', ...v.args] : v.args };
+      return { key: name, name: alias, command: wrap ? 'cmd' : v.command, args: wrap ? ['/c', 'npx', ...args] : args };
     }).filter(Boolean);
 }
 function readJson(file) {

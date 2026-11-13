@@ -38,7 +38,7 @@ const { HOME, SDD_HOME, fwd } = require(path.join(SRC, 'paths'));
 const argv = process.argv.slice(2);
 // Opciones con valor: --motivo "x", --json '{…}', --archivo ruta, --responsable nombre (también --opcion=valor)
 // --json lleva valor solo en «trabajo plan --json '{…}'»; en doctor es una bandera (salida para máquinas)
-const VALUED = ['--motivo', '--archivo', '--responsable', '--explicar', '--sesion', '--para', '--donde', '--tarea', '--respuesta', '--desde', '--ruta', ...(argv[0] === 'trabajo' ? ['--json'] : [])];
+const VALUED = ['--motivo', '--archivo', '--responsable', '--explicar', '--sesion', '--para', '--donde', '--tarea', '--respuesta', '--desde', '--ruta', '--sin-base', ...(argv[0] === 'trabajo' ? ['--json'] : [])];
 const opt = name => { const i = argv.indexOf(name); if (i >= 0) return argv[i + 1]; const eq = argv.find(a => a.startsWith(`${name}=`)); return eq ? eq.slice(name.length + 1) : undefined; };
 const motivo = opt('--motivo') || '';
 const positional = argv.filter((a, i) => !a.startsWith('--') && !VALUED.includes(argv[i - 1]));
@@ -515,6 +515,7 @@ async function trabajo() {
       const t = st.trabajo;
       console.log(`Objetivo: ${t.objetivo}\nEstado: ${T.ETRABAJO[st.estado]}${t.congelado ? ` · plan aprobado ${String(t.congelado.en).slice(0, 16).replace('T', ' ')}` : ''}${t.propuesta ? ' · hay un plan nuevo propuesto sin aprobar' : ''}`);
       if (t.alcance) console.log(`Alcance: ${t.alcance}`);
+      if (t.nota) console.log(`Aviso: ${t.nota}`);
       for (const r of st.requisitos) {
         console.log(`${r.tecnico ? '✓' : '•'} ${r.id} ${r.texto}`);
         for (const c of r.criterios) console.log(`    ${c.ok ? '✓' : c.manual ? '?' : '✗'} ${c.id} ${c.texto || ''} [${c.control ? `control ${c.control}` : c.comando ? 'comando' : 'manual'}] — ${c.motivo}`);
@@ -528,11 +529,12 @@ async function trabajo() {
     }
     if (sub === 'plan') {
       const src = opt('--json') || (opt('--archivo') ? fs.readFileSync(path.resolve(opt('--archivo')), 'utf8') : (id === '-' ? fs.readFileSync(0, 'utf8') : ''));
-      if (!src) { console.log('Uso: trabajo plan --json \'{"objetivo":…,"requisitos":[…],"tareas":[…]}\' | --archivo plan.json | - (stdin)'); process.exitCode = 2; return; }
+      if (!src) { console.log('Uso: trabajo plan --json \'{"objetivo":…,"requisitos":[…],"tareas":[{"id":…,"titulo":…,"requisitos":[…],"archivos":["src/…"]}]}\' | --archivo plan.json | - (stdin)'); process.exitCode = 2; return; }
       let raw; try { raw = JSON.parse(src); } catch (e) { console.log(`El plan no es JSON válido: ${e.message}`); process.exitCode = 2; return; }
-      const r = T.setPlan(root, raw, { sesion: last.sesion });
+      const r = T.setPlan(root, raw, { sesion: last.sesion, sinBase: opt('--sin-base') });
       if (!r.ok) { console.log(`Plan rechazado:\n${r.errores.map(e => `  - ${e}`).join('\n')}`); process.exitCode = 2; return; }
       console.log(r.propuesta ? 'El plan aprobado no se modifica: el nuevo quedó como PROPUESTA y se aplicará cuando el usuario lo apruebe (GATE).' : 'Plan registrado. Preséntalo al usuario: su aprobación lo congela.');
+      if (opt('--sin-base')) console.log('Quedó registrado que el plan no se apoya en archivos existentes. Díselo al usuario junto al plan: es parte de lo que aprueba.');
       return;
     }
     if (sub === 'iniciar') { out(T.startTask(root, id, { responsable: opt('--responsable'), tomar: flags.has('--tomar') })); return; }
@@ -581,7 +583,7 @@ async function trabajo() {
     if (sub === 'aceptar') { T.accept(root, { motivo }); console.log('Trabajo aceptado por el usuario (aceptación funcional).'); return; }
     if (sub === 'cerrar') { T.close(root); console.log('Trabajo cerrado.'); return; }
     if (sub === 'descartar') { T.close(root, { descartar: true }); console.log('Trabajo descartado.'); return; }
-    console.log('Uso: trabajo [estado] | plan --json … | iniciar <tarea> [--responsable x] | bloquear <tarea> --motivo … | verificar <tarea> | decision "texto" --motivo … | preguntas | preguntar "¿…?" --para quién --donde AB#1234 [--tarea T-01] | responder <id> --respuesta … | descartar-pregunta <id> --motivo … | cerrar · (solo el usuario) aceptar [--motivo …] | descartar');
+    console.log('Uso: trabajo [estado] | plan --json … [--sin-base "motivo"] | iniciar <tarea> [--responsable x] | bloquear <tarea> --motivo … | verificar <tarea> | decision "texto" --motivo … | preguntas | preguntar "¿…?" --para quién --donde AB#1234 [--tarea T-01] | responder <id> --respuesta … | descartar-pregunta <id> --motivo … | cerrar · (solo el usuario) aceptar [--motivo …] | descartar');
     process.exitCode = 2;
   } catch (e) { console.log(`No se pudo: ${e.message}`); process.exitCode = 1; }
 }

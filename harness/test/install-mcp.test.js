@@ -72,8 +72,22 @@ test('MCP por proyecto: dos repos con dos organizaciones no se pisan', () => {
   // El nombre lleva la organización: con el mismo nombre, el inicio de sesión de una pisaría el de la otra
   assert.deepStrictEqual(Object.keys(leer(junji)), ['azure-devops-siigsa']);
   assert.deepStrictEqual(Object.keys(leer(sag)), ['azure-devops-sag'], 'la organización se normaliza a minúsculas');
-  assert.strictEqual(leer(junji)['azure-devops-siigsa'].url, 'https://mcp.dev.azure.com/siigsa');
-  assert.strictEqual(leer(sag)['azure-devops-sag'].url, 'https://mcp.dev.azure.com/SAG');
+  // Servidor local por stdio: el remoto de Microsoft no autentica con clientes que no son suyos (ver config/mcp.json).
+  // La organizacion va en los argumentos, con su caja original, y no en una URL.
+  assert.ok(leer(junji)['azure-devops-siigsa'].args.includes('siigsa'));
+  assert.ok(leer(sag)['azure-devops-sag'].args.includes('SAG'));
+  assert.strictEqual(leer(junji)['azure-devops-siigsa'].url, undefined, 'ya no se registra el servidor remoto');
+  assert.ok(leer(sag)['azure-devops-sag'].args.includes('@azure-devops/mcp'));
+  // Sin --auth queda la interactiva, y se avisa porque dentro del agente puede colgarse
+  const sinAuth = repo();
+  const rAuth = run(sinAuth, '--mcp=azure-devops', '--org=siigsa', '--proyecto');
+  assert.match(rAuth.stdout + rAuth.stderr, /sin --auth usa el inicio de sesion por navegador/);
+  assert.ok(!leer(sinAuth)['azure-devops-siigsa'].args.includes('-a'));
+  // Con --auth se pasa tal cual al servidor
+  const conAuth = repo();
+  assert.strictEqual(run(conAuth, '--mcp=azure-devops', '--org=siigsa', '--auth=azcli', '--proyecto').status, 0);
+  const aa = leer(conAuth)['azure-devops-siigsa'].args;
+  assert.deepStrictEqual(aa.slice(-2), ['-a', 'azcli']);
 
   // Solo se registra lo pedido: los servidores de siempre quedan a nivel de usuario, no duplicados en el repo
   assert.ok(!Object.keys(leer(junji)).includes('playwright'));
@@ -102,7 +116,7 @@ test('MCP por proyecto: dos repos con dos organizaciones no se pisan', () => {
   const conAlias = repo();
   assert.strictEqual(run(conAlias, '--mcp=azure-devops', '--org=SubdepartamentoSolucionesTI', '--nombre=azure-sag', '--proyecto').status, 0);
   assert.deepStrictEqual(Object.keys(leer(conAlias)), ['azure-sag']);
-  assert.strictEqual(leer(conAlias)['azure-sag'].url, 'https://mcp.dev.azure.com/SubdepartamentoSolucionesTI', 'la URL conserva las mayúsculas de la organización');
+  assert.ok(leer(conAlias)['azure-sag'].args.includes('SubdepartamentoSolucionesTI'), 'la organización conserva sus mayúsculas: solo el alias se normaliza');
 
   // La forma explícita y el alias hacen lo mismo
   const porAlcance = repo();

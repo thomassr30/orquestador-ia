@@ -34,6 +34,31 @@ async function approved(files = {}, plan = PLAN, cfg = testsCmd('process.exit(0)
   return d;
 }
 
+test('el plan exige archivos por tarea y cruce con el proyecto', () => {
+  const d = project({ 'src/pdf.js': 'v1' });
+  // Sin «archivos»: el plan no dice dónde va nada en este proyecto.
+  const sinArchivos = T.normalizePlan({ ...PLAN, tareas: [{ id: 'T-01', titulo: 't', requisitos: ['REQ-01'] }] });
+  assert.match(sinArchivos.errores.join('\n'), /T-01: indica los archivos que toca/);
+  // Con archivos que no existen: se armó mirando solo el ticket.
+  const inventados = { ...PLAN, tareas: [{ id: 'T-01', titulo: 't', requisitos: ['REQ-01'], archivos: ['src/inventado.js'] }] };
+  assert.match(T.normalizePlan(inventados, { root: d }).errores.join('\n'), /no se cruzó con el proyecto/);
+  assert.equal(T.setPlan(d, inventados, { sesion: 's' }).ok, false);
+  // --sin-base deja pasar lo que de verdad arranca de cero, y queda registrado.
+  const conMotivo = T.normalizePlan(inventados, { root: d, sinBase: 'módulo nuevo, no hay nada que reutilizar' });
+  assert.equal(conMotivo.errores.length, 0);
+  assert.match(conMotivo.plan.nota, /módulo nuevo/);
+  // Un archivo real basta: el plan sí se apoya en el proyecto.
+  assert.equal(T.normalizePlan(PLAN, { root: d }).errores.length, 0);
+  assert.equal(T.normalizePlan(PLAN, { root: d }).plan.nota, undefined);
+});
+
+test('el aviso de «sin base» viaja en el resumen que lee el agente', () => {
+  const d = project({ 'src/pdf.js': 'v1' });
+  const plan = { ...PLAN, tareas: [{ id: 'T-01', titulo: 't', requisitos: ['REQ-01'], archivos: ['src/nuevo.js'] }] };
+  assert.ok(T.setPlan(d, plan, { sesion: 's', sinBase: 'proyecto vacío' }).ok);
+  assert.match(T.summary(d), /Aviso del plan: sin base en el proyecto: proyecto vacío/);
+});
+
 test('un plan inválido se rechaza con motivos legibles', () => {
   const { errores } = T.normalizePlan({
     objetivo: 'x',
