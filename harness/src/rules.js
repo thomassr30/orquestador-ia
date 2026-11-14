@@ -86,7 +86,7 @@ const DANGEROUS = [
 ];
 
 // Archivos con secretos: no se leen ni se escriben (salvo configuración explícita).
-const SECRET_FILES = [/(^|[\\/])\.env(\.[^\\/]*)?$/i, /\.pem$/i, /\.key$/i, /\.pfx$/i, /\.p12$/i, /(^|[\\/])id_(rsa|ed25519|ecdsa)(\.pub)?$/i, /(^|[\\/])\.npmrc$/i, /[\\/]credentials$/i, /(^|[\\/])credentials\.json$/i];
+const SECRET_FILES = [/(^|[\\/])\.env(\.[^\\/]*)?$/i, /\.pem$/i, /\.key$/i, /\.pfx$/i, /\.p12$/i, /(^|[\\/])id_(rsa|ed25519|ecdsa)(\.pub)?$/i, /(^|[\\/])\.npmrc$/i, /[\\/]credentials$/i, /(^|[\\/])credentials\.json$/i, /[\\/]\.sdd-orquestador[\\/](credenciales[\\/]|clave-aprobaciones$)/i];
 // Permitidos aunque parezcan secretos: plantillas sin valores.
 const SECRET_EXCEPTIONS = [/\.env\.(example|sample|template)$/i];
 

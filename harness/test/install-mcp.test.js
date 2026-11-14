@@ -88,6 +88,17 @@ test('MCP por proyecto: dos repos con dos organizaciones no se pisan', () => {
   assert.strictEqual(run(conAuth, '--mcp=azure-devops', '--org=siigsa', '--auth=azcli', '--proyecto').status, 0);
   const aa = leer(conAuth)['azure-devops-siigsa'].args;
   assert.deepStrictEqual(aa.slice(-2), ['-a', 'azcli']);
+  // Con --auth=pat el servidor lo arranca el lanzador del harness: el token vive en UN archivo propio y no
+  // queda copiado en la configuracion de cada herramienta donde se registre el servidor.
+  const conPat = repo();
+  assert.strictEqual(run(conPat, '--mcp=azure-devops', '--org=siigsa', '--nombre=azure-sag', '--auth=pat', '--proyecto').status, 0);
+  const e = leer(conPat)['azure-sag'];
+  assert.strictEqual(e.command, 'node');
+  assert.match(e.args[0], /bin[\\/]sdd-mcp\.js$/);
+  assert.strictEqual(e.args[1], 'azure-sag', 'el alias del servidor es el de la credencial');
+  assert.strictEqual(e.args[2], '--');
+  assert.deepStrictEqual(e.args.slice(-2), ['-a', 'pat']);
+  assert.ok(!JSON.stringify(e).includes('PERSONAL_ACCESS_TOKEN'), 'ningun secreto ni su variable entra en la configuracion');
 
   // Solo se registra lo pedido: los servidores de siempre quedan a nivel de usuario, no duplicados en el repo
   assert.ok(!Object.keys(leer(junji)).includes('playwright'));

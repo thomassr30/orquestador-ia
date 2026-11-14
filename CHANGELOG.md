@@ -8,6 +8,14 @@
   - No se hizo en `PostToolUse` a propósito: en Claude Code, Codex, Cursor y Gemini el harness solo recibe resultados de ediciones (`resultados: 'ediciones'` en sus adaptadores), así que un chequeo de resultados de MCP sería código muerto justo en las herramientas más usadas.
 - **`sdd-ticket`**: paso 0 nuevo (confirmar acceso antes de leer) y paso 3 reescrito, que ahora pide una tabla por requisito con archivos reales en vez de un párrafo.
 
+### El token de Azure lo guarda el harness
+- **`sdd-harness credencial azure <alias> --usuario <correo>`**: pide el token **sin mostrarlo en pantalla**, lo codifica como lo espera el servidor (base64 de `correo:token`) y lo guarda en `~/.sdd-orquestador/credenciales/<alias>.json` con permisos 0600. También `credencial listar` (sin el valor) y `credencial borrar <alias>`.
+- **Lanzador `bin/sdd-mcp.js`**: lee la credencial y se la entrega al servidor por el entorno del proceso hijo. Así el token **no entra en la configuración de ninguna herramienta**; si fuera ahí, registrar el servidor en las seis dejaría seis copias en texto plano. Todo lo que dice el lanzador va por `stderr`: `stdout` es el canal del protocolo MCP y un solo carácter de más rompe la sesión.
+- **`--auth=pat` registra por el lanzador**, no `npx` directo. El alias de la credencial y el `--nombre` del servidor son el mismo.
+- **La carpeta de credenciales cuenta como archivo con secretos** para la política (`SECRET_FILES`), junto con `clave-aprobaciones`: el agente no puede leerla ni pasarla a un comando.
+- **`doctor`** lista las credenciales y avisa si alguna quedó con permisos abiertos o ilegible. Registrar el servidor y olvidar la credencial (o al revés) arrancaba igual y fallaba recién al primer uso, callado desde el chat.
+- Esto **no es cifrado**: 0600 protege de otros usuarios de la máquina, no de algo que corra como tú. La ganancia es sacar el token de seis configuraciones y del entorno.
+
 ### Azure DevOps: del servidor remoto al local
 - **`config/mcp.json` registra el servidor local (`@azure-devops/mcp`) por stdio**, no el remoto. El remoto no autentica con clientes que no son de Microsoft, porque Entra ID no admite el registro dinámico de clientes, y Claude Code es uno de ellos: registrarlo daba «Failed to connect». La organización va en los argumentos y conserva sus mayúsculas; solo el alias del servidor se normaliza.
 - **`--auth=azcli|pat`** para la autenticación no interactiva. Sin `--auth` queda la de navegador y el instalador **avisa**: dentro del agente esa pantalla puede no abrirse y la lectura se queda colgada sin avisar, que es la causa más común de una lectura eterna que después funciona al reintentar.

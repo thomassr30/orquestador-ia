@@ -13,7 +13,8 @@
  *   node install.js --mcp=figma          registra también servidores MCP apagados en config/mcp.json (enabled:false)
  *   node install.js --mcp=azure-devops --org=<organización>   servidor remoto por organización (dev.azure.com/<organización>)
  *   node install.js --mcp=azure-devops --org=<org> --alcance=proyecto   registra el MCP SOLO en este repositorio
- *   node install.js --mcp=azure-devops --org=<org> --auth=azcli            autenticacion no interactiva (recomendado)
+ *   node install.js --mcp=azure-devops --org=<org> --auth=pat              token guardado por el harness (recomendado)
+ *   node install.js --mcp=azure-devops --org=<org> --auth=azcli            requiere el CLI de Azure y «az login»
  *                                        (córrelo desde cualquier carpeta con ~/.sdd-orquestador/install.js)
  *   node install.js --mcp=azure-devops --org=<org> --nombre=azure-sag --alcance=proyecto
  *                                        --nombre: alias corto del servidor (si no, queda azure-devops-<organización>)
@@ -260,6 +261,7 @@ function mcpServers() {
       // Servidor local por organizacion (Azure DevOps): la organizacion va en los argumentos, no en una URL.
       let args = v.args || [];
       let alias = name;
+      let porToken = null;
       if (args.some(x => String(x).includes('{org}'))) {
         if (!org) { warn(`${name}: necesita tu organizacion. Registralo con: node install.js --mcp=${name} --org=<organizacion> [--nombre=<alias>] [--auth=azcli|pat]`); return null; }
         const slug = x => String(x).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
@@ -269,11 +271,21 @@ function mcpServers() {
         // Autenticacion: sin --auth queda la interactiva por navegador, que dentro del agente puede colgarse sin avisar.
         const auth = val('auth');
         if (auth && v._auth) args = [...args, v._auth, auth];
-        else if (v._auth) warn(`${alias}: sin --auth usa el inicio de sesion por navegador. Dentro del agente esa pantalla puede no abrirse y la lectura se queda colgada sin avisar. Si te pasa, vuelve a registrarlo con --auth=azcli (requiere «az login») o --auth=pat (requiere PERSONAL_ACCESS_TOKEN en base64 de «correo:token»).`);
+        else if (v._auth) warn(`${alias}: sin --auth usa el inicio de sesion por navegador. Dentro del agente esa pantalla puede no abrirse y la lectura se queda colgada sin avisar. Si te pasa, vuelve a registrarlo con --auth=pat (el harness guarda el token: sdd-harness credencial azure ${alias} --usuario <correo>) o --auth=azcli (requiere instalar el CLI de Azure y correr «az login»).`);
+        // Con token, el servidor NO se registra directo: lo arranca el lanzador del harness, que lee la credencial
+        // y se la pasa por el entorno. Asi el token queda en UN archivo propio y no copiado en la configuracion de
+        // cada herramienta donde se registre el servidor.
+        if (auth === 'pat') porToken = alias;
       }
       // En Windows, npx es npx.cmd: se envuelve con cmd /c para que lo lancen todas las herramientas
       const wrap = IS_WIN && v.command === 'npx';
-      return { key: name, name: alias, command: wrap ? 'cmd' : v.command, args: wrap ? ['/c', 'npx', ...args] : args };
+      let command = wrap ? 'cmd' : v.command;
+      let finales = wrap ? ['/c', 'npx', ...args] : args;
+      if (porToken) {
+        finales = [`${SDD_HOME_FWD}/bin/sdd-mcp.js`, porToken, '--', command, ...finales];
+        command = 'node';
+      }
+      return { key: name, name: alias, command, args: finales };
     }).filter(Boolean);
 }
 function readJson(file) {

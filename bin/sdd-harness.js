@@ -10,6 +10,9 @@
 //   node sdd-harness.js trabajo preguntas  dudas abiertas, listas para que TÚ las publiques (el harness no escribe en el gestor)
 //   node sdd-harness.js worktree listar | nuevo <rama> [--desde develop] [--ruta …] | sincronizar [--confirmar] | cerrar <rama|ruta> [--confirmar]
 //                                          una carpeta por tarea, cada una con su rama: varias ventanas sin pisarse
+//   node sdd-harness.js credencial azure <alias> --usuario <correo> | listar | borrar <alias>
+//                                          token de un servidor MCP, pedido sin eco y guardado solo para ti (0600);
+//                                          no queda copiado en la configuración de ninguna herramienta
 //   node sdd-harness.js aprobar  [ruta]   (tú, desde tu terminal) aprueba el plan pendiente de la última sesión
 //   node sdd-harness.js consumo  [ruta]   en qué se fueron los tokens de la última sesión (Claude Code)
 //   node sdd-harness.js reglas   [ruta]   revisa TODO el proyecto contra las reglas propias (harness.json → reglas)
@@ -38,7 +41,7 @@ const { HOME, SDD_HOME, fwd } = require(path.join(SRC, 'paths'));
 const argv = process.argv.slice(2);
 // Opciones con valor: --motivo "x", --json '{…}', --archivo ruta, --responsable nombre (también --opcion=valor)
 // --json lleva valor solo en «trabajo plan --json '{…}'»; en doctor es una bandera (salida para máquinas)
-const VALUED = ['--motivo', '--archivo', '--responsable', '--explicar', '--sesion', '--para', '--donde', '--tarea', '--respuesta', '--desde', '--ruta', '--sin-base', ...(argv[0] === 'trabajo' ? ['--json'] : [])];
+const VALUED = ['--motivo', '--archivo', '--responsable', '--explicar', '--sesion', '--para', '--donde', '--tarea', '--respuesta', '--desde', '--ruta', '--sin-base', '--usuario', ...(argv[0] === 'trabajo' ? ['--json'] : [])];
 const opt = name => { const i = argv.indexOf(name); if (i >= 0) return argv[i + 1]; const eq = argv.find(a => a.startsWith(`${name}=`)); return eq ? eq.slice(name.length + 1) : undefined; };
 const motivo = opt('--motivo') || '';
 const positional = argv.filter((a, i) => !a.startsWith('--') && !VALUED.includes(argv[i - 1]));
@@ -405,6 +408,15 @@ function doctor() {
   const ctx = require(path.join(SRC, 'memory')).contextStats(root);
   const largos = (ctx.archivos || []).filter(x => x.recortado);
   console.log(`Contexto que se reinyecta: ${ctx.error ? `✗ no se puede leer (${ctx.error})` : `${ctx.chars} de ${ctx.max} caracteres${ctx.recortado ? ' · ⚠ RECORTADO: el agente no recibe todo' : ''}`}${largos.length ? ` · ⚠ ${largos.map(x => `${x.nombre} tiene ${x.lineas} líneas y solo se leen ${x.max}`).join('; ')} (mueve lo terminado a historial.md)` : ''}`);
+  // Credenciales de servidores MCP con token: lo que mas falla es registrar el servidor y olvidar la credencial,
+  // o al reves. El servidor arranca igual y falla recien al primer uso, callado desde el chat.
+  try {
+    const creds = require(path.join(SRC, 'credenciales')).list();
+    if (creds.length) {
+      const malos = creds.filter(c => !c.ok || (c.modo && c.modo !== '600'));
+      console.log(`Credenciales MCP: ${creds.map(c => `${c.alias}${c.usuario ? ` (${c.usuario})` : ''}`).join(' \u00b7 ')}${malos.length ? ` \u00b7 \u26a0 revisar: ${malos.map(c => `${c.alias} ${c.ok ? `permisos ${c.modo}` : 'ilegible'}`).join(', ')}` : ''}`);
+    }
+  } catch { /* sin credenciales no hay nada que decir */ }
   console.log(`\nSensores ${files.length ? `para los ${files.length} archivo(s) modificados` : '(ejemplo con un archivo del proyecto)'}:`);
   if (!steps.length) console.log('  ninguno detectado: configura sensores.comandos en .sdd/harness.json');
   for (const s of steps) console.log(`  • ${s.nombre}${s.modulo !== '.' ? ` [${s.modulo}]` : ''}${s.runner ? ` (${s.runner})` : ''}: ${s.cmd}`);
@@ -812,6 +824,74 @@ function reglas() {
   process.exitCode = hits.length ? 1 : 0;
 }
 
-const cmds = { estado, doctor, sensores, registro, eventos, aprobar, consumo, reglas, puntos, deshacer, workspace, worktree, perfil, excepcion, 'excepción': excepcion, 'linea-base': lineaBase, trabajo, hooks: () => { const rows = clientes(); imprimirClientes(rows); if (rows.some(r => r.falla)) process.exitCode = 1; } };
-if (!cmds[cmd]) { console.error('Comandos: estado | doctor | hooks | sensores | linea-base | trabajo | registro | eventos | consumo | reglas | workspace | perfil | puntos | deshacer | aprobar | excepcion'); process.exit(1); }
+/**
+ * Credenciales de servidores MCP que se autentican con token. El valor nunca se imprime ni se registra: se pide
+ * por teclado SIN eco, se codifica y se guarda en ~/.sdd-orquestador/credenciales con permisos 0600.
+ * El lanzador (bin/sdd-mcp.js) es quien se la entrega al servidor, para que no quede copiada en la configuracion
+ * de cada herramienta donde el servidor esta registrado.
+ */
+async function credencial() {
+  const C = require(path.join(SRC, 'credenciales'));
+  const sub = positional[1];
+  if (sub === 'listar') {
+    const filas = C.list();
+    if (!filas.length) { console.log(`No hay credenciales registradas. Carpeta: ${C.DIR()}`); return; }
+    console.log(`Credenciales en ${C.DIR()}:`);
+    for (const f of filas) console.log(`  ${f.ok ? '\u2713' : '\u2717'} ${f.alias} \u00b7 ${f.tipo}${f.usuario ? ` \u00b7 ${f.usuario}` : ''}${f.creado ? ` \u00b7 ${String(f.creado).slice(0, 10)}` : ''}${f.modo && f.modo !== '600' ? ` \u00b7 \u26a0 permisos ${f.modo} (deberia ser 600)` : ''}${f.ok ? '' : ' \u00b7 ilegible: vuelve a registrarla'}`);
+    return;
+  }
+  if (sub === 'borrar') {
+    const alias = positional[2];
+    if (!alias) { console.log('Uso: credencial borrar <alias>'); process.exitCode = 2; return; }
+    console.log(C.remove(alias) ? `Credencial \u00ab${alias}\u00bb borrada. El servidor que la usaba dejara de arrancar hasta que registres otra.` : `No habia credencial \u00ab${alias}\u00bb.`);
+    return;
+  }
+  if (sub !== 'azure') {
+    console.log('Uso: credencial azure <alias> --usuario <correo> | credencial listar | credencial borrar <alias>');
+    process.exitCode = 2; return;
+  }
+  const alias = positional[2];
+  const usuario = opt('--usuario');
+  if (!alias || !usuario) { console.log('Uso: credencial azure <alias> --usuario <correo>\n  El alias es el nombre del servidor MCP (el de --nombre al registrarlo), por ejemplo azure-sag.'); process.exitCode = 2; return; }
+  try { C.checkAlias(alias); } catch (e) { console.log(e.message); process.exitCode = 2; return; }
+  console.log(`Credencial para \u00ab${alias}\u00bb (${usuario}).`);
+  console.log('Crea el token en Azure DevOps \u2192 User settings \u2192 Personal access tokens, con permiso de LECTURA en Work Items y Wiki. Nada mas.');
+  const token = await pedirOculto('Pega el token (no se vera en pantalla) y pulsa Enter: ');
+  if (!token) { console.log('\nNo se escribio ningun token: no se guardo nada.'); process.exitCode = 2; return; }
+  const r = C.save(alias, 'azure-pat', { usuario, token });
+  console.log(`\nGuardada en ${r.archivo} (solo legible por ti).`);
+  console.log(`Registra el servidor y reinicia la sesion de tu herramienta:\n  node "${path.join(path.dirname(__dirname), 'install.js')}" --mcp=azure-devops --org=<organizacion> --nombre=${alias} --auth=pat`);
+}
+
+/** Lee una linea del teclado sin mostrarla. Si no hay terminal interactiva, la toma de la entrada estandar. */
+function pedirOculto(mensaje) {
+  return new Promise((resolve, reject) => {
+    const inp = process.stdin;
+    if (!inp.isTTY) { // tuberia: util para pruebas y para quien automatice el registro
+      let buf = '';
+      inp.setEncoding('utf8');
+      inp.on('data', d => { buf += d; });
+      inp.on('end', () => resolve(buf.split('\n')[0].trim()));
+      inp.on('error', reject);
+      return;
+    }
+    process.stdout.write(mensaje);
+    let buf = '';
+    const prev = inp.isRaw;
+    inp.setRawMode(true); inp.resume(); inp.setEncoding('utf8');
+    const fin = v => { inp.setRawMode(prev || false); inp.pause(); inp.removeListener('data', onData); resolve(v); };
+    const onData = ch => {
+      for (const c of ch) {
+        if (c === '\r' || c === '\n') { process.stdout.write('\n'); return fin(buf.trim()); }
+        if (c === '\u0003') { process.stdout.write('\n'); return fin(''); }           // Ctrl+C
+        if (c === '\u007f' || c === '\b') { buf = buf.slice(0, -1); continue; }      // borrar
+        if (c >= ' ') buf += c;
+      }
+    };
+    inp.on('data', onData);
+  });
+}
+
+const cmds = { estado, doctor, sensores, registro, eventos, aprobar, consumo, reglas, puntos, deshacer, workspace, worktree, perfil, excepcion, 'excepción': excepcion, 'linea-base': lineaBase, trabajo, credencial, credenciales: credencial, hooks: () => { const rows = clientes(); imprimirClientes(rows); if (rows.some(r => r.falla)) process.exitCode = 1; } };
+if (!cmds[cmd]) { console.error('Comandos: estado | doctor | hooks | sensores | linea-base | trabajo | credencial | registro | eventos | consumo | reglas | workspace | perfil | puntos | deshacer | aprobar | excepcion'); process.exit(1); }
 Promise.resolve(cmds[cmd]()).catch(e => { console.error(e.message); process.exit(1); });

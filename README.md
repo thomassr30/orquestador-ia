@@ -396,11 +396,37 @@ Sin `--org` el instalador avisa y no lo registra.
 
 | `--auth` | Qué necesita | Cuándo |
 |---|---|---|
+| `pat` | nada más que el harness | **El recomendado.** Un token de lectura que el harness guarda por ti. |
+| `azcli` | instalar el CLI de Azure y `az login` | Si ya lo tienes instalado. |
 | *(sin `--auth`)* | nada | Abre el navegador. Dentro del agente esa pantalla puede no abrirse, y entonces la lectura **se queda colgada sin avisar**. El instalador te lo advierte al registrarlo. |
-| `azcli` | `az login` una vez | Lo más cómodo si ya tienes el CLI de Azure. |
-| `pat` | `PERSONAL_ACCESS_TOKEN` | Un token de lectura en Work Items y Wiki. El valor es el **base64 de `correo:token`**, no el token pelado. No lo pongas en un archivo que vaya a git. |
 
-El cuelgue silencioso del inicio de sesión interactivo es la causa más común de que una lectura parezca eterna y después funcione al reintentar: al cancelar, la autenticación alcanzó a terminar por detrás. Con `azcli` o `pat` no ocurre.
+El cuelgue silencioso del inicio de sesión interactivo es la causa más común de que una lectura parezca eterna y después funcione al reintentar: al cancelar, la autenticación alcanzó a terminar por detrás. Con `pat` o `azcli` no ocurre.
+
+#### El token, guardado por el harness
+
+Con `--auth=pat` no tienes que mantener ninguna variable de entorno ni instalar nada. Son dos pasos:
+
+```bash
+# 1. El token. Lo pide sin mostrarlo en pantalla.
+node "$HOME/.sdd-orquestador/bin/sdd-harness.js" credencial azure azure-sag --usuario tu@correo.cl
+
+# 2. El servidor, con el mismo alias.
+node install.js --mcp=azure-devops --org=SubdepartamentoSolucionesTI --nombre=azure-sag --auth=pat
+```
+
+El token lo creas en Azure DevOps → **User settings → Personal access tokens**, con permiso de **lectura** en Work Items y Wiki. Nada más: el harness no escribe en el gestor.
+
+Qué pasa por dentro, que importa más de lo que parece: el token **no entra en la configuración de ninguna herramienta**. Queda en un solo archivo, `~/.sdd-orquestador/credenciales/azure-sag.json`, solo legible por ti (permisos 0600), y lo entrega al servidor un lanzador propio (`bin/sdd-mcp.js`) por el entorno del proceso. Lo que se registra en `~/.claude.json`, `.mcp.json`, Codex, Gemini, Cursor y Copilot es la línea del lanzador, sin secreto adentro. Si el token fuera en la configuración, registrar el servidor en las seis herramientas dejaría **seis copias en texto plano**.
+
+Eso no es cifrado, y conviene tenerlo claro: un archivo 0600 protege de otros usuarios de la máquina, no de algo que corra como tú. La ganancia es sacarlo de seis archivos y del entorno, no volverlo indescifrable.
+
+| Comando | Qué hace |
+|---|---|
+| `credencial azure <alias> --usuario <correo>` | Pide el token sin eco y lo guarda |
+| `credencial listar` | Alias, tipo, usuario y fecha. Nunca el valor |
+| `credencial borrar <alias>` | Lo quita |
+
+`doctor` lista las credenciales registradas y avisa si alguna quedó con permisos abiertos o ilegible. El alias de la credencial y el `--nombre` del servidor tienen que ser **el mismo**: es así como el lanzador sabe cuál leer.
 
 **Un servidor recién registrado no existe para las sesiones abiertas.** Los MCP se cargan al iniciar la sesión: después de registrarlo, cierra la ventana y abre una nueva. `/mcp` no alcanza, porque reconecta los que ya estaban cargados.
 
