@@ -643,7 +643,7 @@ function installProjectMcp() {
   for (const dir of destinos) {
     const rel = path.relative(root, dir).split(path.sep).join('/') || '.';
     const gitDir = path.join(dir, '.git');
-    const enRepo = dir !== root && fs.existsSync(gitDir);
+    const enRepo = fs.existsSync(gitDir); // repo suelto o repo dentro de la carpeta: mismo trato
     const hechos = [];
     for (const tkey of tkeys) {
       const m = PROJECT_MCP[tkey];
@@ -682,7 +682,7 @@ function installProjectMcp() {
   notes.push('Anota la organización en la memoria de este proyecto (.sdd/memoria) para que el agente sepa cuál usa: lo pide la skill tracker-azure-boards.');
   if (excluidos.length) notes.push(`En ${excluidos.length} repo(s) el archivo ${DRY ? 'quedaría' : 'quedó'} en .git/info/exclude (exclusión local): no aparece en git status ni se commitea.`);
   if (compartidos.length) notes.push(`No se tocaron porque el repo ya los versiona (son del equipo): ${compartidos.join(', ')}. Si quieres el servidor ahí, agrégalo a mano y decide con tu equipo si se commitea.`);
-  if (esRepo) notes.push('El archivo que se acaba de escribir va al repositorio: si no quieres compartirlo con el equipo, agrégalo al .gitignore (o a .git/info/exclude, solo para ti).');
+  if (esRepo && !excluidos.length && !compartidos.length && !fs.statSync(path.join(root, '.git')).isDirectory()) notes.push('Este repositorio es un worktree o submódulo: el archivo no se pudo excluir solo. Si no quieres compartirlo con el equipo, agrégalo al .gitignore.');
   if (notes.length) { log('\nNotas:'); notes.forEach(n => log(`- ${n}`)); }
 }
 

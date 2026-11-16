@@ -100,6 +100,28 @@ test('MCP por proyecto en una carpeta con varios repos: sirve al abrir la carpet
   assert.ok(!fs.existsSync(path.join(otra, 'api', '.mcp.json')));
 });
 
+test('MCP por proyecto en un repo suelto: queda excluido de git; uno versionado no se toca', () => {
+  const home = tmp('home-');
+  const run = (cwd, ...args) => spawnSync(process.execPath, [path.join(REPO, 'install.js'), ...args], { cwd, encoding: 'utf8', env: { ...process.env, HOME: home, USERPROFILE: home } });
+  const git = (cwd, ...args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const args = ['--mcp=azure-devops', '--org=ACTISLTDA-SIIGSA', '--nombre=azure-junji', '--auth=pat', '--alcance=proyecto'];
+
+  const repo = tmp('junji-'); git(repo, 'init', '-q');
+  const r = run(repo, ...args);
+  assert.strictEqual(r.status, 0, r.stderr + r.stdout);
+  assert.ok(JSON.parse(fs.readFileSync(path.join(repo, '.mcp.json'), 'utf8')).mcpServers['azure-junji']);
+  assert.ok(fs.readFileSync(path.join(repo, '.git', 'info', 'exclude'), 'utf8').split(/\r?\n/).includes('/.mcp.json'));
+  assert.strictEqual(git(repo, 'status', '--porcelain').stdout.trim(), '', 'git status limpio');
+
+  const versionado = tmp('junji-'); git(versionado, 'init', '-q');
+  fs.writeFileSync(path.join(versionado, '.mcp.json'), '{"mcpServers":{}}\n');
+  git(versionado, 'add', '.mcp.json');
+  const r2 = run(versionado, ...args);
+  assert.strictEqual(r2.status, 0, r2.stderr + r2.stdout);
+  assert.strictEqual(fs.readFileSync(path.join(versionado, '.mcp.json'), 'utf8'), '{"mcpServers":{}}\n', 'no se toca');
+  assert.match(r2.stdout, /No se tocaron porque el repo ya los versiona/);
+});
+
 test('MCP por proyecto: dos repos con dos organizaciones no se pisan', () => {
   const run = (cwd, ...args) => spawnSync(process.execPath, [path.join(REPO, 'install.js'), ...args], { cwd, encoding: 'utf8', env: { ...process.env, HOME: tmp('home-'), USERPROFILE: tmp('home-') } });
   const repo = () => tmp('repo-'); // sin .git: repoRoot cae al directorio actual, que es lo que se quiere acá

@@ -9,6 +9,7 @@
   - cada repo de adentro.
 - **En los repos el archivo va a `.git/info/exclude`** (exclusión local), no al `.gitignore`. Un `.mcp.json` que el repo ya versiona no se toca y se avisa.
 - `--solo-carpeta` conserva el comportamiento anterior.
+- En un repo suelto pasa lo mismo: si el archivo es nuevo, va a `.git/info/exclude`. Antes solo se sugería agregarlo al `.gitignore`, y el archivo aparecía en `git status`.
 - El harness ya reconocía los `*.code-workspace` para el mapa del espacio y la memoria (`workspace.js`). Lo que faltaba era el registro de MCP.
 
 ### Los scripts del orquestador ya no piden permiso en cada asistente
