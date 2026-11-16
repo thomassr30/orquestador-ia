@@ -13,6 +13,8 @@
  *   node install.js --mcp=figma          registra también servidores MCP apagados en config/mcp.json (enabled:false)
  *   node install.js --mcp=azure-devops --org=<organización>   servidor remoto por organización (dev.azure.com/<organización>)
  *   node install.js --mcp=azure-devops --org=<org> --alcance=proyecto   registra el MCP SOLO en este repositorio
+ *                                        (en una carpeta con varios repos: también en cada carpeta de sus *.code-workspace
+ *                                        y en cada repo, excluido en .git/info/exclude; --solo-carpeta: solo en la carpeta)
  *   node install.js --mcp=azure-devops --org=<org> --auth=pat              token guardado por el harness (recomendado)
  *   node install.js --mcp=azure-devops --org=<org> --auth=azcli            requiere el CLI de Azure y «az login»
  *                                        (córrelo desde cualquier carpeta con ~/.sdd-orquestador/install.js)
@@ -380,6 +382,7 @@ function permissionRules() {
 // Fuente única: harness/src/rules.js (las mismas reglas que aplican los hooks del harness)
 const { GIT_READ, GIT_COMMIT, COMMIT_TOOLS, GIT_WRITE, FORGE_READ, FORGE_WRITE, INFRA_ASK } = require('./harness/src/rules');
 const HC = require('./harness/src/hooks-config');
+const WS = require('./harness/src/workspace');
 
 const CLAUDE_RULES = {
   allow: [...GIT_READ.map(c => `Bash(git ${c}:*)`), 'Bash(git branch)', 'Bash(git remote)', 'Bash(git stash list)', ...FORGE_READ.map(c => `Bash(${c}:*)`)],
@@ -621,35 +624,65 @@ function installProjectMcp() {
   const tkeys = (val('targets') === 'all' ? Object.keys(PROJECT_MCP) : (val('targets') || 'claude').split(',').map(s => s.trim()).filter(Boolean));
   const bad = tkeys.filter(k => !PROJECT_MCP[k]);
   if (bad.length) { console.error(`Destinos sin configuración de MCP por proyecto: ${bad.join(', ')}. Válidos: ${Object.keys(PROJECT_MCP).join(', ')}, all. Codex solo admite MCP globales.`); process.exit(1); }
-  // Puede ser un repositorio o una carpeta con varios: el servidor vale para lo que abras en la herramienta, así
-  // que si todos esos repos son de la misma organización, registrarlo acá los cubre a todos.
+  // Puede ser un repositorio o una carpeta con varios. La herramienta solo lee la configuración de MCP de la carpeta
+  // que abre (no la de las carpetas de arriba), y una carpeta con varios repos se abre de tres formas: entera, con un
+  // *.code-workspace (la herramienta parte en una de sus carpetas) o un repo suelto. Para que sirva en las tres se
+  // registra en la carpeta, en cada carpeta de sus *.code-workspace y en cada repo de adentro (--solo-carpeta: solo ahí).
   const esRepo = fs.existsSync(path.join(root, '.git'));
-  const repos = esRepo ? [] : fs.readdirSync(root, { withFileTypes: true }).filter(e => e.isDirectory() && fs.existsSync(path.join(root, e.name, '.git'))).map(e => e.name);
-  log(`Orquestador SDD v${VERSION}${DRY ? ' (simulación)' : ''} · MCP solo para esta carpeta (alcance: proyecto)`);
+  const repos = esRepo ? [] : fs.readdirSync(root, { withFileTypes: true }).filter(e => e.isDirectory() && fs.existsSync(path.join(root, e.name, '.git'))).map(e => path.join(root, e.name));
+  const workspaces = esRepo ? [] : fs.readdirSync(root, { withFileTypes: true }).filter(e => e.isFile() && /\.code-workspace$/i.test(e.name)).map(e => e.name);
+  const carpetasWs = workspaces.flatMap(w => ((WS.readJsonc(path.join(root, w)) || {}).folders || []).map(f => f && f.path && path.resolve(root, f.path)).filter(Boolean))
+    .filter(d => fs.existsSync(d) && fs.statSync(d).isDirectory());
+  const destinos = [root];
+  if (!opt('solo-carpeta')) for (const d of [...carpetasWs, ...repos]) if (!destinos.some(x => x.toLowerCase() === d.toLowerCase())) destinos.push(d);
+  log(`Orquestador SDD v${VERSION}${DRY ? ' (simulación)' : ''} · MCP solo para este proyecto (alcance: proyecto)`);
   log(`${esRepo ? 'Repositorio' : 'Carpeta'}: ${root.replace(/\\/g, '/')}`);
-  if (repos.length) log(`Cubre los ${repos.length} repositorios de adentro: ${repos.slice(0, 8).join(', ')}${repos.length > 8 ? '…' : ''}`);
-  for (const tkey of tkeys) {
-    const m = PROJECT_MCP[tkey];
-    const file = path.join(root, ...m.file);
-    log(`\n• ${m.label} → ${path.relative(root, file).split(path.sep).join('/')}`);
-    let json;
-    try { json = readJson(file); } catch { warn(`${file} no es JSON puro (¿comentarios?): agrégalos a mano (${servers.map(s => s.name).join(', ')})`); continue; }
-    json[m.key] = json[m.key] || {};
-    let changed = false;
-    for (const s of servers) {
-      if (json[m.key][s.name]) { log(`  · MCP ${s.name} ya está en este proyecto`); continue; }
-      json[m.key][s.name] = s.url ? remoteJson(tkey, s.url)
-        : tkey === 'opencode' ? { type: 'local', command: [s.command, ...s.args], enabled: true }
-          : { ...(m.stdioType ? { type: 'stdio' } : {}), command: s.command, args: s.args };
-      log(`  ✓ MCP ${s.name}`); remoteAdded(tkey, s); changed = true;
+  if (!esRepo && destinos.length > 1) log(`Se registra también en ${destinos.length - 1} carpeta(s) de adentro${workspaces.length ? ` (incluye las de ${workspaces.join(', ')})` : ''}: así sirve si abres la carpeta, el workspace o un repo suelto.`);
+  else if (repos.length) log(`Solo en esta carpeta (--solo-carpeta): sirve si abres la carpeta entera, no un repo suelto ni un workspace.`);
+  const excluidos = []; const compartidos = [];
+  for (const dir of destinos) {
+    const rel = path.relative(root, dir).split(path.sep).join('/') || '.';
+    const gitDir = path.join(dir, '.git');
+    const enRepo = dir !== root && fs.existsSync(gitDir);
+    const hechos = [];
+    for (const tkey of tkeys) {
+      const m = PROJECT_MCP[tkey];
+      const file = path.join(dir, ...m.file);
+      const fileRel = m.file.join('/');
+      // Un archivo que el repo ya versiona es del equipo: modificarlo lo compartiría. Se avisa y no se toca.
+      if (enRepo && fs.existsSync(file) && spawnSync('git', ['-C', dir, 'ls-files', '--error-unmatch', fileRel], { encoding: 'utf8' }).status === 0) { compartidos.push(`${rel}/${fileRel}`); continue; }
+      let json;
+      try { json = readJson(file); } catch { warn(`${file} no es JSON puro (¿comentarios?): agrégalos a mano (${servers.map(s => s.name).join(', ')})`); continue; }
+      json[m.key] = json[m.key] || {};
+      let changed = false;
+      for (const s of servers) {
+        if (json[m.key][s.name]) continue;
+        json[m.key][s.name] = s.url ? remoteJson(tkey, s.url)
+          : tkey === 'opencode' ? { type: 'local', command: [s.command, ...s.args], enabled: true }
+            : { ...(m.stdioType ? { type: 'stdio' } : {}), command: s.command, args: s.args };
+        remoteAdded(tkey, s); changed = true;
+      }
+      if (changed && !DRY) { mkdirp(path.dirname(file)); backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n'); }
+      hechos.push(`${m.label} ${changed ? '✓' : '· ya estaba'}`);
+      // Exclusión local (.git/info/exclude): no se commitea ni cambia el .gitignore del equipo
+      if (enRepo && fs.statSync(gitDir).isDirectory()) {
+        const ex = path.join(gitDir, 'info', 'exclude');
+        const line = `/${fileRel}`;
+        const cur = fs.existsSync(ex) ? fs.readFileSync(ex, 'utf8') : '';
+        if (!cur.split(/\r?\n/).includes(line)) {
+          if (!DRY) { mkdirp(path.dirname(ex)); fs.writeFileSync(ex, `${cur}${cur && !cur.endsWith('\n') ? '\n' : ''}${line}\n`); }
+          excluidos.push(`${rel}/${fileRel}`);
+        }
+      }
     }
-    if (changed && !DRY) { mkdirp(path.dirname(file)); backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n'); }
+    if (hechos.length) log(`  ${rel === '.' ? '(esta carpeta)' : rel}: ${hechos.join(' · ')}`);
   }
   log(DRY ? '\n✅ Simulación completa (no se escribió nada).' : '\n✅ MCP registrados en este proyecto.');
   for (const [name, tkeys2] of loginPending) notes.push(`MCP ${name} necesita que inicies sesión una vez:\n${tkeys2.map(k => `  ${MCP_LOGIN[k](name)}`).join('\n')}`);
   notes.push('Anota la organización en la memoria de este proyecto (.sdd/memoria) para que el agente sepa cuál usa: lo pide la skill tracker-azure-boards.');
-  if (esRepo) notes.push('El archivo que se acaba de escribir va al repositorio: si no quieres compartirlo con el equipo, agrégalo al .gitignore.');
-  else notes.push('Se escribió en la carpeta que contiene los repositorios, así que vale para lo que abras ahí. Si abres un repositorio por separado, ese repositorio necesita su propio registro.');
+  if (excluidos.length) notes.push(`En ${excluidos.length} repo(s) el archivo ${DRY ? 'quedaría' : 'quedó'} en .git/info/exclude (exclusión local): no aparece en git status ni se commitea.`);
+  if (compartidos.length) notes.push(`No se tocaron porque el repo ya los versiona (son del equipo): ${compartidos.join(', ')}. Si quieres el servidor ahí, agrégalo a mano y decide con tu equipo si se commitea.`);
+  if (esRepo) notes.push('El archivo que se acaba de escribir va al repositorio: si no quieres compartirlo con el equipo, agrégalo al .gitignore (o a .git/info/exclude, solo para ti).');
   if (notes.length) { log('\nNotas:'); notes.forEach(n => log(`- ${n}`)); }
 }
 

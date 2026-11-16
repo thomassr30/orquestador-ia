@@ -458,7 +458,15 @@ node "$HOME/.sdd-orquestador/install.js" --mcp=azure-devops --org=cliente   --no
 
 Las dos conviven porque el nombre las distingue, y quedan disponibles en cualquier carpeta que abras. Lo que se paga es que las herramientas de las dos organizaciones entran en todas las sesiones; a cambio, nunca dependes de cómo abriste el proyecto. El mapa del espacio de trabajo del harness funciona igual en los dos casos: con un `.code-workspace`, detecta las carpetas del workspace y sus proyectos aunque abras una sola de ellas.
 
-**Dónde registrarlo: la organización manda, no el repositorio.** El servidor vale para la carpeta que abres en tu herramienta de IA. Si varios repositorios son de la **misma** organización (microservicios de un mismo producto, por ejemplo), registra el servidor una vez en la carpeta que los contiene y queda cubierto todo lo que abras ahí; el instalador te dice cuántos repositorios de adentro cubre. Si cada uno es de una organización distinta, uno por repositorio. Y ojo: si registras dentro de un repositorio pero después abres la carpeta padre, ese registro no aplica, porque se lee de la carpeta que abriste.
+**Dónde registrarlo: la organización manda, no el repositorio.** La herramienta lee la configuración de MCP solo en la carpeta que abre, no en las de arriba. Si varios repositorios son de la **misma** organización (microservicios de un mismo producto, por ejemplo), corre el registro una vez en la carpeta que los contiene. Desde ahí el instalador lo registra en tres lugares, para que funcione abras lo que abras:
+
+- **La carpeta misma**, para cuando la abres entera.
+- **Cada carpeta de los `*.code-workspace` que haya ahí.** Con un workspace, la herramienta parte en una de sus carpetas.
+- **Cada repositorio de adentro**, para cuando abres uno suelto.
+
+En los repositorios el archivo queda en `.git/info/exclude`, la exclusión local de git. No aparece en `git status`, no se commitea y no cambia el `.gitignore` del equipo. Si un repositorio ya versiona su propio `.mcp.json`, no se toca, porque es del equipo: el instalador te avisa cuál es. Con `--solo-carpeta` se registra únicamente en la carpeta contenedora.
+
+Si cada repositorio es de una organización distinta, regístralo uno por repositorio.
 
 Detalles del modo `--alcance=proyecto`:
 

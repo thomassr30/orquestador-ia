@@ -306,7 +306,9 @@ async function verifyTask(root, id, { cfg, sesion, excepciones = [], cambios = [
     const sc = { ...cfg.sensores, alTerminar: [...new Set([...cfg.sensores.alTerminar, ...controls])], obligatorios: [...new Set([...(cfg.sensores.obligatorios || []), ...controls])] };
     const run = code.length ? await runSensors(root, code, { ...cfg, sensores: sc }) : { ran: false, results: [] };
     const found = new Set(run.results.map(r => r.nombre));
-    for (const c of controls) if (!found.has(c)) controles.push({ nombre: c, estado: 'no_verificado', obligatorio: true, motivo: code.length ? `no hay un comando para «${c}» en este proyecto (configura sensores.comandos.${c})` : 'la tarea no tiene archivos de código' });
+    // En una tarea sin código los controles de código no la bloquean: los cubren las tareas con código del mismo
+    // requisito, y el estado del requisito sigue exigiendo esa evidencia.
+    for (const c of controls) if (!found.has(c)) controles.push({ nombre: c, estado: 'no_verificado', obligatorio: code.length > 0, motivo: code.length ? `no hay un comando para «${c}» en este proyecto (configura sensores.comandos.${c})` : 'la tarea no tiene archivos de código: lo cubren las tareas con código del requisito' });
     controles.push(...run.results.map(r => ({ nombre: r.nombre, modulo: r.modulo, estado: r.estado, obligatorio: r.obligatorio, motivo: r.motivo, firma: r.firma })));
     if (run.results.length) evs.push({ tipo: 'sensores', estado: combinar(run.results, { excepciones, huella }).estado, resumen: run.results.map(r => ({ nombre: r.nombre, modulo: r.modulo, estado: r.estado })) });
     // Tarea sin código (documentación, textos de skills): no hay sensores que correr. Sin esto combinar([]) daba

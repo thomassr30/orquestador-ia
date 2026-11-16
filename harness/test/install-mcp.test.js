@@ -60,6 +60,46 @@ test('--mcp con un nombre desconocido avisa y sigue', () => {
   assert.match(r.stdout, /servidores desconocidos en config\/mcp\.json: noexiste/);
 });
 
+test('MCP por proyecto en una carpeta con varios repos: sirve al abrir la carpeta, el workspace o un repo suelto', () => {
+  const home = tmp('home-');
+  const run = (cwd, ...args) => spawnSync(process.execPath, [path.join(REPO, 'install.js'), ...args], { cwd, encoding: 'utf8', env: { ...process.env, HOME: home, USERPROFILE: home } });
+  const git = (cwd, ...args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const raiz = tmp('proyectos-');
+  for (const r of ['api', 'front', 'compartido']) { fs.mkdirSync(path.join(raiz, r)); assert.strictEqual(git(path.join(raiz, r), 'init', '-q').status, 0); }
+  fs.mkdirSync(path.join(raiz, 'Docs'));
+  // workspace con comentarios y coma final, como los que guarda VS Code; incluye Docs (no es repo)
+  fs.writeFileSync(path.join(raiz, 'SAG.code-workspace'), '{\n  // carpetas\n  "folders": [{ "path": "api" }, { "path": "Docs" },],\n  "settings": {}\n}');
+  // un repo que ya versiona su .mcp.json: es del equipo y no se toca
+  const compartido = path.join(raiz, 'compartido');
+  fs.writeFileSync(path.join(compartido, '.mcp.json'), '{"mcpServers":{"del-equipo":{"command":"x"}}}\n');
+  git(compartido, 'add', '.mcp.json');
+  const antes = fs.readFileSync(path.join(compartido, '.mcp.json'), 'utf8');
+
+  const r = run(raiz, '--mcp=azure-devops', '--org=SubdepartamentoSolucionesTI', '--nombre=azure-sag', '--auth=pat', '--alcance=proyecto');
+  assert.strictEqual(r.status, 0, r.stderr + r.stdout);
+  const tiene = d => { const f = path.join(d, '.mcp.json'); return fs.existsSync(f) && !!JSON.parse(fs.readFileSync(f, 'utf8')).mcpServers['azure-sag']; };
+  for (const d of ['.', 'api', 'front', 'Docs']) assert.ok(tiene(path.join(raiz, d)), `registrado en ${d}`);
+  assert.strictEqual(fs.readFileSync(path.join(compartido, '.mcp.json'), 'utf8'), antes, 'el .mcp.json versionado queda intacto');
+  assert.match(r.stdout, /No se tocaron porque el repo ya los versiona.*compartido\/\.mcp\.json/);
+  // Exclusión local: no aparece en git status ni cambia el .gitignore
+  for (const d of ['api', 'front']) {
+    assert.ok(fs.readFileSync(path.join(raiz, d, '.git', 'info', 'exclude'), 'utf8').split(/\r?\n/).includes('/.mcp.json'), d);
+    assert.strictEqual(git(path.join(raiz, d), 'status', '--porcelain').stdout.trim(), '', `${d}: git status limpio`);
+    assert.ok(!fs.existsSync(path.join(raiz, d, '.gitignore')));
+  }
+
+  // Reinstalar no duplica la línea de exclusión ni el servidor
+  assert.strictEqual(run(raiz, '--mcp=azure-devops', '--org=SubdepartamentoSolucionesTI', '--nombre=azure-sag', '--auth=pat', '--alcance=proyecto').status, 0);
+  assert.strictEqual(fs.readFileSync(path.join(raiz, 'api', '.git', 'info', 'exclude'), 'utf8').split(/\r?\n/).filter(l => l === '/.mcp.json').length, 1);
+
+  // --solo-carpeta: el comportamiento anterior, un solo archivo
+  const otra = tmp('proyectos-');
+  fs.mkdirSync(path.join(otra, 'api')); git(path.join(otra, 'api'), 'init', '-q');
+  assert.strictEqual(run(otra, '--mcp=azure-devops', '--org=siigsa', '--nombre=azure-junji', '--alcance=proyecto', '--solo-carpeta').status, 0);
+  assert.ok(fs.existsSync(path.join(otra, '.mcp.json')));
+  assert.ok(!fs.existsSync(path.join(otra, 'api', '.mcp.json')));
+});
+
 test('MCP por proyecto: dos repos con dos organizaciones no se pisan', () => {
   const run = (cwd, ...args) => spawnSync(process.execPath, [path.join(REPO, 'install.js'), ...args], { cwd, encoding: 'utf8', env: { ...process.env, HOME: tmp('home-'), USERPROFILE: tmp('home-') } });
   const repo = () => tmp('repo-'); // sin .git: repoRoot cae al directorio actual, que es lo que se quiere acá

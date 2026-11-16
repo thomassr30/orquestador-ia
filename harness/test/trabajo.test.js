@@ -165,6 +165,23 @@ test('tarea solo de documentación con un archivo declarado que no existe: falla
   assert.ok(r.controles.some(c => c.nombre === 'archivos' && /docs\/falta\.md/.test(c.motivo)));
 });
 
+test('tarea de documentación de un requisito con control de tests: no la bloquea, pero el requisito sigue exigiendo la evidencia', async () => {
+  const plan = {
+    objetivo: 'exportar y documentar',
+    requisitos: [{ id: 'REQ-01', texto: 'exporta', criterios: [{ id: 'CA-01', texto: 'tests del exportador', control: 'tests' }] }],
+    tareas: [
+      { id: 'T-01', titulo: 'exportador', requisitos: ['REQ-01'], archivos: ['src/pdf.js'] },
+      { id: 'T-02', titulo: 'guía', requisitos: ['REQ-01'], archivos: ['docs/guia.md'] },
+    ],
+  };
+  const d = await approved({ 'docs/guia.md': '# Guía' }, plan);
+  T.startTask(d, 'T-02');
+  const r = await T.verifyTask(d, 'T-02', { cfg: loadConfig(d), sesion: 's' });
+  assert.strictEqual(r.tarea.estado, 'verificada');
+  assert.ok(r.controles.some(c => c.nombre === 'tests' && c.estado === 'no_verificado' && !c.obligatorio));
+  assert.notStrictEqual(T.status(d).estado, 'tecnicamente_completo', 'sin la evidencia de T-01 el trabajo no está completo');
+});
+
 test('una tarea con código no suma el control de archivos ni depende de la aceptación', async () => {
   const d = await approved();
   T.startTask(d, 'T-01');

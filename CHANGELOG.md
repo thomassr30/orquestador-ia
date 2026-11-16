@@ -2,6 +2,15 @@
 
 ## Sin publicar
 
+### Azure por proyecto: sirve al abrir la carpeta, el workspace o un repo suelto
+- **`--alcance=proyecto` en una carpeta con varios repos** ya no escribe solo en esa carpeta. La herramienta solo lee el `.mcp.json` de la carpeta que abre, no el de las de arriba. Con un `*.code-workspace` parte en una de sus carpetas, así que el registro hecho en la carpeta contenedora no se cargaba. Ahora se registra en tres lugares:
+  - la carpeta contenedora;
+  - cada carpeta de sus `*.code-workspace`, que se leen con comentarios y comas finales, como los guarda VS Code;
+  - cada repo de adentro.
+- **En los repos el archivo va a `.git/info/exclude`** (exclusión local), no al `.gitignore`. Un `.mcp.json` que el repo ya versiona no se toca y se avisa.
+- `--solo-carpeta` conserva el comportamiento anterior.
+- El harness ya reconocía los `*.code-workspace` para el mapa del espacio y la memoria (`workspace.js`). Lo que faltaba era el registro de MCP.
+
 ### Los scripts del orquestador ya no piden permiso en cada asistente
 - **Ruta real en vez de `$HOME`.** Las reglas globales y los mensajes del harness (doctor, aprobar desde la terminal, estado verificable) le indicaban al agente `node "$HOME/.sdd-orquestador/bin/sdd-harness.js" …`. Los permisos nativos comparan el texto del comando, así que no coincidía con la regla que escribe el instalador (ruta resuelta) y el asistente preguntaba cada vez; además `$HOME` no existe en `cmd.exe`. Ahora `global.md` usa `{{SDD_HOME}}` como las skills, y los mensajes usan `paths.harnessCmd()`.
 - **Permiso nativo en cada cliente**, desde una sola fuente (`rules.OWN_SCRIPTS` y `hooks-config.ownScriptPerms`):
@@ -15,6 +24,7 @@
 
 ### Las tareas de documentación ya se pueden verificar
 - **`trabajo verificar` en una tarea sin código** (README, textos de skills) quedaba «no verificado» para siempre: no corría ningún sensor y `combinar([])` no aprueba nada, aunque el usuario hubiera aceptado. Ahora comprueba que existan los archivos declarados (control `archivos`) y toma los criterios `manual` como aprobados cuando el usuario aceptó el trabajo. Las tareas con código no cambian.
+- En una tarea sin código, los controles de código que hereda de su requisito (por ejemplo `tests`) ya no son obligatorios para la tarea: los cubren las tareas con código, y el estado del requisito sigue exigiendo esa evidencia.
 - `trabajo verificar` imprime el motivo cuando no corre ningún control, en vez de mostrar solo el estado de la tarea.
 
 ### El plan se cruza con el proyecto, y las fuentes externas no fallan calladas
