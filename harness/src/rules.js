@@ -90,4 +90,13 @@ const SECRET_FILES = [/(^|[\\/])\.env(\.[^\\/]*)?$/i, /\.pem$/i, /\.key$/i, /\.p
 // Permitidos aunque parezcan secretos: plantillas sin valores.
 const SECRET_EXCEPTIONS = [/\.env\.(example|sample|template)$/i];
 
-module.exports = { GIT_READ, GIT_COMMIT, COMMIT_TOOLS, GIT_WRITE, GIT_DESTRUCTIVE, MCP_READ, MCP_MANAGE, FORGE_READ, FORGE_WRITE, INFRA_ASK, DELETE_ASK, DEPS_ASK, SAFE_COMMANDS, DANGEROUS, SECRET_FILES, SECRET_EXCEPTIONS };
+// Scripts propios del orquestador (estado, memoria, diagnóstico, registro del trabajo): el permiso nativo de cada
+// asistente los deja correr sin preguntar. Se escriben con la ruta real (`node "<SDD_HOME>/bin/<script>"`), nunca con
+// $HOME: los permisos nativos comparan el texto del comando y $HOME no existe en cmd.exe.
+const OWN_SCRIPTS = ['sdd-harness.js', 'sdd-state.js', 'sdd-status.js', 'sdd-memory.js', 'sdd-context.js', 'sdd-workspace.js', 'sdd-improve.js', 'to-md.js', 'new-change.js'];
+// Subcomandos de sdd-harness que decide solo el usuario: ningún permiso nativo los preaprueba (y el harness los bloquea
+// si los intenta el agente). Lo que cambia el proyecto con una bandera (deshacer --confirmar, perfil … --confirmar,
+// workspace --aplicar, worktree) lo confirma el propio harness en todos los clientes.
+const HARNESS_USER_ONLY = ['aprobar', 'directo', 'liberar', 'excepcion', 'excepción', 'trabajo aceptar', 'trabajo descartar'];
+
+module.exports = { GIT_READ, GIT_COMMIT, COMMIT_TOOLS, GIT_WRITE, GIT_DESTRUCTIVE, MCP_READ, MCP_MANAGE, FORGE_READ, FORGE_WRITE, INFRA_ASK, DELETE_ASK, DEPS_ASK, SAFE_COMMANDS, DANGEROUS, SECRET_FILES, SECRET_EXCEPTIONS, OWN_SCRIPTS, HARNESS_USER_ONLY };

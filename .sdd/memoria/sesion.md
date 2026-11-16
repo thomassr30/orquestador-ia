@@ -1,8 +1,8 @@
 Proyecto: C:/dev/orquestador-ia
 <!-- harness:inicio (bloque automático del harness; no editar) -->
-Última actividad: 2026-11-13 21:51 (claude) · Plan: plan presentado, esperando aprobación
-Pedido en curso: dame un mensaje de commit con los cambios que tenemos
-Archivos modificados en la sesión: harness/src/skills-proyecto.js, bin/sdd-harness.js, config/mcp.json, harness/src/core.js, harness/src/gate.js, harness/src/trabajo.js, harness/test/gate.test.js, harness/test/install-mcp.test.js, harness/test/trabajo.test.js, install.js
+Última actividad: 2026-11-16 01:26 (claude) · Plan: plan presentado, esperando aprobación
+Pedido en curso: realizalo
+Archivos modificados en la sesión: harness/src/rules.js, harness/src/paths.js, harness/src/hooks-config.js, install.js, harness/test/permisos-nativos.test.js, harness/test/install.test.js, CHANGELOG.md, harness/src/core.js, harness/src/gate.js, harness/src/trabajo.js
 Sensores: aprobado — ✓ tests
 <!-- harness:fin -->
 

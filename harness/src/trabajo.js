@@ -20,6 +20,7 @@ const { runShell } = require('./proc');
 const { combinar, verificado, ETIQUETA } = require('./resultado');
 const { shortHash, truncateMiddle } = require('./util');
 const { redact } = require('./secrets');
+const { harnessCmd } = require('./paths');
 
 const VERSION = 1;
 const file = root => path.join(S.projectDir(root), 'trabajo.json');
@@ -239,7 +240,7 @@ function summary(root, { max = 8 } = {}) {
   for (const q of (s.abiertas || []).slice(0, 5)) lines.push(`Pregunta abierta ${q.id}${q.para ? ` para ${q.para}` : ''}${q.donde ? ` en ${q.donde}` : ''}: ${q.texto} — no la respondas tú ni la des por resuelta.`);
   const resp = (s.preguntas || []).filter(q => q.estado === 'respondida').slice(-3);
   for (const q of resp) lines.push(`Pregunta ${q.id} ya respondida: ${q.texto} → ${q.respuesta}`);
-  lines.push('Estado verificable: «node "$HOME/.sdd-orquestador/bin/sdd-harness.js" trabajo». Decir «terminé» no completa nada: cada tarea se verifica con «trabajo verificar <tarea>».');
+  lines.push(`Estado verificable: «${harnessCmd('trabajo')}». Decir «terminé» no completa nada: cada tarea se verifica con «trabajo verificar <tarea>».`);
   return lines.join('\n');
 }
 

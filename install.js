@@ -222,8 +222,10 @@ function renderCommand(fmt, c) {
 }
 
 // ---------- reglas globales ----------
+// Con la ruta real del equipo ({{SDD_HOME}}): así el comando que escribe el agente coincide con el permiso nativo.
+const globalRules = () => render(fs.readFileSync(path.join(CORE, 'rules', 'global.md'), 'utf8')).trim();
 function upsertRules(file) {
-  const block = `${MARK_START}\n${fs.readFileSync(path.join(CORE, 'rules', 'global.md'), 'utf8').trim()}\n${MARK_END}`;
+  const block = `${MARK_START}\n${globalRules()}\n${MARK_END}`;
   let cur = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
   const re = new RegExp(`${MARK_START}[\\s\\S]*?${MARK_END}`);
   const next = re.test(cur) ? cur.replace(re, block) : (cur.trim() ? `${cur.trimEnd()}\n\n${block}\n` : `${block}\n`);
@@ -364,9 +366,8 @@ function registerMcp(tkey, t) {
 // ---------- permisos preaprobados (Claude Code) ----------
 // Tests, lint, build y scripts del orquestador. Nada que borre, publique o despliegue.
 function permissionRules() {
-  const bin = `${SDD_HOME_FWD}/bin`;
   return [
-    ...['new-change.js', 'sdd-state.js', 'sdd-status.js', 'to-md.js', 'sdd-memory.js', 'sdd-context.js', 'sdd-workspace.js', 'sdd-harness.js'].map(f => `Bash(node "${bin}/${f}":*)`),
+    ...HC.ownScriptPerms(SDD_HOME_FWD).claude.allow,
     'Bash(npm test:*)', 'Bash(npm run test:*)', 'Bash(npm run lint:*)', 'Bash(npm run build:*)', 'Bash(npm run typecheck:*)', 'Bash(npm audit:*)',
     'Bash(npx vitest:*)', 'Bash(npx jest:*)', 'Bash(npx playwright test:*)', 'Bash(npx tsc --noEmit:*)', 'Bash(npx eslint:*)', 'Bash(npx stylelint:*)',
     'Bash(ng test:*)', 'Bash(ng lint:*)', 'Bash(ng build:*)', 'Bash(npx ng test:*)', 'Bash(npx ng lint:*)', 'Bash(npx ng build:*)',
@@ -403,7 +404,8 @@ function configureClaudePermissions(file) {
   const old = { allow: new Set(prevP.added || []), ask: new Set(prevP.addedAsk || []), deny: new Set(prevP.addedDeny || []) };
   for (const k of ['allow', 'ask', 'deny']) P[k] = (P[k] || []).filter(r => !old[k].has(r));
   const added = { allow: [], ask: [], deny: [] };
-  const wanted = { allow: [...(opt('no-permissions') ? [] : permissionRules()), ...CLAUDE_RULES.allow], ask: CLAUDE_RULES.ask, deny: CLAUDE_RULES.deny };
+  // Lo que decide solo el usuario (aprobar el plan, aceptar el trabajo…) pide confirmación también con --no-permissions
+  const wanted = { allow: [...(opt('no-permissions') ? [] : permissionRules()), ...CLAUDE_RULES.allow], ask: [...CLAUDE_RULES.ask, ...HC.ownScriptPerms(SDD_HOME_FWD).claude.ask], deny: CLAUDE_RULES.deny };
   for (const k of ['allow', 'ask', 'deny']) for (const r of wanted[k]) if (!P[k].includes(r)) { P[k].push(r); added[k].push(r); }
   for (const k of ['allow', 'ask', 'deny']) if (!P[k].length) delete P[k];
   // Sin "Co-Authored-By: Claude" ni "Generated with Claude Code" en commits y PR (si el usuario no lo configuró ya)
@@ -438,8 +440,8 @@ function configureHooks(k) {
     if (mergeHooksFile(k, file)) log(`  ✓ harness (${HOOK_LABEL}) → ${file}`);
     if (k === 'codex') {
       const rules = path.join(CODEX_HOME, 'rules', 'sdd-orquestador.rules');
-      writeFile(rules, HC.codexRules()); manifest.files.push(rules);
-      log(`  ✓ reglas nativas de Codex: git y GitHub/GitLab solo lectura → ${rules}`);
+      writeFile(rules, HC.codexRules(SDD_HOME_FWD)); manifest.files.push(rules);
+      log(`  ✓ reglas nativas de Codex: git y GitHub/GitLab solo lectura · scripts del orquestador sin preguntar → ${rules}`);
       notes.push('Codex: abre Codex y ejecuta /hooks para revisar y aprobar los hooks del harness (Codex no ejecuta hooks nuevos sin tu aprobación). Reinicia Codex para cargar las reglas.');
     }
     if (k === 'cursor') notes.push('Cursor: los hooks se recargan solos; en Cursor → Settings → Hooks puedes ver que estén activos.');
@@ -492,15 +494,44 @@ function configureOpencodeGit(file) {
   if (typeof bash === 'string') bash = { '*': bash };
   bash = bash || {};
   const prev = new Set((manifest.opencodePerm || {}).added || []);
-  const ours = new Set(OPENCODE_RULES.map(([k]) => k));
+  // los scripts propios van al final: no se cruzan con git, gh/glab ni infraestructura
+  const rules = [...OPENCODE_RULES, ...HC.ownScriptPerms(SDD_HOME_FWD).opencode];
+  const ours = new Set(rules.map(([k]) => k));
   // reconstruir: primero lo del usuario (sin nuestras claves), luego nuestras reglas en orden
   const rebuilt = {};
   for (const [k, v] of Object.entries(bash)) if (!ours.has(k) && !prev.has(k)) rebuilt[k] = v;
-  for (const [k, v] of OPENCODE_RULES) rebuilt[k] = v;
+  for (const [k, v] of rules) rebuilt[k] = v;
   json.permission.bash = rebuilt;
   backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n');
   manifest.opencodePerm = { file, added: [...ours] };
-  log(`  ✓ git y gh/glab solo lectura (escritura bloqueada) · infraestructura con aprobación → ${file}`);
+  log(`  ✓ git y gh/glab solo lectura (escritura bloqueada) · infraestructura con aprobación · scripts del orquestador sin preguntar → ${file}`);
+}
+// Gemini CLI: tools.allowed (prefijo del comando) para los scripts propios del orquestador.
+function configureGeminiPermissions(file) {
+  const wanted = HC.ownScriptPerms(SDD_HOME_FWD).gemini;
+  let json = {};
+  if (fs.existsSync(file)) {
+    try { json = readJson(file); } catch { notes.push(`Gemini CLI: ${file} no es JSON puro; agrega a mano en tools.allowed: ${wanted.join(', ')}`); return; }
+  }
+  json.tools = json.tools || {};
+  const prev = new Set((manifest.geminiPerm || {}).added || []);
+  const cur = (Array.isArray(json.tools.allowed) ? json.tools.allowed : []).filter(r => !prev.has(r));
+  const added = [];
+  for (const r of wanted) if (!cur.includes(r)) { cur.push(r); added.push(r); }
+  json.tools.allowed = cur;
+  backup(file); writeFile(file, JSON.stringify(json, null, 2) + '\n');
+  manifest.geminiPerm = { file, added };
+  log(`  ✓ scripts del orquestador sin preguntar (tools.allowed) → ${file}`);
+}
+function removeGeminiPermissions(p) {
+  if (!p || !fs.existsSync(p.file)) return;
+  let json; try { json = readJson(p.file); } catch { return; }
+  if (!json.tools || !Array.isArray(json.tools.allowed)) return;
+  const rm = new Set(p.added || []);
+  json.tools.allowed = json.tools.allowed.filter(r => !rm.has(r));
+  if (!json.tools.allowed.length) delete json.tools.allowed;
+  if (!Object.keys(json.tools).length) delete json.tools;
+  writeFile(p.file, JSON.stringify(json, null, 2) + '\n');
 }
 function removeOpencodeGit(p) {
   if (!p || !fs.existsSync(p.file)) return;
@@ -528,6 +559,7 @@ function uninstall() {
   removeClaudePermissions(prev.permissions);
   removeHooks(prev.hooks);
   removeOpencodeGit(prev.opencodePerm);
+  removeGeminiPermissions(prev.geminiPerm);
   const userCfg = path.join(SDD_HOME, 'harness.json');
   const keep = fs.existsSync(userCfg) ? fs.readFileSync(userCfg) : null;
   rmrf(SDD_HOME);
@@ -670,6 +702,7 @@ function install() {
   removeHooks(prev?.hooks); // se vuelven a registrar los vigentes
   if (prev?.permissions) manifest.permissions = prev.permissions;
   if (prev?.opencodePerm) manifest.opencodePerm = prev.opencodePerm;
+  if (prev?.geminiPerm) manifest.geminiPerm = prev.geminiPerm;
   removePrevious(prev, true); // reinstalación limpia (las reglas se reemplazan en su lugar)
 
   // 1. runtime: scripts, harness + dependencias
@@ -742,11 +775,18 @@ function install() {
       if (k === 'codex' && fs.existsSync(path.join(CODEX_HOME, 'AGENTS.override.md'))) notes.push('Codex: existe AGENTS.override.md, que tiene prioridad sobre AGENTS.md. Copia el bloque sdd-orquestador ahí si quieres que se aplique.');
       upsertRules(t.rules); log(`  ✓ reglas globales → ${t.rules}`);
     } else if (k === 'cursor') {
-      notes.push(`Cursor: pega el contenido de core/rules/global.md en Cursor → Settings → Rules → User Rules.`);
+      const f = path.join(SDD_HOME, 'reglas-globales.md');
+      writeFile(f, globalRules() + '\n'); manifest.files.push(f);
+      notes.push(`Cursor: pega el contenido de ${f} en Cursor → Settings → Rules → User Rules (ya trae las rutas de este equipo).`);
     }
     if (t.settings) configureClaudePermissions(t.settings);
     if (!opt('no-hooks')) configureHooks(k);
     if (k === 'opencode') configureOpencodeGit(t.mcp.file);
+    if (k === 'gemini' && !opt('no-permissions')) configureGeminiPermissions(t.mcp.file);
+    if ((k === 'cursor' || k === 'copilot') && !opt('no-permissions')) {
+      const where = k === 'cursor' ? 'Cursor → Settings → Agents → comandos permitidos (auto-run)' : 'VS Code → settings.json → chat.tools.terminal.autoApprove';
+      notes.push(`${t.label}: para que no te pida permiso por los scripts del orquestador, agrega en ${where} estos prefijos:\n${HC.ownScriptPerms(SDD_HOME_FWD).prefijos.map(p => `  ${p}`).join('\n')}`);
+    }
     if (!opt('no-mcp')) registerMcp(k, t);
   }
 

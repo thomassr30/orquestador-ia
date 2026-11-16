@@ -51,6 +51,34 @@ test('instala el harness en las 6 herramientas', () => {
   assert.ok(fs.existsSync(path.join(HOME, '.sdd-orquestador/harness.json')));
 });
 
+test('scripts del orquestador: ruta real en las reglas y permiso nativo en cada cliente', () => {
+  const CLI = `node "${path.join(HOME, '.sdd-orquestador').replace(/\\/g, '/')}/bin/sdd-harness.js"`;
+  for (const f of ['.claude/CLAUDE.md', '.codex/AGENTS.md', '.gemini/GEMINI.md', '.config/opencode/AGENTS.md', '.sdd-orquestador/reglas-globales.md']) {
+    const t = fs.readFileSync(path.join(HOME, f), 'utf8');
+    assert.ok(t.includes(`${CLI} trabajo plan`), `${f}: comando con la ruta real`);
+    assert.doesNotMatch(t, /\$HOME\/\.sdd-orquestador|\{\{SDD_HOME\}\}/, f);
+  }
+  const claude = read('.claude/settings.json').permissions;
+  assert.ok(claude.allow.includes(`Bash(${CLI}:*)`));
+  assert.ok(claude.ask.includes(`Bash(${CLI} aprobar:*)`) && claude.ask.includes(`Bash(${CLI} trabajo aceptar:*)`));
+  const codex = fs.readFileSync(path.join(HOME, '.codex/rules/sdd-orquestador.rules'), 'utf8');
+  assert.ok(codex.split('\n').some(l => l.includes('decision = "allow"') && l.includes(JSON.stringify(CLI.slice(6, -1)))), 'Codex: allow con la ruta real');
+  assert.ok(codex.split('\n').some(l => l.includes('decision = "prompt"') && l.includes('"aprobar"')), 'Codex: aprobar con la aprobación del usuario');
+  assert.ok(read('.gemini/settings.json').tools.allowed.includes(`run_shell_command(${CLI})`));
+  const bash = read('.config/opencode/opencode.json').permission.bash;
+  assert.strictEqual(bash[`${CLI}*`], 'allow');
+  assert.strictEqual(bash[`${CLI} aprobar*`], 'ask');
+  const keys = Object.keys(bash);
+  assert.ok(keys.indexOf(`${CLI} aprobar*`) > keys.indexOf(`${CLI}*`), 'OpenCode: la excepción va después (gana la última)');
+});
+
+test('reinstalar no duplica los permisos nativos de Gemini', () => {
+  const r = install('--targets=all', '--no-deps', '--no-mcp');
+  assert.strictEqual(r.status, 0, r.stderr + r.stdout);
+  const allowed = read('.gemini/settings.json').tools.allowed;
+  assert.strictEqual(allowed.length, new Set(allowed).size);
+});
+
 test('el hook instalado funciona desde ~/.sdd-orquestador (sin el repositorio)', () => {
   const dir = project({ 'a.js': '' });
   // Payload simulado: SDD_DOCTOR=1 para que no cuente como evento real del cliente
@@ -88,6 +116,8 @@ test('desinstalar quita solo lo del orquestador y conserva la configuración del
   assert.strictEqual(claude.attribution, undefined, 'se quita la configuración de atribución que puso el instalador');
   assert.ok(!(claude.permissions && (claude.permissions.deny || []).includes('Bash(git commit:*)')));
   assert.ok(!read('.gemini/settings.json').hooks);
+  assert.ok(!read('.gemini/settings.json').tools, 'se quitan los permisos de Gemini que agregó el instalador');
+  assert.ok(!JSON.stringify(read('.config/opencode/opencode.json')).includes('sdd-harness.js'), 'y los de OpenCode');
   assert.ok(!fs.existsSync(path.join(HOME, '.copilot/hooks/sdd-orquestador.json')));
   assert.ok(!fs.existsSync(path.join(HOME, '.config/opencode/plugins/sdd-harness.js')));
   assert.ok(!fs.existsSync(path.join(HOME, '.codex/rules/sdd-orquestador.rules')));

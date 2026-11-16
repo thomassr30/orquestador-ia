@@ -2,6 +2,17 @@
 
 ## Sin publicar
 
+### Los scripts del orquestador ya no piden permiso en cada asistente
+- **Ruta real en vez de `$HOME`.** Las reglas globales y los mensajes del harness (doctor, aprobar desde la terminal, estado verificable) le indicaban al agente `node "$HOME/.sdd-orquestador/bin/sdd-harness.js" …`. Los permisos nativos comparan el texto del comando, así que no coincidía con la regla que escribe el instalador (ruta resuelta) y el asistente preguntaba cada vez; además `$HOME` no existe en `cmd.exe`. Ahora `global.md` usa `{{SDD_HOME}}` como las skills, y los mensajes usan `paths.harnessCmd()`.
+- **Permiso nativo en cada cliente**, desde una sola fuente (`rules.OWN_SCRIPTS` y `hooks-config.ownScriptPerms`):
+  - Claude Code: `allow`, como antes, más `ask` explícito para lo que decide el usuario.
+  - Codex: `prefix_rule` `allow`, con la ruta escrita con `/` y con `\`.
+  - OpenCode: `allow` en `permission.bash`.
+  - Gemini CLI: `tools.allowed`. Se quita al desinstalar.
+  - Cursor y VS Code Copilot guardan la lista en su propia configuración: el instalador indica los prefijos exactos. Para Cursor deja además `~/.sdd-orquestador/reglas-globales.md`, con las rutas ya resueltas, para pegarlo en User Rules.
+- **Lo que decide el usuario nunca queda preaprobado**: `aprobar`, `directo`, `liberar`, `excepcion` y `trabajo aceptar|descartar` (`rules.HARNESS_USER_ONLY`) quedan en `ask`/`prompt` donde el cliente lo permite. En Gemini y en todos los clientes los sigue bloqueando el hook del harness. `deshacer --confirmar`, `perfil … --confirmar`, `workspace --aplicar` y `worktree` los sigue confirmando el harness.
+- `sdd-improve.js` entra en la lista de scripts propios, como ya lo trataba la política.
+
 ### El plan se cruza con el proyecto, y las fuentes externas no fallan calladas
 - **`trabajo plan` exige el cruce con el código.** Cada tarea tiene que declarar los archivos que toca, y al menos uno de los declarados en todo el plan tiene que existir ya. Un plan armado solo con el ticket y el Figma no nombra ningún archivo real, y eso ahora se rechaza al registrarlo en vez de aparecer al verificar, cuando ya se aprobó y se desarrolló. Para lo que de verdad arranca de cero: `trabajo plan … --sin-base "motivo"`, que queda registrado y se muestra junto al plan y en el resumen que lee el agente.
 - **Aviso al mencionar un ticket o un Figma.** En el primer mensaje donde aparece una clave de ticket o un enlace de Figma, el harness recuerda tres cosas: confirmar el acceso con una llamada barata antes de la lectura completa, reportar de inmediato lo que no responda o vuelva vacío en vez de reintentar en silencio, y cruzar el plan con el código existente. Va en `UserPromptSubmit`, que ya corría: no agrega llamadas de hook.

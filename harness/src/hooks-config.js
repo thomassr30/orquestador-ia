@@ -83,11 +83,12 @@ function copilot(home) {
 }
 
 /** Reglas nativas de Codex (~/.codex/rules/): red de seguridad aunque los hooks aún no estén aprobados. */
-function codexRules() {
+function codexRules(home) {
   const rule = (words, decision, why) => `prefix_rule(pattern = ${JSON.stringify(words)}, decision = "${decision}", justification = ${JSON.stringify(why)})`;
   const commit = 'Orquestador SDD: crea un commit. Apruébalo solo si viste el mensaje (sin líneas de atribución de IA) y los archivos que incluye.';
   const git = 'Orquestador SDD: modifica el repositorio git. Apruébalo solo si entiendes el efecto.';
   const forge = 'Orquestador SDD: la escritura en GitHub/GitLab la hace el usuario. Sugiérelo como texto.';
+  const own = home ? ownScriptPerms(home).codex : null;
   return [
     '# Orquestador SDD — reglas de comandos para Codex. Generado por install.js; se reemplaza al reinstalar.',
     '# commit y el resto de git con tu aprobación · escritura en GitHub/GitLab bloqueada.',
@@ -95,8 +96,39 @@ function codexRules() {
     ...R.COMMIT_TOOLS.map(c => rule(c.split(' '), 'prompt', commit)),
     ...R.GIT_WRITE.map(c => rule(['git', ...c.split(' ')], 'prompt', git)),
     ...R.FORGE_WRITE.map(c => rule(c.split(' '), 'forbidden', forge)),
+    ...(own ? [
+      '# Scripts propios del orquestador (estado, memoria, registro del trabajo) sin preguntar; lo que decide el usuario, con su aprobación.',
+      ...own.allow.map(p => rule(p, 'allow', 'Orquestador SDD: script propio del harness (estado, memoria, diagnóstico o registro del trabajo).')),
+      ...own.prompt.map(p => rule(p, 'prompt', 'Orquestador SDD: esta decisión es del usuario; el agente no la toma por él.')),
+    ] : []),
     '',
   ].join('\n');
+}
+
+/**
+ * Permiso nativo de cada cliente para los scripts propios del orquestador (`home` = SDD_HOME con barras normales).
+ * El agente los escribe como `node "<home>/bin/<script>" …` (ver paths.harnessCmd): las reglas usan ese mismo texto.
+ * Los subcomandos de HARNESS_USER_ONLY nunca quedan preaprobados.
+ */
+function ownScriptPerms(home) {
+  const call = f => `node "${home}/bin/${f}"`;
+  const userOnly = s => `${call('sdd-harness.js')} ${s}`;
+  // Codex compara tokens (sin comillas); en Windows el agente puede escribir la ruta con barras invertidas.
+  const tokens = f => [...new Set([`${home}/bin/${f}`, `${home.replace(/\//g, '\\')}\\bin\\${f}`])];
+  return {
+    claude: { allow: R.OWN_SCRIPTS.map(f => `Bash(${call(f)}:*)`), ask: R.HARNESS_USER_ONLY.map(s => `Bash(${userOnly(s)}:*)`) },
+    codex: {
+      allow: [['node', R.OWN_SCRIPTS.flatMap(tokens)]],
+      prompt: R.HARNESS_USER_ONLY.map(s => ['node', tokens('sdd-harness.js'), ...s.split(' ')]),
+    },
+    // OpenCode: gana la última regla que coincide → primero lo permitido, después las excepciones del usuario.
+    opencode: [...R.OWN_SCRIPTS.map(f => [`${call(f)}*`, 'allow']), ...R.HARNESS_USER_ONLY.map(s => [`${userOnly(s)}*`, 'ask'])],
+    // Gemini CLI: tools.allowed saltea la confirmación por prefijo del comando. Lo de HARNESS_USER_ONLY lo bloquea el
+    // hook BeforeTool del harness (el agente no puede aprobar ni aceptar por el usuario).
+    gemini: R.OWN_SCRIPTS.map(f => `run_shell_command(${call(f)})`),
+    // Cursor y VS Code Copilot guardan la lista en su propia configuración: el instalador solo indica qué agregar.
+    prefijos: R.OWN_SCRIPTS.map(call),
+  };
 }
 
 /** ¿Este grupo/entrada de hooks es del orquestador? */
@@ -118,4 +150,4 @@ function mergeHooks(hooks, wanted) {
   return out;
 }
 
-module.exports = { claude, codex, gemini, cursor, copilot, codexRules, mergeHooks, isOurs, MARKS };
+module.exports = { claude, codex, gemini, cursor, copilot, codexRules, ownScriptPerms, mergeHooks, isOurs, MARKS };

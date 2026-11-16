@@ -23,7 +23,7 @@ const checkpoints = require('./checkpoints');
 const W = require('./workspace');
 const { externalSource, exfilTarget, urlLeak } = require('./external');
 const { findCodeSecret } = require('./secrets');
-const { SDD_HOME, fwd } = require('./paths');
+const { SDD_HOME, fwd, harnessCmd } = require('./paths');
 const { isInside, relPosix, shortHash } = require('./util');
 const A = require('./aprobaciones');
 const V = require('./verificacion');
@@ -39,7 +39,7 @@ const firstWord = c => String(c || '').trim().split(/\s+/)[0] || '';
 const isMemory = rel => /(^|\/)\.sdd\/memoria(\/|$)/.test(rel);
 const strict = cfg => cfg.modo === 'estricto';
 const vigencia = cfg => Number((cfg.aprobaciones || {}).vigenciaMin) || 30;
-const DOCTOR = 'node "$HOME/.sdd-orquestador/bin/sdd-harness.js" doctor';
+const DOCTOR = harnessCmd('doctor');
 /** Evento correlacionado con la sesión del agente (ver eventos.js: sin prompts, argumentos ni contenido). */
 const logEv = (ev, entry) => S.log(ev.root, { herramienta: ev.host, sesion: ev.sessionId, ...entry });
 const actionOf = ident => ({ tipo: ident.tipo, etiqueta: ident.etiqueta, huella: ident.huella.slice(0, 16) });

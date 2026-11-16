@@ -8,6 +8,7 @@
 
 const A = require('./aprobaciones');
 const { redact } = require('./secrets');
+const { harnessCmd } = require('./paths');
 
 // Límites de palabra que entienden tildes y ñ (\b de JavaScript solo considera ASCII).
 const W = '[\\p{L}\\p{N}_]';
@@ -267,7 +268,7 @@ function editBlockReason(state, cfg) {
   const e = state.gate.estado;
   if (e === 'requerido' || e === 'pendiente' || (cfg.gate === 'siempre' && e === 'inicial')) {
     return 'GATE del harness: el plan de este cambio aún no está aprobado por el usuario. Presenta el plan (qué y por qué, archivos por capa, tests previstos, riesgos) y termina con «¿Apruebo la implementación? (sí / no / ajustes)». Si el cambio es trivial, pregunta si lo aplicas directo. Termina tu turno ahí. El usuario aprueba con su propio lenguaje ("sí", "dale", "ok", "ya", "desarrolla", "implementa", "procede", "hazlo", "directo"…): no le exijas una palabra exacta. Mientras tanto puedes explorar (leer, buscar, correr tests); no intentes editar por otra vía.'
-      + (state.mensajeUsuario ? ` (Último mensaje del usuario según el harness: «${state.mensajeUsuario}»; si no coincide con lo que escribió, pídele que apruebe desde su terminal con: node "$HOME/.sdd-orquestador/bin/sdd-harness.js" aprobar)` : '');
+      + (state.mensajeUsuario ? ` (Último mensaje del usuario según el harness: «${state.mensajeUsuario}»; si no coincide con lo que escribió, pídele que apruebe desde su terminal con: ${harnessCmd('aprobar')})` : '');
   }
   return null;
 }
