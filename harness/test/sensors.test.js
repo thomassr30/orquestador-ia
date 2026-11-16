@@ -8,7 +8,7 @@ process.env.SDD_HOME = tmp('sdd-home-');
 const { spawnSync } = require('child_process');
 const { plan, runSensors, takeBaseline, summarize, quickCheck, detect } = require('../src/sensors');
 const { DEFAULTS } = require('../src/config');
-const { findProjectRoot } = require('../src/util');
+const { findProjectRoot, mapLimit } = require('../src/util');
 
 const IS_WIN = process.platform === 'win32';
 const bin = (dir, name) => { const f = path.join(dir, 'node_modules', '.bin', IS_WIN ? `${name}.cmd` : name); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, ''); };
@@ -196,4 +196,19 @@ test('runner de tests: Karma fuera de Angular, modo observación neutralizado y 
 
   // El runner viaja en el plan, para que doctor y sensores lo muestren
   assert.strictEqual(plan(karma, ['src/a.js'], cfg({ alTerminar: ['tests'] }))[0].runner, 'karma');
+});
+
+test('mapLimit: respeta el tope de tareas a la vez y devuelve en el orden de entrada, no en el de término', async () => {
+  const pausa = ms => new Promise(r => setTimeout(r, ms));
+  let activas = 0; let maxActivas = 0;
+  // La primera tarea es la más lenta: termina última pero su resultado va primero
+  const fn = async n => { activas++; maxActivas = Math.max(maxActivas, activas); await pausa(n === 0 ? 60 : 5); activas--; return n * 10; };
+  assert.deepStrictEqual(await mapLimit([0, 1, 2, 3, 4], 2, fn), [0, 10, 20, 30, 40]);
+  assert.strictEqual(maxActivas, 2, 'nunca más de 2 a la vez');
+  maxActivas = 0;
+  await mapLimit([0, 1, 2, 3], 1, fn);
+  assert.strictEqual(maxActivas, 1, 'tope 1 = uno tras otro');
+  // Valores inválidos o vacíos no cuelgan ni lanzan: se comportan como tope 1
+  for (const l of [0, -3, undefined, NaN, 'x']) assert.deepStrictEqual(await mapLimit([1, 2], l, async n => n), [1, 2], String(l));
+  assert.deepStrictEqual(await mapLimit([], 2, async n => n), []);
 });

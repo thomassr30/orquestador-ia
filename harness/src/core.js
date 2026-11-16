@@ -24,7 +24,7 @@ const W = require('./workspace');
 const { externalSource, exfilTarget, urlLeak } = require('./external');
 const { findCodeSecret } = require('./secrets');
 const { SDD_HOME, fwd, harnessCmd } = require('./paths');
-const { isInside, relPosix, shortHash } = require('./util');
+const { isInside, relPosix, shortHash, mapLimit } = require('./util');
 const A = require('./aprobaciones');
 const V = require('./verificacion');
 const T = require('./trabajo');
@@ -430,6 +430,12 @@ function onPost(ev) {
 /**
  * Sensores por proyecto: cada archivo se verifica en su proyecto (el que tiene su propio .sdd/harness.json) o en su
  * carpeta del espacio, con la configuración de ese proyecto. Comparten el presupuesto de tiempo.
+ *
+ * Los proyectos son independientes (carpeta, configuración y línea base propias), así que se verifican de a
+ * `sensores.paralelo` a la vez: el turno espera al más lento y no a la suma de todos (con 4 repos Angular, minutos de
+ * diferencia con el spinner del cliente puesto). El presupuesto es uno solo y se mide en reloj: cada proyecto recibe lo
+ * que queda al empezar, así que ninguno pasa de `presupuestoSeg` desde el inicio. Los resultados salen en el orden
+ * de los proyectos, no en el de término.
  */
 async function runSpaceSensors(ev, code, cfg) {
   const ws = spaceOf(ev);
@@ -442,23 +448,21 @@ async function runSpaceSensors(ev, code, cfg) {
     if (!groups.has(base)) groups.set(base, []);
     groups.get(base).push(relPosix(base, abs));
   }
-  const results = []; let ran = false;
   const start = Date.now();
-  for (const [base, files] of groups) {
+  const parts = await mapLimit([...groups], cfg.sensores.paralelo, async ([base, files]) => {
     const gcfg = base === ev.root ? cfg : loadConfig(ev.root, base);
     const left = cfg.sensores.presupuestoSeg - (Date.now() - start) / 1000;
     const prefix = base === ev.root ? '' : relPosix(ev.root, base);
     if (left < 10) {
       // Proyecto sin verificar por falta de tiempo: queda a la vista (y cuenta como obligatorio pendiente)
-      results.push({ nombre: 'sensores', modulo: prefix || '.', estado: 'no_verificado', obligatorio: true, ok: false, motivo: 'sin tiempo para verificar este proyecto' });
-      ran = true;
-      continue;
+      return { ran: true, results: [{ nombre: 'sensores', modulo: prefix || '.', estado: 'no_verificado', obligatorio: true, ok: false, motivo: 'sin tiempo para verificar este proyecto' }] };
     }
+    // Queda en el log antes de correr: si el hook se cuelga, se ve qué proyecto estaba verificando
+    logEv(ev, { evento: 'sensores', decision: 'iniciado', detalle: `${prefix || '.'} (${files.length} archivo(s))` });
     const r = await runSensors(base, files, { ...gcfg, sensores: { ...gcfg.sensores, presupuestoSeg: left } });
-    if (r.ran) ran = true;
-    results.push(...r.results.map(x => ({ ...x, modulo: prefix ? (x.modulo && x.modulo !== '.' ? `${prefix}/${x.modulo}` : prefix) : x.modulo })));
-  }
-  return { ran, results };
+    return { ran: r.ran, results: r.results.map(x => ({ ...x, modulo: prefix ? (x.modulo && x.modulo !== '.' ? `${prefix}/${x.modulo}` : prefix) : x.modulo })) };
+  });
+  return { ran: parts.some(p => p.ran), results: parts.flatMap(p => p.results) };
 }
 
 /**
@@ -516,8 +520,13 @@ async function verifyChanges(ev, cfg, st) {
     return { notice: `Sin cambios desde la última verificación (${ETIQUETA[prev.estado] || prev.estado}${pend.length ? `: ${pend.join(', ')}` : ''}): no se vuelve a correr. Los cambios siguen sin verificar. Para repetirla igual (un test inestable, un servicio que ya levantó): sdd-harness sensores; para seguir sin ella, el usuario puede autorizar una excepción respondiendo «sí» o con sdd-harness excepcion.` };
   }
   let run;
+  const t0 = Date.now();
   if (!cfg.sensores.alTerminar.length) run = { ran: false, motivo: 'sensores desactivados (sensores.alTerminar está vacío)', results: [] };
-  else run = await runSpaceSensors(ev, code, cfg);
+  else {
+    logEv(ev, { evento: 'sensores', decision: 'iniciados', detalle: `${code.length} archivo(s); presupuesto ${cfg.sensores.presupuestoSeg} s, ${cfg.sensores.timeoutSeg} s por comando, ${cfg.sensores.paralelo} proyecto(s) a la vez` });
+    run = await runSpaceSensors(ev, code, cfg);
+  }
+  const totalMs = Date.now() - t0;
   const rc = rulesControl(ev, spaceOf(ev), code.filter(f => CODE_EXT.test(f)));
   if (rc) run = { ...run, ran: true, results: [...run.results, rc] };
   const c = run.ran ? combinar(run.results, { excepciones: st.excepciones, huella })
@@ -538,8 +547,10 @@ async function verifyChanges(ev, cfg, st) {
       A.request(s, A.forException(ev, pend.join(','), huella), { vigenciaMin: vigencia(cfg), datos: { controles: pend, huella } });
     }
   });
-  logEv(ev, { evento: 'sensores', decision: c.estado, detalle: resumen.map(r => `${idControl(r)}:${r.estado}`).join(' ') || c.motivo,
-    verificacion: { estado: c.estado, huella, controles: resumen.map(r => ({ control: idControl(r), estado: r.estado, obligatorio: r.obligatorio })) }, ...(blocking ? { reintento: { n: tries, max } } : {}) });
+  // Duración por control (y total) en el log: es lo que dice qué proyecto o comando retiene el fin de turno
+  const dur = r => (r.ms >= 1000 ? `(${Math.round(r.ms / 1000)} s)` : '');
+  logEv(ev, { evento: 'sensores', decision: c.estado, detalle: `${run.ran ? `total ${Math.round(totalMs / 1000)} s · ` : ''}${resumen.map(r => `${idControl(r)}:${r.estado}${dur(r)}`).join(' ') || c.motivo}`,
+    verificacion: { estado: c.estado, huella, ms: totalMs, controles: resumen.map(r => ({ control: idControl(r), estado: r.estado, obligatorio: r.obligatorio, ms: r.ms })) }, ...(blocking ? { reintento: { n: tries, max } } : {}) });
   const text = summarize({ estado: c.estado, motivo: c.motivo, results: run.results.map((r, i) => ({ ...r, estado: resumen[i].estado, motivo: resumen[i].motivo })) }, code.length);
   const done = { ran: true, archivos: code };
   if (ok) return { ...done, notice: `Verificado${c.estado === 'excepcion' ? ' con excepción' : ''}: ${resumen.map(r => `${SIMBOLO[r.estado]} ${idControl(r)}`).join(' · ')}${c.motivo ? ` (${c.motivo})` : ''}` };

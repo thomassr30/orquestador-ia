@@ -4,7 +4,10 @@ Resuelto en 3.0.0 (2026-11-03): resultado de evaluaciones, fallo que persiste tr
 
 Resuelto en 3.1.0 (2026-11-06 y 2026-11-08): GATE invertido con banco de frases, «~» y variables de home en comandos, «sin sdd» en contenido pegado, tickets de Azure Boards en el GATE, clasificación MCP de Azure DevOps, runner de tests por proyecto (Karma fuera de Angular, modo observación, Mocha y Jasmine), registro de preguntas abiertas, aviso de contexto recortado y Azure DevOps (registro del MCP remoto, wiki, planes de prueba y pipelines, escritura por «action», flujo del work item al plan y MCP por proyecto con un servidor por organización) worktrees, el anuncio previo de las operaciones del orquestador y la selección de skills por proyecto.
 
-## Abierto (10)
+## Abierto (12)
+
+- [ ] `credencial listar` y doctor avisan «permisos 666 (debería ser 600)» en Windows: ahí el modo POSIX no refleja el acceso (lo protegen los permisos NTFS del perfil). Falsa alarma; omitir la comprobación en win32 o revisar ACL. Visto 2026-11-16.
+- [ ] GATE: «puedes correr los comandos tu» (respuesta a un plan con comandos listados) no se reconoce como aprobación; hubo que pedir «sí» explícito. Sumar al banco de frases del GATE (evals/corpus). Visto 2026-11-16.
 
 - [ ] Integración real por cliente (doctor nivel d) sin confirmar: requiere instalar 3.0.0 y usar cada cliente; Cursor no instalado en este equipo.
 - [ ] Ejecutar CI en macOS/Linux (solo se probó en Windows localmente). 2026-11-03: corregidos el test que dependía de ~/.claude/settings.json y la lectura de stdin (EAGAIN); falta ver el CI en verde. 2026-11-06: la suite completa corre en 65 s en Linux (214 pruebas, 213 pass + 1 skip por disco sensible a mayúsculas); medir sobre una carpeta montada por red o por puente da 19 s por spawn y no sirve de referencia.

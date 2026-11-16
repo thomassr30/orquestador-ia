@@ -2,6 +2,16 @@
 
 ## Sin publicar
 
+### El fin de turno ya no espera la suma de todos los repos
+- **El síntoma:** al terminar una tarea que tocó varios repos, el cliente se quedaba con el spinner («Determining…» en la extensión de VS Code) durante minutos aunque la respuesta ya estuviera escrita. El turno no se cierra hasta que termina el hook `Stop`, y ese hook corría lint, tipos y tests de cada proyecto **uno tras otro** (hasta `presupuestoSeg`, 600 s; el hook admite 900 s). Con Angular son `ng build` y `ng test` con Chrome headless por repo.
+- **Proyectos en paralelo** (`sensores.paralelo`, 2 por defecto; `1` vuelve al comportamiento anterior). Cada proyecto conserva su carpeta, su configuración y su línea base, y los resultados salen en el orden de los proyectos, no en el de término. El presupuesto de tiempo sigue siendo uno solo y medido en reloj: ningún proyecto pasa de `presupuestoSeg` desde el inicio.
+- **El log dice dónde se va el tiempo.** Antes el evento `sensores` no guardaba duraciones, y un `Stop` colgado no dejaba ninguna huella. Ahora:
+  - `sensores · iniciados` al empezar, con los archivos, el presupuesto y el paralelismo;
+  - `sensores · iniciado · <proyecto>` al empezar cada proyecto del espacio;
+  - el resultado trae `total N s` y `(N s)` por control en `sdd-harness registro`, y los milisegundos en `verificacion.ms` y `verificacion.controles[].ms` del JSONL.
+- No cambia qué se verifica, qué bloquea ni cuándo se da algo por «no verificado». Un proyecto solo (sin espacio) corre igual que antes.
+- Para que rija en tus sesiones hay que instalar: `node install.js` (con cambios sin commit, `npm run update` se niega).
+
 ### Azure por proyecto: sirve al abrir la carpeta, el workspace o un repo suelto
 - **`--alcance=proyecto` en una carpeta con varios repos** ya no escribe solo en esa carpeta. La herramienta solo lee el `.mcp.json` de la carpeta que abre, no el de las de arriba. Con un `*.code-workspace` parte en una de sus carpetas, así que el registro hecho en la carpeta contenedora no se cargaba. Ahora se registra en tres lugares:
   - la carpeta contenedora;

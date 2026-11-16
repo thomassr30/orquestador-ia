@@ -114,7 +114,31 @@ test('al terminar, los sensores corren en cada proyecto con su propia configurac
   hook('claude', 'Stop', { ...base, last_assistant_message: 'Listo.' });
   const estado = cli(c, 'estado', c).stdout;
   assert.match(estado, /Verificación: aprobado — ✓ tests@api/);
-  assert.match(cli(c, 'registro', '200').stdout, /sensores · aprobado · tests@api:aprobado/);
+  assert.match(cli(c, 'registro', '200').stdout, /sensores · aprobado · total \d+ s · tests@api:aprobado/);
+});
+
+test('al terminar, los proyectos del espacio se verifican a la vez (no uno tras otro) y el log dice cuánto tardó cada uno', () => {
+  const c = container();
+  // Cada comando anota cuándo empezó y cuándo terminó: si se solapan, corrieron a la vez (sin medir tiempos de pared)
+  const marca = (p, qué) => `require('fs').appendFileSync('${p.replace(/\\/g, '/')}','${qué}:'+Date.now()+'\\n')`;
+  const registro = path.join(c, 'marcas.txt');
+  const cmd = id => `"${process.execPath}" -e "${marca(registro, `ini-${id}`)};setTimeout(()=>{${marca(registro, `fin-${id}`)}},2000)"`;
+  write(c, {
+    'front/.sdd/harness.json': JSON.stringify({ sensores: { alTerminar: ['tests'], comandos: { tests: cmd('front') } } }),
+    'api/.sdd/harness.json': JSON.stringify({ sensores: { alTerminar: ['tests'], comandos: { tests: cmd('api') } } }),
+  });
+  const base = { session_id: 'par', cwd: c };
+  hook('claude', 'UserPromptSubmit', { ...base, prompt: 'arregla x, directo' });
+  for (const f of ['front/src/a.ts', 'api/src/x.ts']) hook('claude', 'PostToolUse', { ...base, tool_name: 'Write', tool_input: { file_path: path.join(c, f), content: '' } });
+  hook('claude', 'Stop', { ...base, last_assistant_message: 'Listo.' });
+  const t = Object.fromEntries(fs.readFileSync(registro, 'utf8').trim().split('\n').map(l => l.split(':')).map(([k, v]) => [k, Number(v)]));
+  assert.ok(t['ini-front'] && t['ini-api'] && t['fin-front'] && t['fin-api'], 'corrieron los dos proyectos');
+  assert.ok(Math.max(t['ini-front'], t['ini-api']) < Math.min(t['fin-front'], t['fin-api']), 'el segundo empezó antes de que terminara el primero');
+  const log = cli(c, 'registro', '200').stdout;
+  assert.match(log, /sensores · iniciados · \d+ archivo\(s\); presupuesto 600 s, 240 s por comando, 2 proyecto\(s\) a la vez/);
+  assert.match(log, /sensores · iniciado · front \(\d+ archivo\(s\)\)/);
+  assert.match(log, /sensores · iniciado · api \(\d+ archivo\(s\)\)/);
+  assert.match(log, /sensores · aprobado · total \d+ s · tests@front:aprobado\(\d+ s\) tests@api:aprobado\(\d+ s\)/, 'resultado en el orden de los proyectos, con lo que tardó cada control');
 });
 
 /** Carpeta con un proyecto arriba y otro en el nivel 6 (n1/…/n5/hondo). */

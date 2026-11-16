@@ -67,4 +67,19 @@ function shortHash(s) {
   return crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 10);
 }
 
-module.exports = { IS_WIN, truncateMiddle, findProjectRoot, canonicalCase, isInside, relPosix, shortHash };
+/**
+ * map asíncrono con tope de tareas a la vez. El resultado conserva el orden de `items` (no el de término), así la
+ * salida es la misma con 1 o con N a la vez. Con tope 1 equivale a un for…await secuencial.
+ */
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) { const i = next++; out[i] = await fn(items[i], i); }
+  };
+  const n = Math.max(1, Math.min(Math.floor(Number(limit)) || 1, items.length));
+  await Promise.all(Array.from({ length: n }, worker));
+  return out;
+}
+
+module.exports = { IS_WIN, truncateMiddle, findProjectRoot, canonicalCase, isInside, relPosix, shortHash, mapLimit };

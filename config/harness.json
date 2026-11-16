@@ -23,6 +23,8 @@
     "presupuestoSeg": 600,
     "_maxBloqueos": "veces seguidas que se impide terminar el turno con controles fallidos u obligatorios sin verificar. Agotarlas NO aprueba nada. Para afirmar que un error ya existía, toma la línea base sobre el último commit sin cambios: sdd-harness.js linea-base.",
     "maxBloqueos": 2,
+    "_paralelo": "en un espacio con varios proyectos (carpeta con varios repos o workspace), cuántos se verifican a la vez al terminar el turno. El turno espera al más lento y no a la suma de todos; el presupuesto de tiempo sigue siendo uno solo. 1 = uno tras otro (úsalo si el equipo se queda corto de CPU o memoria con varios Chrome y builds a la vez). sdd-harness.js registro muestra cuánto tardó cada proyecto y control.",
+    "paralelo": 2,
     "_ejemplos": {
       "android": {
         "tipos": "gradlew.bat compileDebugKotlin",

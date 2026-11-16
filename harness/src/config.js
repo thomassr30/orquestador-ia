@@ -17,6 +17,7 @@ const DEFAULTS = {
     timeoutSeg: 240,               // por comando
     presupuestoSeg: 600,           // total al terminar el turno
     maxBloqueos: 2,                // veces seguidas que se impide terminar con sensores en rojo
+    paralelo: 2,               // proyectos del espacio que se verifican a la vez (1 = uno tras otro)
   },
   permisos: { permitir: [], preguntar: [], denegar: [], mcpLibres: [], mcpBloquear: [], porDefecto: 'ask', permitirSecretos: false },
   salida: { compactar: true, maxCaracteres: 4000 }, // salidas largas de tests/lint/build → errores + resumen
