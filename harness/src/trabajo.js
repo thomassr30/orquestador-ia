@@ -309,6 +309,18 @@ async function verifyTask(root, id, { cfg, sesion, excepciones = [], cambios = [
     for (const c of controls) if (!found.has(c)) controles.push({ nombre: c, estado: 'no_verificado', obligatorio: true, motivo: code.length ? `no hay un comando para «${c}» en este proyecto (configura sensores.comandos.${c})` : 'la tarea no tiene archivos de código' });
     controles.push(...run.results.map(r => ({ nombre: r.nombre, modulo: r.modulo, estado: r.estado, obligatorio: r.obligatorio, motivo: r.motivo, firma: r.firma })));
     if (run.results.length) evs.push({ tipo: 'sensores', estado: combinar(run.results, { excepciones, huella }).estado, resumen: run.results.map(r => ({ nombre: r.nombre, modulo: r.modulo, estado: r.estado })) });
+    // Tarea sin código (documentación, textos de skills): no hay sensores que correr. Sin esto combinar([]) daba
+    // «no verificado» para siempre, aunque el usuario hubiera aceptado. Se comprueba que existan los archivos
+    // declarados y que los criterios manuales estén aceptados por el usuario.
+    if (!code.length) {
+      const faltan = archivos.filter(f => !fs.existsSync(path.resolve(root, f)));
+      const estado = faltan.length ? 'fallido' : 'aprobado';
+      controles.push({ nombre: 'archivos', estado, obligatorio: true, motivo: faltan.length ? `no existen: ${faltan.join(', ')}` : '', firma: faltan.length ? shortHash(faltan.sort().join('|')) : undefined });
+      evs.push({ tipo: 'archivos', estado, motivo: faltan.length ? `no existen: ${faltan.join(', ')}` : `${archivos.length} archivo(s) presentes` });
+      for (const c of crits.filter(k => k.manual)) {
+        controles.push({ nombre: `aceptación ${c.id}`, estado: t0.aceptado ? 'aprobado' : 'no_verificado', obligatorio: true, motivo: t0.aceptado ? 'aceptado por el usuario' : 'requiere la aceptación del usuario' });
+      }
+    }
     for (const c of crits.filter(k => k.comando)) {
       const r = await runShell(c.comando, { cwd: root, timeoutMs: (cfg.sensores.timeoutSeg || 240) * 1000 });
       const estado = r.timedOut ? 'no_verificado' : r.code === 0 ? 'aprobado' : 'fallido';

@@ -587,6 +587,7 @@ async function trabajo() {
       if (!id) { console.log('Uso: trabajo verificar <tarea>'); process.exitCode = 2; return; }
       const r = await T.verifyTask(root, id, { cfg: loadConfig(root), sesion: last.sesion, excepciones: last.excepciones || [], cambios: last.cambios || [] });
       for (const c of r.controles) console.log(`${SIMBOLO[c.estado] || '•'} ${c.nombre}${c.modulo && c.modulo !== '.' ? ` [${c.modulo}]` : ''}: ${ETIQUETA[c.estado]}${c.motivo ? ` (${c.motivo})` : ''}`);
+      if (!r.controles.length) console.log(`• ${ETIQUETA[r.resultado.estado]}: ${r.resultado.motivo}`);
       out(r);
       if (r.sinProgreso) console.log('La tarea quedó bloqueada por falta de progreso: detente y consulta al usuario.');
       process.exitCode = verificadoEstado(r.resultado.estado) ? 0 : 1;

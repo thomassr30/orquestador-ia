@@ -4,7 +4,7 @@ Resuelto en 3.0.0 (2026-11-03): resultado de evaluaciones, fallo que persiste tr
 
 Resuelto en 3.1.0 (2026-11-06 y 2026-11-08): GATE invertido con banco de frases, «~» y variables de home en comandos, «sin sdd» en contenido pegado, tickets de Azure Boards en el GATE, clasificación MCP de Azure DevOps, runner de tests por proyecto (Karma fuera de Angular, modo observación, Mocha y Jasmine), registro de preguntas abiertas, aviso de contexto recortado y Azure DevOps (registro del MCP remoto, wiki, planes de prueba y pipelines, escritura por «action», flujo del work item al plan y MCP por proyecto con un servidor por organización) worktrees, el anuncio previo de las operaciones del orquestador y la selección de skills por proyecto.
 
-## Abierto (11)
+## Abierto (10)
 
 - [ ] Integración real por cliente (doctor nivel d) sin confirmar: requiere instalar 3.0.0 y usar cada cliente; Cursor no instalado en este equipo.
 - [ ] Ejecutar CI en macOS/Linux (solo se probó en Windows localmente). 2026-11-03: corregidos el test que dependía de ~/.claude/settings.json y la lectura de stdin (EAGAIN); falta ver el CI en verde. 2026-11-06: la suite completa corre en 65 s en Linux (214 pruebas, 213 pass + 1 skip por disco sensible a mayúsculas); medir sobre una carpeta montada por red o por puente da 19 s por spawn y no sirve de referencia.
@@ -16,10 +16,11 @@ Resuelto en 3.1.0 (2026-11-06 y 2026-11-08): GATE invertido con banco de frases,
 - [ ] Decisión del usuario · npm: package.json sigue con `private: true` y sin `bin` ni `files`, y existe la carpeta vacía changes/2026-10-30-publicar-orquestador-sdd-en-npm-sin-depe. Publicar (agregar bin y files, quitar private) o borrar la carpeta.
 - [ ] Decisión del usuario · partir README.md (798 líneas: portada, manual, referencia de configuración y seguridad en un solo archivo). Falta definir qué se va a docs/.
 - [ ] Decisión del usuario · issues de GitHub/GitLab: siguen denegados. Aplicarles el criterio de «tracker con confirmación, código bloqueado» que ya tiene Azure cambiaría una garantía declarada en SECURITY.md; sus nombres de herramienta (create_issue, add_issue_comment) no distinguen tracker de repositorio.
-- [ ] trabajo.js `verifyTask`: una tarea que solo toca documentación (.md) y cuyos criterios son todos `manual` nunca puede quedar verificada, porque no corre ningún control y `combinar([])` devuelve no_verificado (T-03 del trabajo de commit llegó a 13 intentos). Además, `trabajo verificar` imprime solo «en curso», sin el motivo. Visto 2026-11-10.
 - [ ] Decisión del usuario · Node 18 está fuera de soporte y sigue en engines y en la matriz de CI (3 SO x 4 versiones). La suite corre en 52 s, así que la matriz completa no es cara: es solo si vale la pena seguir probando 18.
 
 ## Resuelto (se conserva por el límite que dejó)
+
+- [x] `verifyTask` con tareas solo de documentación: resuelto 2026-11-15. Sin archivos de código se comprueba que existan los declarados (control «archivos») y los criterios manuales cuentan con la aceptación del usuario; `trabajo verificar` imprime el motivo aunque no corra ningún control. Límite: no revisa el contenido de los .md, eso lo decide el usuario al aceptar.
 
 - [x] Compactador en Claude (claude.js:25): resuelto 2026-11-03 con la opción a (adapters/claude-permisos.js). Límite: no ve políticas por registro, perfil de macOS, servidor ni --allowedTools/--disallowedTools.
 - [x] «sin sdd» dentro de contenido pegado: resuelto 2026-11-06 (gate.js `switchScope`): la frase solo cuenta en mensajes cortos que no parecen log ni código. Límite: sigue siendo heurística (un mensaje corto que sea solo esa línea pegada la tomaría como instrucción).

@@ -130,6 +130,49 @@ test('las evidencias de fin de turno tomadas en curso no vencen una verificació
   assert.strictEqual(T.status(d).tareas[0].estado, 'por_reverificar');
 });
 
+test('tarea solo de documentación: se verifica con los archivos presentes y la aceptación del usuario', async () => {
+  const plan = {
+    objetivo: 'documentar el exportador',
+    requisitos: [{ id: 'REQ-01', texto: 'la guía explica la exportación', criterios: [{ id: 'CA-01', texto: 'el usuario acepta la guía', manual: true }] }],
+    tareas: [{ id: 'T-01', titulo: 'guía', requisitos: ['REQ-01'], archivos: ['docs/guia.md'] }],
+  };
+  const d = await approved({ 'docs/guia.md': '# Guía' }, plan);
+  T.startTask(d, 'T-01');
+  const cfg = loadConfig(d);
+  const r1 = await T.verifyTask(d, 'T-01', { cfg, sesion: 's' });
+  assert.strictEqual(r1.resultado.estado, 'no_verificado', 'sin aceptación no se da por verificada');
+  assert.strictEqual(r1.tarea.estado, 'en_curso');
+  assert.ok(r1.controles.some(c => c.nombre === 'archivos' && c.estado === 'aprobado'));
+  assert.ok(r1.controles.some(c => c.nombre === 'aceptación CA-01' && /requiere la aceptación/.test(c.motivo)));
+  T.accept(d, { motivo: 'leída' });
+  const r2 = await T.verifyTask(d, 'T-01', { cfg, sesion: 's' });
+  assert.strictEqual(r2.tarea.estado, 'verificada', 'antes quedaba «no verificado» para siempre: combinar([])');
+  assert.ok(r2.evidencias.length, 'deja evidencia del harness');
+});
+
+test('tarea solo de documentación con un archivo declarado que no existe: falla y dice cuál', async () => {
+  const plan = {
+    objetivo: 'documentar',
+    requisitos: [{ id: 'REQ-01', texto: 'guías', criterios: [{ id: 'CA-01', texto: 'el usuario las acepta', manual: true }] }],
+    tareas: [{ id: 'T-01', titulo: 'guías', requisitos: ['REQ-01'], archivos: ['docs/guia.md', 'docs/falta.md'] }],
+  };
+  const d = await approved({ 'docs/guia.md': '# Guía' }, plan);
+  T.startTask(d, 'T-01');
+  T.accept(d);
+  const r = await T.verifyTask(d, 'T-01', { cfg: loadConfig(d), sesion: 's' });
+  assert.strictEqual(r.resultado.estado, 'fallido');
+  assert.match(r.resultado.motivo, /archivos/);
+  assert.ok(r.controles.some(c => c.nombre === 'archivos' && /docs\/falta\.md/.test(c.motivo)));
+});
+
+test('una tarea con código no suma el control de archivos ni depende de la aceptación', async () => {
+  const d = await approved();
+  T.startTask(d, 'T-01');
+  const r = await T.verifyTask(d, 'T-01', { cfg: loadConfig(d), sesion: 's' });
+  assert.strictEqual(r.tarea.estado, 'verificada');
+  assert.ok(!r.controles.some(c => c.nombre === 'archivos' || /^aceptación/.test(c.nombre)));
+});
+
 test('un comando de aceptación que falla impide verificar; el «sin progreso» bloquea la tarea al tercer intento igual', async () => {
   const plan = { ...PLAN, requisitos: [{ id: 'REQ-01', texto: 'x', criterios: [{ id: 'CA-01', texto: 'aceptación', comando: `"${NODE}" -e "console.log('falla igual');process.exit(1)"` }] }] };
   const d = await approved({}, plan);

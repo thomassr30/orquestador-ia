@@ -13,6 +13,10 @@
 - **Lo que decide el usuario nunca queda preaprobado**: `aprobar`, `directo`, `liberar`, `excepcion` y `trabajo aceptar|descartar` (`rules.HARNESS_USER_ONLY`) quedan en `ask`/`prompt` donde el cliente lo permite. En Gemini y en todos los clientes los sigue bloqueando el hook del harness. `deshacer --confirmar`, `perfil … --confirmar`, `workspace --aplicar` y `worktree` los sigue confirmando el harness.
 - `sdd-improve.js` entra en la lista de scripts propios, como ya lo trataba la política.
 
+### Las tareas de documentación ya se pueden verificar
+- **`trabajo verificar` en una tarea sin código** (README, textos de skills) quedaba «no verificado» para siempre: no corría ningún sensor y `combinar([])` no aprueba nada, aunque el usuario hubiera aceptado. Ahora comprueba que existan los archivos declarados (control `archivos`) y toma los criterios `manual` como aprobados cuando el usuario aceptó el trabajo. Las tareas con código no cambian.
+- `trabajo verificar` imprime el motivo cuando no corre ningún control, en vez de mostrar solo el estado de la tarea.
+
 ### El plan se cruza con el proyecto, y las fuentes externas no fallan calladas
 - **`trabajo plan` exige el cruce con el código.** Cada tarea tiene que declarar los archivos que toca, y al menos uno de los declarados en todo el plan tiene que existir ya. Un plan armado solo con el ticket y el Figma no nombra ningún archivo real, y eso ahora se rechaza al registrarlo en vez de aparecer al verificar, cuando ya se aprobó y se desarrolló. Para lo que de verdad arranca de cero: `trabajo plan … --sin-base "motivo"`, que queda registrado y se muestra junto al plan y en el resumen que lee el agente.
 - **Aviso al mencionar un ticket o un Figma.** En el primer mensaje donde aparece una clave de ticket o un enlace de Figma, el harness recuerda tres cosas: confirmar el acceso con una llamada barata antes de la lectura completa, reportar de inmediato lo que no responda o vuelva vacío en vez de reintentar en silencio, y cruzar el plan con el código existente. Va en `UserPromptSubmit`, que ya corría: no agrega llamadas de hook.
